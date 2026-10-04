@@ -71,6 +71,14 @@ namespace BeastCraft.Spike55.Live3D
         // BoneOutlineMask comment for what the fix turned out to be.
         public bool PilotNoOutline;
 
+        // Round 17 (producer review -- KO's lie-down redo): a straight-down camera, the same
+        // pattern as PilotSideCamera above, so a flat-on-the-ground pose can actually be judged
+        // from directly overhead -- the default 3/4 battle camera auto-fits its orthographic
+        // projection to the instance's current bounds every frame (see ApplyCamera), which keeps
+        // the subject nicely framed but means it never visibly "sinks" toward a ground reference
+        // as the body lowers, making a lying-down pose hard to confirm from that angle alone.
+        public bool PilotTopCamera;
+
         public static LaunchOptions Parse(string[] args)
         {
             var o = new LaunchOptions();
@@ -140,6 +148,9 @@ namespace BeastCraft.Spike55.Live3D
                         break;
                     case "--pilot-no-outline":
                         o.PilotNoOutline = true;
+                        break;
+                    case "--pilot-top-camera":
+                        o.PilotTopCamera = true;
                         break;
                     default:
                         Console.Error.WriteLine("Unrecognised argument: " + args[i]);

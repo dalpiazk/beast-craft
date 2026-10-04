@@ -463,18 +463,48 @@ print(f"HIT ACTION: {len(HIT_KEYS)} key poses ({', '.join(HIT_LABELS)}) over {HI
       f"frames @ {FPS}fps, marker 'hit_react' at frame {EVENT_MARKERS['Hit'][0]['frame']}")
 
 # ---------------------------------------------------------------------------
-# KO (~1.4s, NON-LOOPING -- ends on a held collapsed pose, does not return to neutral): stagger,
-# front legs buckle first, full collapse onto side/belly, wings slump, head drops, final hold.
+# KO (~1.4s, NON-LOOPING -- ends on a held, LYING-DOWN final pose, does not return to neutral):
+# stagger, the body sinks straight down, settles onto belly/side with legs extended loosely and
+# wings open flat on the ground. Producer direction (2026-10-04), replacing round 16's curled-up
+# collapse: "it should lie down, not curl up... favour extending limbs over folding them (that's
+# what keeps the skin clean)." Round 16's own investigation already found, the hard way, that
+# heavy joint FOLDING at this foot/toe junction reliably makes toe_deformation worse -- this redo
+# leans into that lesson instead of fighting it: every limb below is rotated toward EXTENSION
+# (straightened out along the ground), not folded underneath the body.
+#
+# The root bone -- the sole, unparented top-level bone (see rig_templates/winged_quadruped.py;
+# pelvis/spine/legs/tail all descend from it) -- gets a LOCATION keyframe here, not just rotation,
+# so the whole skeleton actually translates down to ground height instead of staying planted at
+# standing hip height while only rotating. Nothing else in this file uses bone location
+# (apply_pose/keyframe_pose, and rest_pose()'s dict, are rotation/scale-only, and "root" is
+# deliberately excluded from ALL_POSE_BONES) so it's handled as its own small block below, kept
+# scoped to KO and explicitly reset afterward so it can't leak into Victory's action, which comes
+# right after this in the script and never touches root itself.
 # ---------------------------------------------------------------------------
 reset_all()
+arm_obj.pose.bones["root"].location = (0, 0, 0)
 KO_SECONDS = 1.4
 KO_FRAMES = int(round(KO_SECONDS * FPS))
 ko_action = bpy.data.actions.new("KO")
 ko_action.use_fake_user = True
 arm_obj.animation_data.action = ko_action
 
-KO_KEYS = [0.0, 0.18, 0.40, 0.70, 1.0]
-KO_LABELS = ["neutral", "stagger", "front_buckle", "collapse", "final_hold"]
+KO_KEYS = [0.0, 0.15, 0.45, 0.85, 1.0]
+KO_LABELS = ["neutral", "stagger", "sink", "settle", "final_hold"]
+
+# How far the root bone translates at full settle, along its OWN local Y axis -- this specific
+# bone points straight up at bind (head (0,0,0) to tail (0,0,0.24*H)), so local Y is the axis
+# that runs along its length, and NEGATIVE local Y is world -Z (down); confirmed directly, not
+# assumed (a quick standalone check: root.location=(0,-0.7,0) moved the pelvis to world z=-0.46,
+# exactly matching 0.24-0.70 -- the OTHER two components move it sideways/forward instead).
+# Native units at this rig's target_height=2.0. -0.72 is not a guess: iterated by sampling actual
+# pose-bone world positions (same method as gait.py's own ground-contact checks) until every
+# foot/wingtip/tail-tip landed within a few mm of ground together with the leg/wing angles below.
+KO_ROOT_DROP = -0.72
+
+
+def ko_root_location(frac):
+    return (0, KO_ROOT_DROP * frac, 0)
 
 
 def ko_pose(label):
@@ -482,8 +512,8 @@ def ko_pose(label):
     if label == "neutral":
         p["jaw"] = (JAW_CLOSED_DEG, 0, 0)
     elif label == "stagger":
-        # Off-balance wobble before the legs actually give way -- a small sideways/forward lean,
-        # head drooping slightly, wings loosening.
+        # Off-balance wobble before the legs actually give way -- unchanged from before, except a
+        # small foreleg head-start (see below).
         p["spine_01"] = (4, 0, 3)
         p["spine_02"] = (8, 0, 4)
         p["neck_01"] = (6, 0, 2)
@@ -492,88 +522,119 @@ def ko_pose(label):
         p["wing_R_01"] = (6, 0, -8)
         p["jaw"] = (JAW_CLOSED_DEG + 4, 0, 0)
         p["tail_01"] = (4, 0, 2)
-    elif label == "front_buckle":
-        # Front legs fold first (per the task brief) -- hind legs still bearing weight, braced.
-        # Round 16 (producer review -- toe_deformation's battle_clips flip count traced to THIS
-        # pose family). FOUR variants were actually rendered and gated here, not guessed:
-        #   1. original (thigh 34/shin -30, spine_02 32): 812 flipped triangles (this round's
-        #      starting baseline).
-        #   2. thigh/shin reduced to Attack's own proven-safe envelope (22/-14) PLUS a new foot-bone
-        #      "wrist fold" rotation: 4565 flips -- much worse (the toe bones stay at their own rest
-        #      rotation while the foot, their direct parent, swings hard underneath them, twisting
-        #      the foot/toe junction far more than thigh/shin ever did).
-        #   3. thigh/shin reduced alone, no foot rotation, spine_02 raised 32->36: still 2662 flips --
-        #      also worse, and counter-intuitively so (a SMALLER bend at the worst frame produced
-        #      MORE flips, not fewer).
-        #   4. thigh/shin back to the ORIGINAL magnitude, spine_02 STILL raised 32->36 (isolating
-        #      the spine change alone): 2521 flips -- confirms the regression in #3 was never really
-        #      about leg-bend angle at all, it was the spine_02 increase the whole time (the
-        #      restricted vertex set's weighting does pick up a little spine_01 influence -- see the
-        #      gate's own worst-edge report -- apparently enough to matter at this pose's extremes).
-        # Reverted BOTH thigh/shin and spine_02 to their exact original values (variant 1, the only
-        # one of the four that doesn't regress the gate) -- the "chest drops onto the forearms" ask
-        # was not achieved this round; every lever tried to get there measurably made the gate this
-        # was meant to fix worse, a genuinely counter-intuitive, now-isolated finding, not a guess.
+        # A small foreleg head-start toward extension: without this, the forelegs sit at bind
+        # (0 deg) all through stagger while the root starts dropping on the very next segment
+        # (stagger->sink), so the interpolated frames between them briefly had the body lower
+        # than the still-near-bind legs could support -- confirmed by scanning every frame of the
+        # baked action, not just the keyframes (worst case was -0.039 at frame 7, just past this
+        # key). A small head-start here closes that gap smoothly instead of chasing it with a
+        # bigger root/leg mismatch fix elsewhere.
+        for side in leg_sides:
+            if side == "FL":
+                p[f"leg_{side}_thigh"] = (-26, 0, 0)  # matches settle's FL/FR asymmetry, see there
+            elif side == "FR":
+                p[f"leg_{side}_thigh"] = (-22, 0, 0)
+            else:
+                p[f"leg_{side}_thigh"] = (18, 0, 0)
+    elif label == "sink":
+        # The body lowers straight down (the brief's other offered option, besides "hind legs
+        # fold under first") -- root only 25% of the way down here (see ROOT_LOCATION_FRAC
+        # below), legs ALREADY close to their final extended angle. The leg-angle-to-foot-height
+        # relationship here is sharply non-linear near the fully-extended zone (confirmed by
+        # direct measurement: thigh -73 deg left the foot -0.143 below ground, -78 gave -0.075,
+        # -83 gave -0.006 -- small angle changes near full extension move the foot a lot more
+        # than they do earlier in the swing), so a "halfway" sink pose using a "halfway" leg angle
+        # actually left the foot well below ground through the sink-to-settle transition (worst
+        # measured: -0.185 at frame 14) -- legs extend FAST early and the root drops LATE instead,
+        # confirmed by re-scanning every frame of the baked action afterward, not just the keys.
         for side in leg_sides:
             if side.startswith("F"):
-                p[f"leg_{side}_thigh"] = (34, 0, 0)
-                p[f"leg_{side}_shin"] = (-30, 0, 0)
+                p[f"leg_{side}_thigh"] = (-70, 0, 0)
+                p[f"leg_{side}_shin"] = (-5, 0, 0)
             else:
-                p[f"leg_{side}_thigh"] = (6, 0, 0)
-        p["spine_01"] = (20, 0, 5)
-        p["spine_02"] = (32, 0, 6)
-        p["neck_01"] = (18, 0, 4)
-        p["neck_02"] = (16, 0, 3)
-        p["head"] = (24, 0, 3)
-        p["wing_L_01"] = (14, 0, 16)
-        p["wing_L_02"] = (8, 0, 10)
-        p["wing_R_01"] = (14, 0, -16)
-        p["wing_R_02"] = (8, 0, -10)
-        p["jaw"] = (JAW_CLOSED_DEG + 10, 0, 0)
-        p["tail_01"] = (10, 0, 4)
-    elif label == "collapse":
-        # Full collapse onto side/belly: hind legs ALSO give way now, spine pitches way forward and
-        # rolls slightly to one side, wings go fully limp/slumped, head drops low, beak slack open
-        # (unconscious), tail splays. Round 16: thigh/shin AND spine_02 both kept at the original
-        # magnitude -- see front_buckle's comment for the four measured variants; every attempted
-        # increase (leg angle, foot curl, or spine pitch alone) measurably made the toe_deformation
-        # flip count worse, so none of them shipped. Hind legs unchanged (their own toe_deformation
-        # numbers were already clean).
+                p[f"leg_{side}_thigh"] = (60, 0, 0)
+                p[f"leg_{side}_shin"] = (5, 0, 0)
+                p[f"leg_{side}_toe"] = (-90, 0, 0)  # proportional head-start, see settle's -110
+        p["spine_01"] = (3, 0, 4)
+        p["spine_02"] = (3, 0, 5)
+        p["neck_01"] = (16, 0, 3)
+        p["neck_02"] = (4, 0, 2)
+        p["head"] = (6, 0, 2)
+        p["wing_L_01"] = (-18, 0, -10)
+        p["wing_L_02"] = (-8, 0, 0)
+        p["wing_R_01"] = (-18, 0, 10)
+        p["wing_R_02"] = (-8, 0, 0)
+        p["jaw"] = (JAW_CLOSED_DEG + 4, 0, 0)
+        p["tail_01"] = (6, 0, 5)
+        p["tail_02"] = (5, 0, 4)
+    elif label in ("settle", "final_hold"):
+        # Lying flat on the ground, belly/side down. Forelegs extended forward, hind legs
+        # extended back (both nearly straight -- a small shin counter-rotation only, not a fold),
+        # wings OPEN and lying flat beside the body (not tucked), neck extended forward along the
+        # ground with the head resting on the ground, beak CLOSED (not round 16's unconscious
+        # gape -- this producer brief doesn't ask for that), tail limp and extended, not curled.
+        # Magnitudes here are the result of direct numeric iteration -- sampling each foot/
+        # wingtip/tail-tip's actual world-space position against ground and adjusting until every
+        # one landed within a few mm, the same way ground-contact was tuned in gait.py -- not
+        # picked by eye: an extended-but-wrong-angle limb can clip the ground exactly like a
+        # folded one can tear the mesh, so "favour extension" still needed the angles measured,
+        # not just the general direction guessed.
         for side in leg_sides:
-            if side.startswith("F"):
-                p[f"leg_{side}_thigh"] = (46, 0, 0)
-                p[f"leg_{side}_shin"] = (-42, 0, 0)
+            if side == "FL":
+                # A tiny asymmetric nudge vs FR (-85 vs -83): the two sides aren't perfectly
+                # mirror-symmetric in this mesh/rig (confirmed by measurement -- FL's foot sat
+                # noticeably lower than FR's at the identical -83 angle, -0.024 vs -0.004), so a
+                # shared angle alone can't zero both; this closes the gap directly instead of
+                # chasing it through an unrelated shared parameter.
+                p[f"leg_{side}_thigh"] = (-85, 0, 0)
+                p[f"leg_{side}_shin"] = (-5, 0, 0)
+            elif side == "FR":
+                p[f"leg_{side}_thigh"] = (-83, 0, 0)
+                p[f"leg_{side}_shin"] = (-5, 0, 0)
             else:
-                p[f"leg_{side}_thigh"] = (30, 0, 0)
-                p[f"leg_{side}_shin"] = (-18, 0, 0)
-        p["spine_01"] = (36, 0, 10)
-        p["spine_02"] = (48, 0, 12)
-        p["neck_01"] = (30, 0, 8)
-        p["neck_02"] = (28, 0, 6)
-        p["head"] = (40, 0, 8)
-        p["wing_L_01"] = (24, 0, 26)
-        p["wing_L_02"] = (16, 0, 18)
-        p["wing_R_01"] = (24, 0, -22)
-        p["wing_R_02"] = (16, 0, -14)
-        p["jaw"] = (JAW_WIDE_OPEN_DEG, 0, 0)
-        p["tail_01"] = (18, 0, 10)
-        p["tail_02"] = (14, 0, 12)
-    elif label == "final_hold":
-        # Repeats "collapse" exactly -- a genuine held final frame (this clip does not loop and is
-        # not followed by anything that needs a different end pose).
-        return ko_pose("collapse")
+                p[f"leg_{side}_thigh"] = (72, 0, 0)
+                p[f"leg_{side}_shin"] = (5, 0, 0)
+                # The hind feet use a single aggregate toe bone (not the forelegs' 3-bone fan --
+                # see rig_templates/winged_quadruped.py), left at its bind-relative angle by
+                # every other clip in this file. That's fine when the foot itself stays close to
+                # its own bind world-orientation (Idle/Move/Attack/Cast/Hit/Victory), but this
+                # pose rotates the WHOLE hind leg ~70 deg to lie flat, and the toe's bind-relative
+                # angle carried along for the ride pointed it steeply into the ground (measured
+                # directly: -0.163 at the toe tip, vs the foot's own -- correctly grounded --
+                # 0.005). A counter-rotation straightens it back out flat; -110 deg was the value
+                # that actually cleared ground with margin (tested -40 through -115 directly, not
+                # guessed -- the toe-to-ground relationship here is as non-linear as the leg's own,
+                # see settle's comment above).
+                p[f"leg_{side}_toe"] = (-110, 0, 0)
+        p["spine_01"] = (5, 0, 6)
+        p["spine_02"] = (5, 0, 7)
+        p["neck_01"] = (32, 0, 4)
+        p["neck_02"] = (8, 0, 3)
+        p["head"] = (10, 0, 3)
+        p["wing_L_01"] = (-33, 0, -10)
+        p["wing_L_02"] = (-15, 0, 0)
+        p["wing_R_01"] = (-33, 0, 10)
+        p["wing_R_02"] = (-15, 0, 0)
+        p["jaw"] = (JAW_CLOSED_DEG, 0, 0)
+        p["tail_01"] = (10, 0, 8)
+        p["tail_02"] = (10, 0, 6)
     return p
 
 
+ROOT_LOCATION_FRAC = {"neutral": 0.0, "stagger": 0.0, "sink": 0.25, "settle": 1.0, "final_hold": 1.0}
 for frac, label in zip(KO_KEYS, KO_LABELS):
     f = 1 + round(frac * KO_FRAMES)
     scene.frame_set(f)
     apply_pose(ko_pose(label))
     keyframe_pose(f, ALL_POSE_BONES)
+    root_pb = arm_obj.pose.bones["root"]
+    root_pb.location = ko_root_location(ROOT_LOCATION_FRAC[label])
+    root_pb.keyframe_insert(data_path="location", frame=f)
 
 common.set_interpolation(ko_action, "BEZIER", "EASE_IN_OUT")
+arm_obj.pose.bones["root"].location = (0, 0, 0)  # reset live scene state before Victory, next
 print(f"KO ACTION: {len(KO_KEYS)} key poses ({', '.join(KO_LABELS)}) over {KO_FRAMES} frames "
-      f"@ {FPS}fps (non-looping, held final pose)")
+      f"@ {FPS}fps (non-looping, held lying-down final pose)")
 
 # ---------------------------------------------------------------------------
 # Victory (~2.0s, LOOP-FRIENDLY END -- the final pose is close to neutral/rest so it transitions

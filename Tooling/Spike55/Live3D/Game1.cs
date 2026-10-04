@@ -768,7 +768,12 @@ namespace BeastCraft.Spike55.Live3D
             // the side camera is yaw=0 (not the battle camera's 35), with a shallower tilt so the
             // gait's fore-aft leg swing reads clearly instead of being foreshortened by elevation.
             // Every other mode is completely unaffected.
-            float tiltDeg = _options.PilotSideCamera ? 10f : CameraTiltDeg;
+            //
+            // Round 17: --pilot-top-camera looks straight down (tilt=90) -- same idea as the side
+            // camera above, a dedicated angle for judging a pose the default 3/4 battle camera
+            // can't show clearly (there, a flat-on-the-ground pose; here, whether limbs/wings are
+            // splayed out to the sides correctly when seen from directly overhead).
+            float tiltDeg = _options.PilotTopCamera ? 89.9f : _options.PilotSideCamera ? 10f : CameraTiltDeg;
             float yawDeg = _options.PilotSideCamera ? 0f : CameraYawDeg;
             float tilt = MathHelper.ToRadians(tiltDeg);
             float yaw = MathHelper.ToRadians(yawDeg);

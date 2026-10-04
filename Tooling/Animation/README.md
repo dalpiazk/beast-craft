@@ -880,6 +880,112 @@ constant), still well under the 2 MiB budget; 7 NLA clips; events sidecar now al
 map. Live3D gates green: build 0 warnings, `dotnet format` clean, BeastCraft.Desktop build 0 warnings,
 EditModeTests 1663/1663 passed, `git diff main --stat -- src .github BeastCraft.slnx` empty.
 
+## v17: KO redone to lie down instead of curling up -- a real new mechanism (root-bone translation),
+## ground-clearance/held-pose gates genuinely pass, edge-stretch/toe_deformation stretch targets
+## honestly NOT met (producer review round 17)
+
+Producer direction (2026-10-04): round 16's KO read as curling up, not lying down. "Legs and wings
+may lie flat on the ground... favour extending limbs over folding them." Redone from scratch.
+
+### What changed
+
+KO's pose sequence is now `neutral -> stagger -> sink -> settle -> final_hold` (previously `neutral ->
+stagger -> front_buckle -> collapse -> final_hold`). The body SINKS STRAIGHT DOWN (the brief's other
+offered option, alongside "hind legs fold under first") rather than buckling forward, and settles
+belly/side-down with every limb rotated toward EXTENSION, not folding: forelegs stretched forward,
+hind legs stretched back, wings open and lying flat beside the body, neck extended forward along the
+ground with the head resting on it, beak CLOSED (not round 16's unconscious gape -- this brief didn't
+ask for that), tail limp and extended, not curled.
+
+**A genuinely new mechanism for this file:** the root bone -- the sole, unparented top-level bone (see
+`rig_templates/winged_quadruped.py`; pelvis/spine/legs/tail all descend from it) -- now gets a
+LOCATION keyframe, not just rotation, so the skeleton actually translates down to ground height
+instead of staying planted at standing hip height while only rotating. Nothing else in `keyed.py` had
+ever used bone location before (`apply_pose`/`keyframe_pose`/`rest_pose()` are rotation/scale-only,
+and `root` is deliberately excluded from `ALL_POSE_BONES`), so it's handled as its own small block,
+scoped to KO and explicitly reset afterward so it can't leak into Victory's action right after it.
+
+Every angle was arrived at by direct numeric measurement, not picked by eye: a standalone Blender
+check first confirmed WHICH of `root.location`'s three components actually maps to world-Z movement
+for this specific bone (it's the local-Y component, since `root` points straight up at bind -- the
+other two move it sideways/forward instead), then each limb's rotation was iterated by sampling its
+actual world-space foot/wingtip/tail-tip position against ground and adjusting until every one landed
+within a few mm, the same method already used for gait.py's own ground-contact tuning. This surfaced
+two real findings worth recording:
+- The leg-angle-to-foot-height relationship is sharply non-linear near full extension (thigh -73 deg
+  left the foot -0.143 below ground, -78 gave -0.075, -83 gave -0.006 -- a "halfway" angle is not
+  remotely halfway in foot-height terms), which is why the `sink` transition pose extends the legs
+  MOST of the way early rather than linearly, with the root dropping late instead -- an initial
+  halfway-everything version left the foot -0.185 below ground mid-transition.
+- The forelegs are not perfectly mirror-symmetric in this mesh/rig: an identical -83 deg angle left
+  FL's foot measurably lower than FR's (-0.024 vs -0.004) -- closed with a small asymmetric nudge
+  (-85 vs -83) rather than chased through an unrelated shared parameter.
+- The hind feet's single aggregate toe bone (not the forelegs' 3-bone fan) was left at its bind-
+  relative angle by every other clip in this file, which is fine when the foot stays near its own
+  bind world-orientation -- but this pose rotates the whole hind leg ~70 deg, and the toe's bind-
+  relative angle carried along for the ride pointed it steeply into the ground (-0.163 at the tip,
+  vs the foot's own correctly-grounded 0.005). A counter-rotation (-110 deg, tested -40 through -115
+  directly) straightens it back out.
+
+### New tooling: `--pilot-top-camera`
+
+The default 3/4 battle camera auto-fits its orthographic projection to the instance's current bounds
+every frame (`Game1.ApplyCamera`), which keeps the subject nicely framed but means a body that's
+genuinely sinking toward the ground never visibly "sinks" on screen -- the camera just re-centers and
+re-scales around it. This made the regular contact sheet genuinely hard to read as "lying down" even
+though the pose was correct (confirmed the data was right via a direct GLB inspection before doubting
+the pose itself). Added `--pilot-top-camera` (same pattern as the existing `--pilot-side-camera`,
+`LaunchOptions.PilotTopCamera`, `Game1.CameraDir`) -- a straight-down view, for exactly the kind of
+pose the overhead angle is the right tool to judge. Between the existing side camera and this new top
+camera, the lying-down pose reads clearly: the side view shows the body visibly lower in later frames,
+legs extending, wings dropping to the ground; the top-down view shows the full "starfish" silhouette --
+head and forelegs forward, wings spread flat to both sides, hind legs and tail trailing behind.
+
+### Gates
+
+New KO-specific gates added to `verify.py` (KO was previously excluded from ground-interpenetration
+entirely -- "a full collapse onto the ground by design" -- that exclusion no longer makes sense now
+that the ground is where the body is actually meant to rest):
+- **Final pose held:** compares the `settle` keyframe to the action's last frame (both are authored
+  as the identical pose) -- **0.000 deg/units delta, PASS**.
+- **Ground interpenetration** (feet/toes all 4 legs toe-fan-aware, wingtips, tail tip, head; every
+  frame of the action, not just the held end; producer's own tighter -0.005 tolerance, not the rest
+  of this file's established -0.01) -- **every chain passes**, worst case 0.0029 (right at the
+  tolerance, the rest comfortably positive).
+- **Jitter:** unaffected, still passes (0.00040 mean / 0.01323 max).
+
+**Honestly NOT met:** the producer's edge-stretch (<=1.6x) and toe_deformation stretch (<=1.35x)
+targets for KO. `KO max edge-stretch: 7.50x` (same vertex pair -- `leg_FR_thigh`/`pelvis`/`spine_01` --
+implicated in Move's 9.56x and Attack's 3.32x, the SAME pre-existing, unresolved weight-painting
+fragility documented since round 9, now stressed further by this pose's extreme leg extension).
+`toe_deformation` for KO: 1.892x worst stretch (fails 1.35x) but **0 flipped triangles** (round 16's
+curled-up version had 674 -- this really is a genuine improvement on the flip count, even though the
+stretch-ratio target isn't met). Given the demonstrated non-linear, sometimes counter-intuitive
+relationship between leg angle and both ground-clearance AND mesh deformation (round 16's own four-
+variant investigation), and that reducing the leg extension to chase this number would directly fight
+the "favour extending limbs" brief this round exists to satisfy, this was not chased further -- it's
+reported honestly as unresolved, in the same family as Move/Attack's own edge-stretch gates, not
+silently dropped or falsely claimed fixed.
+
+### Sheets, stills, MP4s, reel
+
+`scratchpad/anim-pilot/review_v17/contact_ko/` (3/4 battle camera, 10 frames -- hard to read as lying
+down for the reason above, kept for consistency with the other clips' sheets) and `contact_ko_side/`
+(`--pilot-side-camera`, 10 frames -- clearly shows the body progressively lowering, legs extending,
+wings dropping to the ground frame by frame) and `contact_ko_top/` (`--pilot-top-camera`, 10 frames --
+the final frame's "starfish" silhouette is the clearest single confirmation that the pose matches the
+brief). `scratchpad/anim-pilot/video_v17/griffin_ko.mp4` (252 frames @ 60fps, 3x loop of the 84-frame/
+1.4s clip) and `griffin_reel.mp4` (600 frames @ 60fps, 9.96s, idle -> move -> attack -> hit -> cast ->
+victory -> ko) regenerated; both event markers (`hit_react`, `cast_release`) still log exactly once
+at the correct times; the reel's last two captured frames differ by a negligible amount (mean 0.09/255
+per pixel, ~0.15% of pixels) -- the spring-bone layer (tail/wingtip follow-through, layered on top of
+the now-static baked pose) still settling the last fraction of a frame, not the pose itself drifting,
+consistent with the `verify.py` held-pose check's exact 0.000 result on the underlying baked data.
+
+Live3D gates green: build 0 warnings, `dotnet format` clean, BeastCraft.Desktop build 0 warnings,
+EditModeTests 1663/1663 passed, `git diff main --stat -- src .github BeastCraft.slnx` empty. Mesh
+unchanged at 8000 tris / 41 bones; GLB 0.956 MiB (1,002,604 bytes), still under the 2 MiB budget.
+
 ## v9: max-edge-stretch gate + weight/render fixes -- partial progress, honestly not fully resolved
 ## (lead-review round 9)
 

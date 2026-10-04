@@ -264,6 +264,73 @@ if KEYED_BLEND:
             "max_cumulative_head_pitch_deg": max_head_pitch, "pass": ok}
         print(f"  Attack cumulative head pitch max: {max_head_pitch:.1f} deg -> {'PASS' if ok else 'FAIL'}")
 
+    # Round 17 (producer review -- "it should lie down, not curl up"): KO's redo has the root
+    # bone TRANSLATING the whole body down to ground height (a new mechanism for this file -- see
+    # anim/keyed.py's own comment on ko_root_location), so it needs two checks round 15's version
+    # never did: (1) the final pose is actually HELD, not drifting, and (2) nothing (not just toes
+    # -- legs, wings, head, tail) ends up below ground once the body is lying flat. KO was
+    # previously excluded from the ground-interpenetration check entirely ("a full collapse onto
+    # the ground by design") -- that's no longer the right call now that "the ground" is where the
+    # body is actually meant to rest, not an unchecked side effect of a curl-up collapse.
+    ko_action = bpy.data.actions.get("KO")
+    if ko_action:
+        arm_obj.animation_data.action = ko_action
+        f0, f1 = ko_action.frame_range
+        f0, f1 = int(f0), int(f1)
+
+        # Held final pose: "settle" and "final_hold" are authored as the IDENTICAL pose (see
+        # ko_pose()), so every frame from the settle keyframe to the end of the action should be
+        # bit-for-bit static -- compare the settle key's own frame (round(0.85*KO_FRAMES)+1) to
+        # the last frame; any real delta would mean the two keys drifted apart, or the root
+        # location channel (keyframed separately from rotation -- see keyed.py) didn't hold.
+        settle_frame = f0 + round(0.85 * (f1 - f0))
+        max_hold_delta = 0.0
+        root_pb = arm_obj.pose.bones.get("root")
+        for pb in arm_obj.pose.bones:
+            scene.frame_set(settle_frame)
+            r0 = mathutils.Euler(pb.rotation_euler).to_quaternion()
+            l0 = pb.location.copy()
+            scene.frame_set(f1)
+            r1 = mathutils.Euler(pb.rotation_euler).to_quaternion()
+            l1 = pb.location.copy()
+            ang_delta = math.degrees(r0.rotation_difference(r1).angle)
+            loc_delta = (l0 - l1).length
+            max_hold_delta = max(max_hold_delta, ang_delta, loc_delta * 100)  # loc in native units, ~cm-scale
+        hold_ok = max_hold_delta < 0.5
+        report.setdefault("ko", {})["final_pose_held"] = {
+            "settle_frame": settle_frame, "last_frame": f1,
+            "max_delta_deg_or_cm": max_hold_delta, "pass": hold_ok}
+        print(f"  KO final pose held (frame {settle_frame} -> {f1}): max delta {max_hold_delta:.3f} "
+              f"-> {'PASS' if hold_ok else 'FAIL'}")
+
+        # Ground interpenetration, every frame, every chain that can plausibly reach the ground in
+        # a lying-down pose: feet/toes (all 4 legs, toe-fan-aware), wingtips, tail tip, head. The
+        # producer's own tolerance for this redo (-0.005) is tighter than the rest of this file's
+        # established -0.01 budget (Move/Cast/Hit/Victory, above) -- used as given, not loosened to
+        # match the older gates.
+        KO_GROUND_TOL = -0.005
+        leg_sides_ko = sorted({n.name.split("_")[1] for n in arm_obj.data.bones if n.name.startswith("leg_")})
+        ko_ground_report = {}
+        for side in leg_sides_ko:
+            toe_suffixes = ("toe_in", "toe_mid", "toe_out") if f"leg_{side}_toe_in" in arm_obj.data.bones \
+                else ("toe",)
+            min_z = min(
+                p.z for suffix in toe_suffixes
+                for _, p in sample_action_bone_positions(arm_obj, ko_action, f"leg_{side}_{suffix}", "tail")
+            )
+            ko_ground_report[f"leg_{side}"] = {"min_z": min_z, "pass": min_z >= KO_GROUND_TOL}
+        for name, bone in (("wing_L", "wing_L_03"), ("wing_R", "wing_R_03"),
+                            ("tail", "tail_04"), ("head", "head")):
+            if bone not in arm_obj.data.bones:
+                continue
+            min_z = min(p.z for _, p in sample_action_bone_positions(arm_obj, ko_action, bone, "tail"))
+            ko_ground_report[name] = {"min_z": min_z, "pass": min_z >= KO_GROUND_TOL}
+        ko_ground_ok = all(v["pass"] for v in ko_ground_report.values())
+        report["ko"]["interpenetration_ground"] = ko_ground_report
+        for name, v in ko_ground_report.items():
+            print(f"  KO ground check {name}: min z {v['min_z']:.4f} (>= {KO_GROUND_TOL}? {v['pass']}) "
+                  f"-> {'PASS' if v['pass'] else 'FAIL'}")
+
 # ---------------------------------------------------------------------------
 # Interpenetration (rough): feet-below-ground check across Move, using the already-sampled data.
 # ---------------------------------------------------------------------------
@@ -385,6 +452,12 @@ if KEYED_BLEND:
     attack_stretch = check_edge_stretch(KEYED_BLEND, "Attack")
     if attack_stretch is not None:
         report["attack_edge_stretch"] = attack_stretch
+    # Round 17: KO's redo moves the root bone + every limb through a large range of motion (the
+    # lie-down settle), explicitly called out by the producer with its own edge-stretch budget
+    # (<=1.6x, same MAX_STRETCH_RATIO already used for Move/Attack above) -- check it the same way.
+    ko_stretch = check_edge_stretch(KEYED_BLEND, "KO")
+    if ko_stretch is not None:
+        report["ko_edge_stretch"] = ko_stretch
 
 # ---------------------------------------------------------------------------
 # Round 11 (producer review: "the Griffin walks backwards"): walk_direction gate. Confirms, from
