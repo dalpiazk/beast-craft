@@ -177,6 +177,12 @@ wing_bleed_fixed = template.fix_wing_root_bleed(obj, H, lm, bone_roles)
 report["weighting"]["wing_root_bleed_fixed"] = wing_bleed_fixed
 print(f"WING ROOT BLEED: {wing_bleed_fixed} vertices had an out-of-range spine_02/scapula weight removed")
 
+# Round 13: the same class of fix again, for the new per-toe bones (leg_FL/FR_toe_in/mid/out) a
+# foreleg's toe fan uses instead of one aggregate toe bone -- see fix_toe_fan_weights's docstring.
+toe_fan_fixed = template.fix_toe_fan_weights(obj, bone_roles)
+report["weighting"]["toe_fan_crossing_fixed"] = toe_fan_fixed
+print(f"TOE FAN WEIGHTS: {toe_fan_fixed} vertices had a conflicting cross-toe weight pair removed")
+
 common.cleanup_weights(obj, limit=4)
 
 # Round 9 lead review: a flat-shaded close-up and a new verify.py max-edge-stretch gate both found
@@ -194,15 +200,18 @@ removed_post_smooth = common.restrict_leg_weights(obj, leg_masks, bone_roles)
 cross_leg_removed_post_smooth, belly_forced_post_smooth = template.fix_hip_weight_gradient(
     obj, H, lm["legs"], bone_roles, enable_pass1=False)
 wing_bleed_fixed_post_smooth = template.fix_wing_root_bleed(obj, H, lm, bone_roles)
+toe_fan_fixed_post_smooth = template.fix_toe_fan_weights(obj, bone_roles)
 common.normalize_weights(obj)
 report["weighting"]["post_smooth_leg_restriction_removed"] = removed_post_smooth
 report["weighting"]["post_smooth_hip_gradient_cross_leg_removed"] = cross_leg_removed_post_smooth
 report["weighting"]["post_smooth_hip_gradient_belly_forced"] = belly_forced_post_smooth
 report["weighting"]["post_smooth_wing_root_bleed_fixed"] = wing_bleed_fixed_post_smooth
+report["weighting"]["post_smooth_toe_fan_crossing_fixed"] = toe_fan_fixed_post_smooth
 print(f"POST-SMOOTH RE-RESTRICTION: leg={removed_post_smooth} "
       f"hip_gradient_cross_leg={cross_leg_removed_post_smooth} "
       f"hip_gradient_belly={belly_forced_post_smooth} "
-      f"wing_root_bleed={wing_bleed_fixed_post_smooth}")
+      f"wing_root_bleed={wing_bleed_fixed_post_smooth} "
+      f"toe_fan_crossing={toe_fan_fixed_post_smooth}")
 
 worst, avg = common.max_influences_per_vertex(obj)
 report["weighting"]["max_influences_after_cleanup"] = worst

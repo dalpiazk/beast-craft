@@ -625,10 +625,25 @@ HAND_LANDMARKS_NATIVE = {
     "legs": [
         {"side": "FL", "is_front": True, "chain": [
             (-0.16, -0.30, -0.13), (-0.16, -0.32, -0.35), (-0.16, -0.34, -0.55), (-0.16, -0.40, -0.63)],
-         "toe_tip": (-0.16, -0.54, -0.63)},
+         "toe_tip": (-0.16, -0.54, -0.63),
+         # Round 13 (producer review): three-toe fan, hand-placed from fresh calibrated close-ups
+         # (calib_v10 bottom/left/front) -- replaces the single toe_tip for forelegs (the eagle
+         # foot's three splayed toes, each with its own talon on the ground; no rear toe). Base
+         # Z~=-0.60 (slightly above ground -- the toe-spreading junction, not the talon tips
+         # themselves), tip Z~=-0.625 (on the ground). "in"/"mid"/"out" assigned by which side
+         # faces the body midline, per the lead's instruction -- verified against an overlay render
+         # (see README's round-13 section), not assumed from the raw coordinate order.
+         "toe_fan": {"base": (-0.171, -0.369, -0.60),
+                     "in": (-0.047, -0.433, -0.625),
+                     "mid": (-0.182, -0.531, -0.625),
+                     "out": (-0.296, -0.439, -0.625)}},
         {"side": "FR", "is_front": True, "chain": [
             (0.16, -0.30, -0.13), (0.16, -0.32, -0.35), (0.16, -0.34, -0.55), (0.16, -0.40, -0.63)],
-         "toe_tip": (0.16, -0.54, -0.63)},
+         "toe_tip": (0.16, -0.54, -0.63),
+         "toe_fan": {"base": (0.175, -0.369, -0.60),
+                     "out": (0.294, -0.439, -0.625),
+                     "mid": (0.186, -0.552, -0.625),
+                     "in": (0.034, -0.450, -0.625)}},
         # Hind legs (lion): round-10 lead review flagged "check the hind-leg bend against the mesh;
         # if the actual knee is forward of the hip, use the mesh's real knee within the 0.04 snap
         # and report it" -- the given knee (Y 0.07) sits BEHIND the hip (Y -0.03) in this mesh's
@@ -764,6 +779,17 @@ def detect_landmarks_handplaced(obj, H, to_normalized):
             snap_log.append((tuple(round(c, 4) for c in p), moved, exceeded))
         return snapped
 
+    def pt_toe_fan(native_xyz):
+        # Round 13: the lead's toe-fan instruction specifies a TIGHTER snap budget (<=0.03, not the
+        # usual 0.04) for these specific points -- a fresh, more tightly-calibrated close-up pass,
+        # so points straying further than that likely indicate a real placement problem worth
+        # surfacing rather than silently absorbing with the wider general-purpose budget.
+        p = to_normalized(native_xyz)
+        snapped, moved, exceeded = _snap_if_outside(obj, bvh, p, H, max_move=0.03)
+        if moved > 1e-6:
+            snap_log.append((tuple(round(c, 4) for c in p), moved, exceeded))
+        return snapped
+
     spine = HAND_LANDMARKS_NATIVE["spine"]
     pelvis = pt(spine["pelvis"])
     chest = pt(spine["chest"])
@@ -786,6 +812,10 @@ def detect_landmarks_handplaced(obj, H, to_normalized):
     for leg_spec in HAND_LANDMARKS_NATIVE["legs"]:
         hip, knee, ankle, foot = [pt(p) for p in leg_spec["chain"]]
         toe_tip = pt(leg_spec["toe_tip"])
+        toe_fan_spec = leg_spec.get("toe_fan")
+        toe_fan = None
+        if toe_fan_spec is not None:
+            toe_fan = {k: pt_toe_fan(v) for k, v in toe_fan_spec.items()}
         if leg_spec["side"] in SOLVER_STABILITY_NUDGE:
             knee = knee + SOLVER_STABILITY_NUDGE[leg_spec["side"]]
         hip_foot = hip - foot
@@ -800,7 +830,7 @@ def detect_landmarks_handplaced(obj, H, to_normalized):
         bend_dir.normalize()
         legs.append({"side": leg_spec["side"], "is_front": leg_spec["is_front"],
                      "foot": foot, "ankle": ankle, "knee": knee, "hip": hip,
-                     "toe_tip": toe_tip, "bend_dir": bend_dir})
+                     "toe_tip": toe_tip, "toe_fan": toe_fan, "bend_dir": bend_dir})
 
     tail_points = [pt(p) for p in HAND_LANDMARKS_NATIVE["tail"]]
     wing_l_pts = [pt(p) for p in HAND_LANDMARKS_NATIVE["wing_l"]]
@@ -1099,6 +1129,50 @@ def fix_wing_root_bleed(obj, H, lm, bone_roles, max_dist_frac=0.15):
     return fixed
 
 
+def fix_toe_fan_weights(obj, bone_roles):
+    """Round 13 (producer review): the same pairwise weight-conflict-strip principle as
+    fix_hip_weight_gradient's leg-pair pass and fix_wing_root_bleed's wing-pair pass, applied to
+    the three new per-toe bones (leg_<side>_toe_in/mid/out) a front foreleg's toe fan uses instead
+    of one aggregate toe bone. restrict_leg_weights already prevents a toe vertex from carrying
+    weight for a DIFFERENT leg (it restricts by role, which is shared as "leg_<side>" across a
+    whole leg's bones) -- but role-based restriction can't see the finer distinction between the
+    three toe bones WITHIN the same leg, so a vertex near where two splayed toes meet at their
+    shared base could still pick up substantial weight on two different toe bones from automatic
+    heat weighting, which would pull it in two different curl directions once each toe gets its own
+    independent swing-phase hinge curl (anim/gait.py) -- exactly the "no weight crossing between
+    toes" the task brief asks to avoid. Strips ONLY the specific conflicting toe pair's weight from
+    a vertex carrying both substantially (>0.08 each) -- the same conservative "touch only the
+    conflicting pair, leave everything else alone" approach confirmed best in rounds 9-10. Must run
+    BEFORE common.cleanup_weights (like the other weighting fixes here) and again after it
+    (cleanup_weights' own smoothing re-spreads weight across group boundaries the same way)."""
+    me = obj.data
+    group_index = {g.name: g.index for g in obj.vertex_groups}
+    fixed = 0
+    for side in ("FL", "FR"):
+        toe_names = ("in", "mid", "out")
+        toe_ids = {}
+        for t in toe_names:
+            n = f"leg_{side}_toe_{t}"
+            if n in group_index:
+                toe_ids[t] = {group_index[n]}
+        pairs = [(a, b) for i, a in enumerate(toe_names) for b in toe_names[i + 1:]]
+        for a, b in pairs:
+            a_ids = toe_ids.get(a, set())
+            b_ids = toe_ids.get(b, set())
+            if not a_ids or not b_ids:
+                continue
+            for vi, v in enumerate(me.vertices):
+                a_w = sum(g.weight for g in v.groups if g.group in a_ids)
+                b_w = sum(g.weight for g in v.groups if g.group in b_ids)
+                if a_w > 0.08 and b_w > 0.08:
+                    for gi in a_ids | b_ids:
+                        for g in list(v.groups):
+                            if g.group == gi:
+                                obj.vertex_groups[gi].remove([vi])
+                    fixed += 1
+    return fixed
+
+
 def build_bones(eb, lm, H):
     """Builds the deform skeleton into armature edit_bones `eb` from landmarks `lm`
     (as returned by detect_landmarks or detect_landmarks_handplaced). Returns
@@ -1210,6 +1284,24 @@ def build_bones(eb, lm, H):
         mk(f"leg_{side}_thigh", hip, knee, parent_bone, role=f"leg_{side}")
         mk(f"leg_{side}_shin", knee, ankle, f"leg_{side}_thigh", role=f"leg_{side}")
         mk(f"leg_{side}_foot", ankle, foot, f"leg_{side}_shin", role=f"leg_{side}")
-        mk(f"leg_{side}_toe", foot, toe_tip, f"leg_{side}_foot", role=f"leg_{side}")
+        # Round 13 (producer review): a real eagle foreleg has THREE splayed toes (inner/middle/
+        # outer, each with its own talon), not one aggregate toe -- the old single leg_<side>_toe
+        # bone, when curled, swung all three splayed toes around a single shared axis (outer toes
+        # crossing each other, the middle talon pointing straight down at contact -- visible in
+        # round 12's own ALL_4_FEET_SHEET contact/passing columns, which this round's producer
+        # review caught). `toe_fan` (lead-placed, from fresh calibrated close-ups of the bottom/
+        # left/front views) supplies a shared toe-base junction and 3 independent tip points for
+        # front legs; replaced with 3 sibling bones (toe_in/toe_mid/toe_out), all parented directly
+        # to leg_<side>_foot (not chained to each other), each spanning base->its own tip. Hind
+        # (lion) legs keep the single-toe-bone construction unchanged -- no toe_fan data for them,
+        # a real lion paw's toes don't need independent per-toe fanning for this pilot's purposes.
+        toe_fan = leg.get("toe_fan")
+        if toe_fan is not None:
+            base = toe_fan["base"]
+            for toe_name in ("in", "mid", "out"):
+                mk(f"leg_{side}_toe_{toe_name}", base, toe_fan[toe_name], f"leg_{side}_foot",
+                   role=f"leg_{side}")
+        else:
+            mk(f"leg_{side}_toe", foot, toe_tip, f"leg_{side}_foot", role=f"leg_{side}")
 
     return names, roles

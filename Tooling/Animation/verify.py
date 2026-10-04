@@ -267,8 +267,15 @@ if MOVE_BLEND and "move" in report:
     leg_sides = sorted({n.name.split("_")[1] for n in arm_obj.data.bones if n.name.startswith("leg_")})
     below_ground_report = {}
     for side in leg_sides:
-        positions = sample_action_bone_positions(arm_obj, move_action, f"leg_{side}_toe", "tail")
-        min_z = min(p.z for _, p in positions)
+        # Round 13: toe-fan legs (front) have 3 toe bones, not 1 -- check the lowest of all 3
+        # talon tips (the "min_toe_z" this gate has always reported is explicitly a worst-case
+        # check, so the worst of 3 tips is the right generalization, not an arbitrary pick).
+        toe_suffixes = ("toe_in", "toe_mid", "toe_out") if f"leg_{side}_toe_in" in arm_obj.data.bones \
+            else ("toe",)
+        min_z = min(
+            p.z for suffix in toe_suffixes
+            for _, p in sample_action_bone_positions(arm_obj, move_action, f"leg_{side}_{suffix}", "tail")
+        )
         below_ground_report[side] = {"min_toe_z": min_z, "pass": min_z > -0.01}
         print(f"  leg {side} min toe z: {min_z:.4f} -> {'PASS' if min_z > -0.01 else 'FAIL'}")
     report["move"]["interpenetration_ground"] = below_ground_report
@@ -397,7 +404,13 @@ def check_walk_direction(blend_path, action_name="Move"):
     overall_pass = True
     for side in leg_sides:
         phase_off = LATERAL_SEQUENCE.get(side, 0.0 if side == leg_sides[0] else 0.5)
-        positions = sample_action_bone_positions(arm_obj, action, f"leg_{side}_toe", "tail")
+        # Round 13: toe-fan legs (front) have 3 toe bones -- use the middle toe (toe_mid) as the
+        # representative point for the overall foot's fore-aft travel (this gate only cares about
+        # net forward/backward direction, not the fan's own shape, which the dedicated toe_fan gate
+        # checks separately).
+        toe_bone_name = f"leg_{side}_toe_mid" if f"leg_{side}_toe_in" in arm_obj.data.bones \
+            else f"leg_{side}_toe"
+        positions = sample_action_bone_positions(arm_obj, action, toe_bone_name, "tail")
         stance_fwd, swing_fwd = [], []
         for (f, p), (_, pel) in zip(positions, pelvis_positions):
             t = (f - f0) / n_frames
@@ -505,6 +518,14 @@ def check_foot_orientation(blend_path, action_name="Move"):
     leg_results = {}
     overall_pass = True
     for side in leg_sides:
+        # Round 13: legs with a toe FAN (leg_<side>_toe_in/mid/out -- front legs on this rig) no
+        # longer have a single aggregate leg_<side>_toe bone at all, and are covered in more
+        # relevant detail by the new toe_fan gate below (per-toe fan-angle + ground-clearance,
+        # rather than this gate's single-toe sole-normal/toe-direction concept, which doesn't map
+        # cleanly onto 3 independently-splayed toes) -- skip them here rather than guessing which
+        # one of the 3 toe bones would stand in for "the" toe.
+        if f"leg_{side}_toe_in" in arm_obj.data.bones:
+            continue
         toe_pb = arm_obj.pose.bones[f"leg_{side}_toe"]
         phase_off = LATERAL_SEQUENCE.get(side, 0.0 if side == leg_sides[0] else 0.5)
 
@@ -568,17 +589,112 @@ if MOVE_BLEND:
     if foot_orient_result is not None:
         report["foot_orientation"] = foot_orient_result
 
+# ---------------------------------------------------------------------------
+# Round 13 (producer review: FR's toes still looked crossed, since a real eagle foreleg has THREE
+# independently-splayed toes -- inner/middle/outer, each with its own talon -- and the single
+# aggregate toe bone round 12 fixed curling around one axis necessarily swung all three splayed
+# toes together, crossing the outer toes and pointing the middle talon straight down at contact.
+# gait.py now gives each foreleg 3 sibling toe bones (toe_in/mid/out), each curling around its OWN
+# hinge axis, staying exactly at bind during stance (see set_leg_pose's docstring).
+#
+# This gate checks that fix directly: for each front foot (FL/FR), EVERY frame (not just stance --
+# the task brief's own wording), the angle between adjacent toe directions (in-mid, mid-out) must
+# stay within TOE_FAN_ANGLE_TOLERANCE_DEG of its BIND value -- i.e. the fan's own shape never
+# distorts/crosses, regardless of how the whole foot is posed -- and during STANCE specifically,
+# no talon tip may sink below GROUND_CLEARANCE_MIN (ground - 0.005).
+TOE_FAN_ANGLE_TOLERANCE_DEG = 12.0
+GROUND_CLEARANCE_MIN = -0.005
+
+
+def check_toe_fan(blend_path, action_name="Move"):
+    arm_obj = load(blend_path)
+    action = bpy.data.actions.get(action_name)
+    if action is None:
+        return None
+    if arm_obj.animation_data is None:
+        arm_obj.animation_data_create()
+    scene = bpy.context.scene
+
+    front_sides = [s for s in ("FL", "FR")
+                   if f"leg_{s}_toe_in" in arm_obj.data.bones]
+    if not front_sides:
+        return None  # no toe-fan legs on this rig -- nothing to check
+
+    f0, f1 = action.frame_range
+    f0, f1 = int(f0), int(f1)
+    n_frames = f1 - f0
+
+    def toe_dir(side, t_name):
+        pb = arm_obj.pose.bones[f"leg_{side}_toe_{t_name}"]
+        v = (arm_obj.matrix_world @ pb.tail) - (arm_obj.matrix_world @ pb.head)
+        return v.normalized() if v.length > 1e-6 else mathutils.Vector((0, -1, 0))
+
+    leg_results = {}
+    overall_pass = True
+    for side in front_sides:
+        phase_off = LATERAL_SEQUENCE.get(side, 0.0)
+
+        # Bind-pose reference angles (no action assigned -- pose == rest).
+        arm_obj.animation_data.action = None
+        bind_in_mid = math.degrees(toe_dir(side, "in").angle(toe_dir(side, "mid")))
+        bind_mid_out = math.degrees(toe_dir(side, "mid").angle(toe_dir(side, "out")))
+
+        arm_obj.animation_data.action = action
+        worst_fan_delta, worst_fan_frame = 0.0, None
+        worst_ground, worst_ground_frame = 999.0, None
+        for f in range(f0, f1 + 1):
+            scene.frame_set(f)
+            in_mid = math.degrees(toe_dir(side, "in").angle(toe_dir(side, "mid")))
+            mid_out = math.degrees(toe_dir(side, "mid").angle(toe_dir(side, "out")))
+            delta = max(abs(in_mid - bind_in_mid), abs(mid_out - bind_mid_out))
+            if delta > worst_fan_delta:
+                worst_fan_delta, worst_fan_frame = delta, f
+
+            t = (f - f0) / n_frames
+            ph = (t + phase_off) % 1.0
+            if ph < DUTY:  # stance only, per the task brief
+                for t_name in ("in", "mid", "out"):
+                    pb = arm_obj.pose.bones[f"leg_{side}_toe_{t_name}"]
+                    tip_z = (arm_obj.matrix_world @ pb.tail).z
+                    if tip_z < worst_ground:
+                        worst_ground, worst_ground_frame = tip_z, f
+
+        fan_ok = worst_fan_delta <= TOE_FAN_ANGLE_TOLERANCE_DEG
+        ground_ok = worst_ground >= GROUND_CLEARANCE_MIN
+        leg_pass = fan_ok and ground_ok
+        overall_pass = overall_pass and leg_pass
+        leg_results[side] = {
+            "bind_angle_in_mid_deg": bind_in_mid, "bind_angle_mid_out_deg": bind_mid_out,
+            "worst_fan_delta_deg": worst_fan_delta, "worst_fan_delta_frame": worst_fan_frame,
+            "fan_pass": fan_ok,
+            "worst_ground_z": worst_ground, "worst_ground_frame": worst_ground_frame,
+            "ground_pass": ground_ok,
+            "pass": leg_pass,
+        }
+        print(f"  toe_fan {side}: worst fan-angle delta from bind {worst_fan_delta:.1f} deg "
+              f"(<= {TOE_FAN_ANGLE_TOLERANCE_DEG}? {fan_ok}), worst talon ground z "
+              f"{worst_ground:.4f} (>= {GROUND_CLEARANCE_MIN}? {ground_ok}) -> "
+              f"{'PASS' if leg_pass else 'FAIL'}")
+
+    return {"legs": leg_results, "pass": overall_pass}
+
+
+if MOVE_BLEND:
+    toe_fan_result = check_toe_fan(MOVE_BLEND, "Move")
+    if toe_fan_result is not None:
+        report["toe_fan"] = toe_fan_result
+
 with open(os.path.join(OUT, "verify_report.json"), "w") as f:
     json.dump(report, f, indent=2)
 print("VERIFY DONE")
 
-# "Fail loudly": walk_direction and foot_orientation are correctness gates, not quality-polish
-# ones -- a backwards-walking or mangled-footed Griffin is categorically broken, not just
-# imperfect, so (unlike the other gates in this file, which report pass/fail in the JSON for a
+# "Fail loudly": walk_direction, foot_orientation, and toe_fan are correctness gates, not
+# quality-polish ones -- a backwards-walking or mangled-footed Griffin is categorically broken, not
+# just imperfect, so (unlike the other gates in this file, which report pass/fail in the JSON for a
 # human to read) these also abort the pipeline with a non-zero exit code so a failure can't be
 # silently skipped past in a batch/CI context.
 hard_fail = False
-for gate_name in ("walk_direction", "foot_orientation"):
+for gate_name in ("walk_direction", "foot_orientation", "toe_fan"):
     if gate_name in report and not report[gate_name].get("pass", False):
         print("=" * 70)
         print(f"FATAL: {gate_name} gate FAILED -- see verify_report.json['{gate_name}'].")

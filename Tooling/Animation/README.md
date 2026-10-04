@@ -341,6 +341,99 @@ deliverables).
 
 Mesh/export unchanged except the new Move action: 8000 tris, 37 bones, GLB 0.848 MiB.
 
+## v13: replace the single aggregate foreleg toe bone with a 3-bone toe fan (producer review
+## round 13)
+
+Producer review of the v12 videos: the FRONT feet's toes were STILL wrong. The lead's diagnosis
+(from fresh calibrated close-ups, calib_v10 bottom/left/front) pinpointed the real anatomical
+mismatch round 12 never addressed: a real eagle foreleg has **three splayed toes** (inner, middle,
+outer, each with its own talon), toe tips on the ground, no rear toe -- but this rig had ONE toe
+bone per foreleg. Curling a single toe bone necessarily rotates all three splayed toes around one
+shared axis: the outer toes swing across each other and the middle talon points straight down at
+contact, exactly what round 12's own `ALL_4_FEET_SHEET` contact/passing columns showed in
+hindsight (missed at the time because round 12's fix did genuinely resolve the SWING-phase
+orientation-flip bug it targeted -- this is a different, anatomical-modelling bug underneath it).
+
+**Fix, by task-brief item:**
+
+1. **Three toe bones per foreleg.** `HAND_LANDMARKS_NATIVE` gained a `toe_fan` entry per foreleg
+   (lead-placed, native coords, base Z~=-0.60, tip Z~=-0.625, snapped with a TIGHTER 0.03 budget
+   than this pipeline's usual 0.04 -- a fresh, more tightly-calibrated close-up pass).
+   `detect_landmarks_handplaced` parses it (new `pt_toe_fan` helper); `build_bones` now builds
+   `leg_<side>_toe_in/mid/out` as three SIBLING bones (not chained to each other) parented directly
+   to `leg_<side>_foot`, each spanning the shared base junction to its own tip, whenever `toe_fan`
+   data is present -- hind legs are entirely unaffected (no `toe_fan` data for them, old
+   single-toe-bone construction kept verbatim). Verified with a dedicated colour-coded overlay
+   render (`work/toe_fan_overlay.py`, scratch-only): inner (red) consistently faces the body
+   midline and outer (blue) consistently faces away from it on BOTH front feet, and all three bones
+   visibly lie inside their own toe in a side-view close-up.
+2. **Weights.** New `fix_toe_fan_weights` (winged_quadruped.py), the same pairwise
+   conflict-strip principle as `fix_hip_weight_gradient`/`fix_wing_root_bleed` (rounds 9-10),
+   applied to the three new toe-bone pairs within each foreleg -- strips ONLY a vertex's
+   conflicting toe-pair weight when it carries >0.08 on two different toes, leaving everything
+   else alone. Run both before `cleanup_weights` and again after (cleanup's own smoothing
+   re-spreads weight across group boundaries, same reason the other two fixes run twice). Caught
+   29 vertices pre-smooth, 32 post-smooth on this mesh -- a real, non-trivial amount of
+   cross-toe bleed that automatic heat weighting alone left behind. `restrict_leg_weights`
+   already prevented cross-LEG bleed (toe vs. a different leg) via the shared `leg_<side>` role;
+   this is the finer within-leg fix the task brief specifically flagged as a risk.
+3. **Motion.** `anim/gait.py`'s `set_leg_pose` (per-leg precompute + new toe-fan branch): during
+   STANCE, all three toes hold their EXACT bind-pose direction (zero curl, not an approximation --
+   literally the same fixed vector every stance frame, reusing round 12's "no roll/twist while
+   planted" pattern). During SWING, each toe curls up to `TOE_FAN_CURL_MAX_DEG=20` around its OWN
+   hinge axis (`normalize(cross(toe_direction, world_up))`, precomputed once per toe from its rest
+   direction -- a new `rotate_around_axis` Rodrigues-formula helper, since a splayed toe's hinge
+   axis is generally NOT world X the way the single shared foot-curl axis was), peaking at
+   mid-swing and easing back to the identical stance direction by touchdown. The whole fan's shared
+   base junction inherits the SAME rigid rotation already applied to the foot bone itself (round
+   12's `foot_curl_angle`) -- anatomically the base is part of the same rigid pastern segment, so
+   it tilts together with it; each toe's OWN curl is applied on top, never around the foot's shared
+   axis (the original bug this round fixes).
+4. **Hind feet** checked on the same close-up sheet (bind/contact/passing/lift/midswing/idle) --
+   unchanged construction, confirmed still correct, no regression.
+5. **New `verify.py` gate, `toe_fan`:** for each front foot, EVERY frame (not just stance, per the
+   task brief's own wording), the angle between adjacent toe directions (in-mid, mid-out) must stay
+   within `TOE_FAN_ANGLE_TOLERANCE_DEG=12` of its BIND value -- i.e. the fan's own shape never
+   distorts/crosses, independent of how the whole foot is posed -- and during STANCE specifically,
+   no talon tip may sink below `GROUND_CLEARANCE_MIN=-0.005`. Fails loudly (`sys.exit(1)`) like
+   `walk_direction`/`foot_orientation`. Result: **PASS** for both FL and FR -- worst fan-angle delta
+   from bind 5.1-5.7 deg (well under the 12 deg budget), worst talon ground z -0.0001 (well under
+   the -0.005 budget). Also fixed three pre-existing `verify.py` references to a single
+   `leg_<side>_toe` bone that would have crashed on the new rig (the ground-interpenetration check,
+   `walk_direction`'s toe-position sample, and `foot_orientation`, which now explicitly skips
+   toe-fan legs in favour of this new, more relevant gate).
+   `walk_direction`/`foot_orientation`/edge-stretch all still pass/fail exactly as in v12 (edge
+   stretch is untouched, same pre-existing Move 9.53x/Attack 3.31x).
+
+**Live3D:** rig bone count 37 -> 41 (2 extra toe bones per foreleg * 2 forelegs). Bumped
+`MAX_BONES`/`MaxBones` 40 -> 48 (with headroom) in both `Toon.fx` and `BeastInstance.cs`; still
+comfortably inside the ES 3.0 256-vec4 vertex-uniform minimum this project targets.
+
+**Visual confirmation, as required.** A labelled front-feet close-up sheet (bottom + side views;
+bind, contact, passing, lift, mid-swing, idle, attack-rake strike -- `work/front_feet_v13/
+FRONT_FEET_SHEET.png`, scratch-only), looked at critically before reporting:
+- **bind/contact/passing:** clean 3-toe fan, each talon distinct and pointed, inner toe toward the
+  midline, outer toe away from it, exactly as placed.
+- **lift/mid-swing (the frames that were broken in v12):** each toe curls down slightly and
+  independently -- no crossing, no single talon pointing straight down, no fused/tangled blob.
+  Confirmed both in the wide sheet and in a 2x-zoomed crop of these two specific phases.
+- **idle:** toes relaxed at bind position (Idle doesn't drive the toe-fan bones directly; they
+  follow the thigh/shin FK chain rigidly, which keeps the fan's own shape intact by construction).
+- **attack-rake strike:** the raking foreleg's 3-toe fan stays naturally shaped through the rake
+  motion (same FK-follows-rigidly reasoning as idle -- keyed.py never touches the toe bones
+  directly), splayed forward with the reach, no distortion.
+
+Also re-inspected every frame of the standard `contact_sheet_idle/move/move_side/attack.png` sheets
+(via a dedicated feet-only zoomed crop for move/move_side): all clean, front-leg talons read
+naturally in every frame; `contact_sheet_attack.png` unchanged except the same pre-existing
+frame-5 wing blotch from v10-v12 (untouched, unrelated).
+
+**MP4s regenerated** with the same `--pilot-sequence`/ffmpeg parameters as v11/v12 into
+`scratchpad/anim-pilot/video_v13/`: `griffin_reel.mp4`, `griffin_idle.mp4`, `griffin_walk.mp4`,
+`griffin_walk_side.mp4`, `griffin_attack.mp4` -- all 720x1280 h264/yuv420p. Not committed.
+
+Mesh/export: 8000 tris, **41 bones** (up from 37), GLB 0.859 MiB.
+
 ## v9: max-edge-stretch gate + weight/render fixes -- partial progress, honestly not fully resolved
 ## (lead-review round 9)
 

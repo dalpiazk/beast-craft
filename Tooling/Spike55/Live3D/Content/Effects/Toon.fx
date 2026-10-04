@@ -13,22 +13,23 @@
 // frame-time spikes at 12+ instances (see docs/spikes/055-3d-mini-spike.md's fourth-pass section for
 // the before/after numbers) and is why this version moved the blend into the vertex shader instead.
 //
-// MAX_BONES = 40 (bumped again in round 10, from 34, for the new neutral-pose text-to-3D Griffin's
-// 37-bone rig -- the extra 2 bones beyond the previous mesh's 35 are a jaw + upper-beak bone pair,
-// added so Idle/Attack can close/snap this mesh's open-mouth bind pose; see Tooling/Animation/
-// rig_templates/winged_quadruped.py's build_bones). 40 float4x4 = 160 vec4 vertex-uniform
-// registers -- this now EXCEEDS GLSL ES 2.0's spec-minimum guaranteed 128 vec4, but this project
-// targets OpenGL ES 3.0 (Galaxy A35 minimum spec, per the animation methodology research), whose
-// spec-minimum guaranteed vertex-uniform-vector count is 256 vec4 -- 136 is comfortably inside that
-// higher floor alongside this shader's handful of other vertex-stage parameters (ViewProjection
-// etc, a few more vec4). MonoGame's own SkinnedEffect budgets 72 bones = 288 vec4, which would NOT
-// fit even the ES 3.0 minimum; this rig needs nowhere near that. The fourth pass's griffin_live.glb
-// (11 joints) and crest_alt.glb (1) both still fit easily in this larger array -- unused slots are
-// inert identity padding, see Game1's NewIdentityPalette. The cosmetic crest
-// attachment (no real skin) reuses the same vertex format and shader: every one of its vertices is
-// authored with BlendIndices=(0,0,0,0) and BlendWeight=(1,0,0,0) (see Game1.LoadContent), so setting
-// Bones[0] to its rigid head-bone-relative transform skins it as a single "bone" with no separate code
-// path.
+// MAX_BONES = 48 (bumped again in round 13, from 40, for the new 41-bone rig: a foreleg's single
+// aggregate toe bone was replaced with THREE independent toe bones -- toe_in/mid/out, a real
+// eagle foot's splayed digits, each with its own talon and its own swing-phase hinge curl -- see
+// Tooling/Animation/rig_templates/winged_quadruped.py's build_bones and anim/gait.py's set_leg_pose
+// docstrings for the full producer-review root cause. 37 (round 10's rig) + 2 extra toe bones per
+// foreleg * 2 forelegs = 41; bumped to 48 rather than the bare minimum for some headroom against
+// the next small addition. 48 float4x4 = 192 vec4 vertex-uniform registers -- comfortably inside
+// OpenGL ES 3.0's spec-minimum guaranteed 256 vec4 (this project's target, Galaxy A35 minimum spec,
+// per the animation methodology research) alongside this shader's handful of other vertex-stage
+// parameters (ViewProjection etc, a few more vec4). MonoGame's own SkinnedEffect budgets 72 bones =
+// 288 vec4, which would NOT fit even the ES 3.0 minimum; this rig needs nowhere near that. The
+// fourth pass's griffin_live.glb (11 joints) and crest_alt.glb (1) both still fit easily in this
+// larger array -- unused slots are inert identity padding, see Game1's NewIdentityPalette. The
+// cosmetic crest attachment (no real skin) reuses the same vertex format and shader: every one of
+// its vertices is authored with BlendIndices=(0,0,0,0) and BlendWeight=(1,0,0,0) (see
+// Game1.LoadContent), so setting Bones[0] to its rigid head-bone-relative transform skins it as a
+// single "bone" with no separate code path.
 //
 // Two techniques:
 //   Toon    -- the banded-lighting beast/crest material.
@@ -45,7 +46,7 @@
     #define PS_SHADERMODEL ps_4_0_level_9_1
 #endif
 
-#define MAX_BONES 40
+#define MAX_BONES 48
 
 float4x4 ViewProjection;
 float4x4 Bones[MAX_BONES];
