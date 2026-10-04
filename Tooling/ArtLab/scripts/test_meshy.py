@@ -156,6 +156,136 @@ class RemeshCostTests(unittest.TestCase):
         self.assertEqual(meshy.REMESH_COST, 5)
 
 
+class TextTo3DPreviewCostTests(unittest.TestCase):
+    def test_meshy71_preview(self):
+        credits, note = meshy.text_to_3d_preview_cost_lookup("meshy-7.1")
+        self.assertEqual(credits, 20)
+        self.assertIn("mesh only", note)
+
+    def test_meshy6_lite_preview(self):
+        credits, _ = meshy.text_to_3d_preview_cost_lookup("meshy-6-lite")
+        self.assertEqual(credits, 5)
+
+    def test_meshy_t2_preview(self):
+        credits, _ = meshy.text_to_3d_preview_cost_lookup("meshy-t2")
+        self.assertEqual(credits, 5)
+
+    def test_latest_assumed_as_meshy71(self):
+        credits, note = meshy.text_to_3d_preview_cost_lookup("latest")
+        self.assertEqual(credits, 20)
+        self.assertIn("ASSUMED", note)
+
+    def test_meshy_t2_also_valid_for_image_to_3d(self):
+        # meshy-t2 appears in both the Image to 3D and Text to 3D (Preview) pricing tables per the docs
+        # (docs.meshy.ai/en/api/pricing, read 2026-10-04) -- not text-to-3d-only despite the "t2" name.
+        self.assertIn("meshy-t2", meshy.IMAGE_TO_3D_COSTS)
+        self.assertEqual(meshy.IMAGE_TO_3D_COSTS["meshy-t2"]["mesh"], meshy.TEXT_TO_3D_PREVIEW_COSTS["meshy-t2"])
+
+
+class TextTo3DRefineCostTests(unittest.TestCase):
+    def test_2k(self):
+        credits, note = meshy.text_to_3d_refine_cost_lookup("2k")
+        self.assertEqual(credits, 10)
+        self.assertIn("flat rate", note)
+
+    def test_4k_same_as_2k(self):
+        credits, _ = meshy.text_to_3d_refine_cost_lookup("4k")
+        self.assertEqual(credits, 10)
+
+    def test_8k(self):
+        credits, _ = meshy.text_to_3d_refine_cost_lookup("8k")
+        self.assertEqual(credits, 15)
+
+    def test_case_insensitive(self):
+        credits, _ = meshy.text_to_3d_refine_cost_lookup("2K")
+        self.assertEqual(credits, 10)
+
+    def test_unknown_resolution_returns_none(self):
+        credits, note = meshy.text_to_3d_refine_cost_lookup("16k")
+        self.assertIsNone(credits)
+        self.assertIn("no documented", note)
+
+
+class BuildTextTo3DPreviewBodyTests(unittest.TestCase):
+    def test_minimal_body(self):
+        body = meshy.build_text_to_3d_preview_body("a griffin", "latest", None, None, None, None, None, None, [])
+        self.assertEqual(body, {"mode": "preview", "prompt": "a griffin", "ai_model": "latest"})
+
+    def test_art_style_included_when_set(self):
+        body = meshy.build_text_to_3d_preview_body("a griffin", "latest", "realistic", None, None, None, None, None, [])
+        self.assertEqual(body["art_style"], "realistic")
+
+    def test_negative_prompt_included_when_set(self):
+        body = meshy.build_text_to_3d_preview_body("a griffin", "latest", None, "no rider", None, None, None, None, [])
+        self.assertEqual(body["negative_prompt"], "no rider")
+
+    def test_empty_negative_prompt_omitted(self):
+        body = meshy.build_text_to_3d_preview_body("a griffin", "latest", None, "", None, None, None, None, [])
+        self.assertNotIn("negative_prompt", body)
+
+    def test_polycount_implies_remesh(self):
+        body = meshy.build_text_to_3d_preview_body("a griffin", "latest", None, None, None, 8000, None, None, [])
+        self.assertEqual(body["target_polycount"], 8000)
+        self.assertIs(body["should_remesh"], True)
+
+    def test_topology_included_when_set(self):
+        body = meshy.build_text_to_3d_preview_body("a griffin", "latest", None, None, "quad", None, None, None, [])
+        self.assertEqual(body["topology"], "quad")
+
+    def test_symmetry_passed_through(self):
+        body = meshy.build_text_to_3d_preview_body("a griffin", "latest", None, None, None, None, "on", None, [])
+        self.assertEqual(body["symmetry_mode"], "on")
+
+    def test_pose_mode_included_when_set(self):
+        body = meshy.build_text_to_3d_preview_body("a griffin", "latest", None, None, None, None, None, "a-pose", [])
+        self.assertEqual(body["pose_mode"], "a-pose")
+
+    def test_pose_mode_omitted_when_none(self):
+        body = meshy.build_text_to_3d_preview_body("a griffin", "latest", None, None, None, None, None, None, [])
+        self.assertNotIn("pose_mode", body)
+
+    def test_formats_included_when_set(self):
+        body = meshy.build_text_to_3d_preview_body("a griffin", "latest", None, None, None, None, None, None, ["glb", "fbx"])
+        self.assertEqual(body["target_formats"], ["glb", "fbx"])
+
+
+class BuildTextTo3DRefineBodyTests(unittest.TestCase):
+    def test_minimal_body(self):
+        body = meshy.build_text_to_3d_refine_body("task-1", None, None, False, "2k", None, [])
+        self.assertEqual(body, {"mode": "refine", "preview_task_id": "task-1",
+                                 "enable_pbr": False, "texture_resolution": "2k"})
+
+    def test_texture_prompt_included_when_set(self):
+        body = meshy.build_text_to_3d_refine_body("task-1", "golden feathers", None, False, "2k", None, [])
+        self.assertEqual(body["texture_prompt"], "golden feathers")
+
+    def test_texture_image_url_included_when_set(self):
+        body = meshy.build_text_to_3d_refine_body("task-1", None, "data:image/png;base64,AAA", False, "2k", None, [])
+        self.assertEqual(body["texture_image_url"], "data:image/png;base64,AAA")
+
+    def test_model_override_included_when_set(self):
+        body = meshy.build_text_to_3d_refine_body("task-1", None, None, False, "2k", "meshy-6", [])
+        self.assertEqual(body["ai_model"], "meshy-6")
+
+    def test_model_omitted_when_none(self):
+        body = meshy.build_text_to_3d_refine_body("task-1", None, None, False, "2k", None, [])
+        self.assertNotIn("ai_model", body)
+
+    def test_pbr_passed_through(self):
+        body = meshy.build_text_to_3d_refine_body("task-1", None, None, True, "4k", None, [])
+        self.assertIs(body["enable_pbr"], True)
+        self.assertEqual(body["texture_resolution"], "4k")
+
+    def test_formats_included_when_set(self):
+        body = meshy.build_text_to_3d_refine_body("task-1", None, None, False, "2k", None, ["glb", "usdz"])
+        self.assertEqual(body["target_formats"], ["glb", "usdz"])
+
+
+class TextTo3DPromptLengthTests(unittest.TestCase):
+    def test_max_chars_constant_matches_docs(self):
+        self.assertEqual(meshy.TEXT_TO_3D_PROMPT_MAX_CHARS, 800)
+
+
 class ApiKeyTests(unittest.TestCase):
     def test_process_env_wins_over_registry(self, monkeypatch=None):
         import os
