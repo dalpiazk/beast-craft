@@ -68,6 +68,27 @@ float3 TintMultiply = float3(1.0, 1.0, 1.0);                    // colour-form c
 
 float OutlineThickness = 0.012;
 float3 OutlineColor = float3(0.1804, 0.1647, 0.2706);           // #2E2A45, ink-plum
+// Round 16 (producer review -- wing blotch root cause, confirmed not assumed: re-captured the exact
+// Attack/Cast/Victory frames with the whole Outline technique skipped -- Game1's --pilot-no-outline --
+// and the dark ink-plum streaks vanished completely on every one of them, confirming the outline pass
+// itself, not the toon fill underneath it). Root cause: griffin_anim.glb's wings are a bundle of many
+// thin, only loosely-connected feather-card islands (see DrawBeasts' CullNone comment for why the toon
+// pass already has to be double-sided for them), each thinner than OutlineThickness's push-out
+// distance and not reliably wound outward -- the inverted hull's reversed-culling silhouette trick
+// (correct for a thick, consistently-wound body shell) pokes the WRONG face through on these thin
+// cards whenever a card turns edge-on to the camera, reading as a dark patch instead of a thin fringe.
+// Fix: scale the outline push-out per vertex by a mask, near-zero on wing/tail-tuft bones (thin,
+// unreliable-winding geometry -- an outline on an individual feather card was never the intent, the
+// WING's own silhouette against the body still reads fine without it) and 1.0 everywhere else (the
+// body keeps its full outline, unchanged). Deliberately reuses the EXISTING per-vertex BlendIndices/
+// BlendWeight already uploaded for skinning (see BoneOutlineMask below) rather than the brief's other
+// suggested option, a new vertex attribute baked at export time: no GLB schema change, no Blender
+// exporter plumbing, no new vertex buffer field, and it falls out of data this rig already carries
+// (bone identity), set once per model load in Game1 (BuildBoneOutlineMask), not per frame. Indexed by
+// the same skin-joint slot as Bones[] above (MAX_BONES, already #defined), defaults to 1.0 for any
+// model/path that never sets it (Game1 always initialises the whole array before use, so this default
+// only matters if a future caller forgets to).
+float BoneOutlineMask[MAX_BONES];
 // Lead-review fix round: a SEPARATE, smaller outline thickness for the swarm pass. OutlineThickness
 // above was tuned for the Griffin's ~2.0-unit scale; the Swarmling is ~0.55-0.65 world units tall
 // (roughly a third), so the same *absolute* push-out distance reads as a large, disconnected ring
@@ -102,6 +123,11 @@ struct VSOutput
     float4 Position : SV_POSITION;
     float3 NormalWS : TEXCOORD0;
     float2 TexCoord : TEXCOORD1;
+    // Round 16: interpolated outline mask (see BoneOutlineMask/SkinOutlineMask below) -- only
+    // PS_Outline reads this (to clip wing/tail-tuft triangles out of the outline pass entirely, not
+    // just thin them -- see PS_Outline's comment for why thinning alone wasn't enough). Every vertex
+    // shader below still sets it (1.0 where irrelevant) so the struct is never partially initialised.
+    float OutlineMask : TEXCOORD2;
 };
 
 // Linear-blend GPU skin: bind-pose position/normal -> world space, via up to 4 weighted bone matrices.
@@ -119,6 +145,29 @@ void SkinPositionNormal(VSInput input, out float3 worldPos, out float3 worldNorm
     worldNormal = mul(input.Normal, (float3x3)skin);
 }
 
+// Round 16: per-vertex outline-thickness mask. A first version took a WEIGHTED SUM over the same 4
+// BlendIndices/BlendWeight the skin itself uses (matching how the skin matrix is blended) -- but
+// prep_mesh.py's own weighting notes (rig_templates/winged_quadruped.py) already document that
+// Blender's automatic heat weighting blends wing-ROOT vertices with spine_02/scapula_{side} (a real,
+// legitimate smooth blend, not a bug -- round 9 already proved stripping it makes edge-stretch worse),
+// so a wing-root vertex might be only ~60% wing_L_01-weighted. A weighted-sum mask only partially
+// suppresses the outline there (e.g. 0.6*0 + 0.4*1 = 0.4), which still left a smaller residual dark
+// patch at the wing root in a re-render (confirmed, not assumed -- see BoneOutlineMask's comment).
+// Takes the MINIMUM mask across every bone the vertex has non-trivial weight on instead: a vertex
+// touched AT ALL by a wing/tail-tuft bone gets its outline pushed fully to zero, regardless of how
+// much weight it also carries on a body bone. The small halo of body-blended vertices this also
+// zeroes sits exactly at the wing/tail-root seam, an interior join the wing or tail mesh itself
+// already visually covers -- not a silhouette edge -- so losing its outline there isn't visible.
+float SkinOutlineMask(VSInput input)
+{
+    float m = 1.0;
+    if (input.BlendWeight.x > 0.01) m = min(m, BoneOutlineMask[(int)input.BlendIndices.x]);
+    if (input.BlendWeight.y > 0.01) m = min(m, BoneOutlineMask[(int)input.BlendIndices.y]);
+    if (input.BlendWeight.z > 0.01) m = min(m, BoneOutlineMask[(int)input.BlendIndices.z]);
+    if (input.BlendWeight.w > 0.01) m = min(m, BoneOutlineMask[(int)input.BlendIndices.w]);
+    return m;
+}
+
 // ---------------------------------------------------------------------------
 // Toon technique: 3-band diffuse ramp multiplied onto the base-colour texture.
 // Band thresholds/colours mirror blender_export_live.py's source material so the real-time look
@@ -132,6 +181,7 @@ VSOutput VS_Toon(VSInput input)
     output.Position = mul(float4(worldPos, 1.0), ViewProjection);
     output.NormalWS = worldNormal;
     output.TexCoord = input.TexCoord;
+    output.OutlineMask = 1.0; // unused by PS_Toon
     return output;
 }
 
@@ -172,15 +222,34 @@ VSOutput VS_Outline(VSInput input)
     VSOutput output;
     float3 worldPos, worldNormal;
     SkinPositionNormal(input, worldPos, worldNormal);
-    float3 expanded = worldPos + normalize(worldNormal) * OutlineThickness;
+    float mask = SkinOutlineMask(input);
+    float3 expanded = worldPos + normalize(worldNormal) * (OutlineThickness * mask);
     output.Position = mul(float4(expanded, 1.0), ViewProjection);
     output.NormalWS = worldNormal;
     output.TexCoord = input.TexCoord;
+    output.OutlineMask = mask;
     return output;
 }
 
+// Round 16: re-rendering with --pilot-no-outline confirmed the dominant wing blotches (large,
+// diagonal, spanning a whole feather card) came from this pass -- but after masking the push-out
+// DISTANCE to zero on wing/scapula/tail-tuft bones, a SMALLER residual blotch still remained on
+// Attack's strike frame, and it was the SAME SIZE regardless of the mask value (confirmed: identical
+// at mask 0.15 and mask 0.0), which a thickness scale could never explain -- thickness only changes
+// how far a shell pokes through, not whether a whole triangle renders. Root cause #2: the wing is a
+// bundle of independently-decimated feather-card islands with NOT reliably consistent winding (see
+// DrawBeasts' CullNone comment -- already known and worked around for the toon fill pass, never
+// addressed for this single-sided, reversed-culling pass). A card wound the "wrong" way has its
+// surface KEPT instead of culled under CullCounterClockwise, so its full front face -- not a thin
+// fringe -- renders flat in OutlineColor, regardless of how far (or little) its hull was pushed out.
+// No amount of thickness scaling fixes a cull-test outcome. Fix: discard the pixel outright wherever
+// the interpolated mask says "wing/tail-tuft", so a mis-wound card can never leave a solid patch
+// behind -- this is the brief's other suggested option, "skip the hull for wing submeshes", applied
+// per-pixel since this mesh has no separate wing draw call to simply omit. Confirmed clean afterward
+// on the exact frame that motivated this second fix (see video_v16/review_v16's wing-blotch notes).
 float4 PS_Outline(VSOutput input) : SV_TARGET
 {
+    clip(input.OutlineMask - 0.5);
     return float4(OutlineColor, 1.0);
 }
 
@@ -320,6 +389,7 @@ VSOutput VS_ToonSwarm(VSInputSwarm input)
     output.Position = mul(float4(worldPos, 1.0), ViewProjection);
     output.NormalWS = worldNormal;
     output.TexCoord = input.TexCoord;
+    output.OutlineMask = 1.0; // unused by PS_Toon
     return output;
 }
 
@@ -341,6 +411,10 @@ VSOutput VS_OutlineSwarm(VSInputSwarm input)
     output.Position = mul(float4(expanded, 1.0), ViewProjection);
     output.NormalWS = worldNormal;
     output.TexCoord = input.TexCoord;
+    // Round 16: the Swarmling's own rig has no wing-card bundle (bone_body/bone_head/4 legs -- see
+    // this file's "Fifth pass" header comment) and no wing-blotch issue was ever reported for it, so
+    // its outline mask stays 1.0 everywhere -- PS_Outline's clip never discards anything here.
+    output.OutlineMask = 1.0;
     return output;
 }
 

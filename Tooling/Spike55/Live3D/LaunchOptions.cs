@@ -63,6 +63,14 @@ namespace BeastCraft.Spike55.Live3D
         // leg swing actually reads instead of being foreshortened by the battle camera's yaw/tilt.
         public bool PilotSideCamera;
 
+        // Round 16 (producer review -- wing blotch diagnosis): a debug-only switch that skips the
+        // inverted-hull Outline draw call entirely, so the SAME --pilot-sequence frames can be
+        // re-captured with the outline pass off, isolating whether a visual defect comes from the
+        // outline pass or the toon fill pass underneath it. Used to confirm (not just assume) the
+        // wing-blotch hypothesis before writing a fix -- see Game1.DrawBeasts and Toon.fx's
+        // BoneOutlineMask comment for what the fix turned out to be.
+        public bool PilotNoOutline;
+
         public static LaunchOptions Parse(string[] args)
         {
             var o = new LaunchOptions();
@@ -129,6 +137,9 @@ namespace BeastCraft.Spike55.Live3D
                         break;
                     case "--pilot-side-camera":
                         o.PilotSideCamera = true;
+                        break;
+                    case "--pilot-no-outline":
+                        o.PilotNoOutline = true;
                         break;
                     default:
                         Console.Error.WriteLine("Unrecognised argument: " + args[i]);

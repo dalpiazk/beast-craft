@@ -107,9 +107,19 @@ namespace BeastCraft.Spike55.Live3D
         /// correctly (a linear blend of two rotation matrices is not itself a rotation in general). `blend`
         /// is 0 = fully `clipFrom`, 1 = fully `clipTo`. Same non-allocating, parent-before-child fixed-point
         /// sweep as ComputeWorldMatrices (see its doc comment) -- this is that method's sibling, not a
-        /// wrapper around it, since the blend has to happen per-node before any parent composition.</summary>
+        /// wrapper around it, since the blend has to happen per-node before any parent composition.
+        ///
+        /// `loopFrom`/`loopTo` (round 16, producer review): whether each clip's time should WRAP (a
+        /// seamless loop -- Idle/Move/Victory) or CLAMP to its last keyframe (a one-shot action --
+        /// Attack/Hit/Cast/KO). Root cause this fixes: sampling a non-looping clip at exactly
+        /// t==duration (the contact-sheet/MP4 capture's own last-frame formula, frameIndex/(frames-1)*
+        /// duration, hits this exactly) previously always called Wrap(duration, duration), whose
+        /// floating-point modulo is 0 -- silently re-evaluating the BIND/neutral pose instead of
+        /// holding KO's authored collapsed final pose. Both default to true so every pre-round-16 call
+        /// site (UpdateInstancePose's non-pilot loop, which only ever plays Idle/Move anyway) keeps its
+        /// original wrapping behaviour unchanged.</summary>
         public static void ComputeWorldMatricesBlended(GltfSkinnedModel model, Clip clipFrom, float timeFrom,
-            Clip clipTo, float timeTo, float blend, Matrix4x4[] destination)
+            Clip clipTo, float timeTo, float blend, Matrix4x4[] destination, bool loopFrom = true, bool loopTo = true)
         {
             var animFrom = AnimationFor(model, clipFrom);
             var animTo = AnimationFor(model, clipTo);
@@ -117,8 +127,12 @@ namespace BeastCraft.Spike55.Live3D
             var parentIndex = model.ParentIndex;
             blend = Math.Clamp(blend, 0f, 1f);
 
-            float tFrom = animFrom != null && animFrom.Duration > 0f ? Wrap(timeFrom, animFrom.Duration) : 0f;
-            float tTo = animTo != null && animTo.Duration > 0f ? Wrap(timeTo, animTo.Duration) : 0f;
+            float tFrom = animFrom != null && animFrom.Duration > 0f
+                ? (loopFrom ? Wrap(timeFrom, animFrom.Duration) : Math.Clamp(timeFrom, 0f, animFrom.Duration))
+                : 0f;
+            float tTo = animTo != null && animTo.Duration > 0f
+                ? (loopTo ? Wrap(timeTo, animTo.Duration) : Math.Clamp(timeTo, 0f, animTo.Duration))
+                : 0f;
 
             Span<bool> done = stackalloc bool[nodes.Length];
             int remaining = nodes.Length;

@@ -15,5 +15,14 @@
         "fraction": 0.22
       }
     ]
+  },
+  "loop": {
+    "Idle": true,
+    "Move": true,
+    "Attack": false,
+    "Hit": false,
+    "Cast": false,
+    "KO": false,
+    "Victory": true
   }
 }

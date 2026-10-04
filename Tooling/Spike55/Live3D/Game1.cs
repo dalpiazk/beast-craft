@@ -65,6 +65,10 @@ namespace BeastCraft.Spike55.Live3D
         // this runtime's clip duration (from the GLB's own animation sampler) is the authority, not
         // keyed.py's 24fps bake. Null/empty if the sidecar is missing (e.g. griffin_live.glb has none).
         private Dictionary<string, List<(string Name, float Fraction)>> _pilotEventMarkers;
+        // Round 16: per-clip loop flag, same sidecar (see LoadPilotClipLoop) -- Idle/Move/Victory wrap
+        // (true), Attack/Hit/Cast/KO clamp to their last key (false). Missing/unparseable defaults to
+        // true per clip (the old, pre-round-16 always-wrap behaviour), via LoopFor's lookup below.
+        private Dictionary<string, bool> _pilotClipLoop;
         // Crossing-detection state for --pilot-sequence logging (see LogPilotEventMarkerCrossings):
         // the previous captured frame's (clip, time-within-clip), so a marker is logged exactly once,
         // the first captured frame whose time has reached or passed it.
@@ -317,7 +321,9 @@ namespace BeastCraft.Spike55.Live3D
                 _springWingL = new SpringJointConfig(AnimatedPose.FindNodeIndexByName(_bodyModel, "wing_L_03"), 140f, 8f);
                 _springWingR = new SpringJointConfig(AnimatedPose.FindNodeIndexByName(_bodyModel, "wing_R_03"), 140f, 8f);
 
-                _pilotEventMarkers = LoadPilotEventMarkers(Path.Combine(contentRoot, "model", "griffin_anim_events.json"));
+                string eventsSidecarPath = Path.Combine(contentRoot, "model", "griffin_anim_events.json");
+                _pilotEventMarkers = LoadPilotEventMarkers(eventsSidecarPath);
+                _pilotClipLoop = LoadPilotClipLoop(eventsSidecarPath);
             }
 
             _bodyMesh = GpuMesh.Build(GraphicsDevice, _bodyModel);
@@ -359,6 +365,7 @@ namespace BeastCraft.Spike55.Live3D
             _toonEffect.Parameters["HighlightBoost"].SetValue(new XnaVector3(1.03f, 1.0f, 0.96f));
             _toonEffect.Parameters["OutlineThickness"].SetValue(0.012f);
             _toonEffect.Parameters["OutlineColor"].SetValue(new XnaVector3(0x2E / 255f, 0x2A / 255f, 0x45 / 255f));
+            _toonEffect.Parameters["BoneOutlineMask"].SetValue(BuildBoneOutlineMask(_bodyModel));
             _paramViewProjection = _toonEffect.Parameters["ViewProjection"];
             _paramTintMultiply = _toonEffect.Parameters["TintMultiply"];
             _paramBaseTexture = _toonEffect.Parameters["BaseTexture"];
@@ -1126,6 +1133,42 @@ namespace BeastCraft.Spike55.Live3D
             _ => AnimatedPose.Clip.Idle,
         };
 
+        /// <summary>Round 16: per-joint outline-thickness mask for Toon.fx's Outline technique (see its
+        /// BoneOutlineMask comment for the full root-cause writeup -- confirmed, not assumed, via a
+        /// --pilot-no-outline A/B capture). 1.0 (full outline) for every joint by default; ZERO for the
+        /// wing bones (wing_L_01..03/wing_R_01..03 -- thin, loosely-connected feather-card islands whose
+        /// inverted hull pokes through when a card turns edge-on to the camera) and the tail's last
+        /// segment specifically (tail_04, the fluffy tip/"tuft" -- the task brief's own wording) rather
+        /// than the whole tail, so the tail's own silhouette against the body still reads normally along
+        /// tail_01-03. A first attempt at 0.15 (a visible-but-thin fringe, not fully off) still left a
+        /// smaller residual dark patch at the most extreme edge-on wing angles (confirmed by re-rendering
+        /// Attack's strike frame and zooming in) -- any non-zero push-out distance on a thin,
+        /// inconsistently-wound card can still poke through at a steep enough viewing angle, so this
+        /// settled on fully skipping the hull for these bones (mask 0.0) rather than just thinning it,
+        /// matching the task brief's other explicitly-offered option ("skip the hull for wing
+        /// submeshes"). The wing's own silhouette against the background still reads fine from the toon
+        /// fill pass's own texture edge; only the per-card inverted-hull fringe is gone. Indexed by
+        /// skin-joint slot, same order as Bones[]/model.Joints -- any slot beyond model.Joints.Length
+        /// (padding up to BeastInstance.MaxBones) stays at the harmless default, 1.0, since nothing ever
+        /// indexes it.</summary>
+        private static float[] BuildBoneOutlineMask(GltfSkinnedModel model)
+        {
+            var mask = new float[BeastInstance.MaxBones];
+            for (int i = 0; i < mask.Length; i++)
+                mask[i] = 1f;
+            for (int j = 0; j < model.Joints.Length && j < mask.Length; j++)
+            {
+                string name = model.Joints[j].Node.Name ?? string.Empty;
+                bool isWing = name.StartsWith("wing_L_", StringComparison.OrdinalIgnoreCase) ||
+                              name.StartsWith("wing_R_", StringComparison.OrdinalIgnoreCase);
+                bool isScapula = name.StartsWith("scapula_", StringComparison.OrdinalIgnoreCase);
+                bool isTailTuft = string.Equals(name, "tail_04", StringComparison.OrdinalIgnoreCase);
+                if (isWing || isScapula || isTailTuft)
+                    mask[j] = 0f;
+            }
+            return mask;
+        }
+
         /// <summary>Reads export_glb.py's griffin_anim_events.json sidecar (Tooling/Animation/anim/
         /// keyed.py's EVENT_MARKERS, re-keyed by export_glb.py -- see its header comment) into a
         /// clip-name-keyed lookup of (marker name, fraction-through-clip). Tolerant of a missing file
@@ -1160,6 +1203,40 @@ namespace BeastCraft.Spike55.Live3D
             }
             return result;
         }
+
+        /// <summary>Reads the same griffin_anim_events.json sidecar's sibling "loop" map (Tooling/
+        /// Animation/anim/keyed.py's CLIP_LOOP, forwarded by export_glb.py) -- clip name to whether its
+        /// time should wrap (a seamless loop) or clamp to its last keyframe (a one-shot action). See
+        /// LoopFor for the default when a clip/the whole sidecar is missing. Same tolerance as
+        /// LoadPilotEventMarkers: a bad/missing file just means every clip falls back to wrapping
+        /// (the pre-round-16 behaviour), never a crash.</summary>
+        private static Dictionary<string, bool> LoadPilotClipLoop(string path)
+        {
+            var result = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+            if (!File.Exists(path))
+                return result;
+            try
+            {
+                using var doc = JsonDocument.Parse(File.ReadAllText(path));
+                if (doc.RootElement.TryGetProperty("loop", out var loopEl))
+                {
+                    foreach (var clipProp in loopEl.EnumerateObject())
+                        result[clipProp.Name] = clipProp.Value.GetBoolean();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[pilot] warning: failed to load clip loop flags from {path}: {ex.Message}");
+            }
+            return result;
+        }
+
+        /// <summary>Whether `clip`'s time should wrap (true) or clamp to its last keyframe (false) --
+        /// looks up _pilotClipLoop by clip name, defaulting to true (wrap, the original behaviour) for
+        /// any clip the sidecar doesn't mention or when there's no sidecar at all (e.g. griffin_live.glb,
+        /// which never runs through the pilot path anyway).</summary>
+        private bool LoopFor(AnimatedPose.Clip clip) =>
+            _pilotClipLoop == null || !_pilotClipLoop.TryGetValue(clip.ToString(), out var loop) || loop;
 
         /// <summary>Called once per captured --pilot-sequence frame (not per instance -- markers are a
         /// property of the reel's timeline, not of any one beast) with the just-rendered frame's
@@ -1264,7 +1341,8 @@ namespace BeastCraft.Spike55.Live3D
         {
             float dt = 1f / Math.Max(1, _options.PilotFps);
             GetPilotPoseParams(_pilotFrameIndex, out var clipFrom, out var tFrom, out var clipTo, out var tTo, out var blend);
-            AnimatedPose.ComputeWorldMatricesBlended(_bodyModel, clipFrom, tFrom, clipTo, tTo, blend, inst.NodeWorldScratch);
+            AnimatedPose.ComputeWorldMatricesBlended(_bodyModel, clipFrom, tFrom, clipTo, tTo, blend,
+                inst.NodeWorldScratch, LoopFor(clipFrom), LoopFor(clipTo));
 
             ApplySpringJoint(ref inst.TailSpring, _springTail, inst.NodeWorldScratch, inst.World, dt);
             ApplySpringJoint(ref inst.WingLSpring, _springWingL, inst.NodeWorldScratch, inst.World, dt);
@@ -1487,10 +1565,15 @@ namespace BeastCraft.Spike55.Live3D
                 DrawInstance(inst, toonTechnique);
 
             // Inverted-hull outline pass: reversed culling, so only the expanded shell's silhouette shows.
-            GraphicsDevice.RasterizerState = RasterizerState.CullCounterClockwise;
-            var outlineTechnique = _toonEffect.Techniques["Outline"];
-            foreach (var inst in _instances)
-                DrawInstance(inst, outlineTechnique);
+            // Round 16: --pilot-no-outline skips this entirely (diagnostic only -- see LaunchOptions.
+            // PilotNoOutline's comment).
+            if (!_options.PilotNoOutline)
+            {
+                GraphicsDevice.RasterizerState = RasterizerState.CullCounterClockwise;
+                var outlineTechnique = _toonEffect.Techniques["Outline"];
+                foreach (var inst in _instances)
+                    DrawInstance(inst, outlineTechnique);
+            }
         }
 
         private void DrawInstance(BeastInstance inst, EffectTechnique technique)

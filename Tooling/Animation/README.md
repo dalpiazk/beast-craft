@@ -696,6 +696,190 @@ git diff main --stat -- src .github BeastCraft.slnx      # empty
 Mesh/export: 8000 tris, 41 bones (unchanged from v14 -- joint-geometry pass is off by default, see
 part B), GLB 0.948 MiB, 7 NLA clips (`Idle, Move, Attack, Cast, Hit, KO, Victory`).
 
+## v16: wing-blotch root cause found and fixed, KO's sampler-wrap bug fixed, Cast's leg fix shipped,
+## KO's foreleg tear investigated honestly and NOT fixed, PLUS a major self-discovered export bug
+## (leg-bone keyframes from every keyed clip were silently not reaching the shipped GLB) (producer
+## review round 16)
+
+Lead review of v15's sheets, four items, plus a fifth the lead didn't ask about but this round found
+while chasing item 4.
+
+### 1. Wing blotches (Attack/Cast/Victory) -- FIXED, root cause confirmed not assumed
+
+The lead's hypothesis (dark plum streaks appear exactly when a wing turns edge-on to camera) was
+tested before writing any fix: added `--pilot-no-outline` (a debug-only switch, `Game1.DrawBeasts`,
+`LaunchOptions.PilotNoOutline`) that skips the inverted-hull Outline draw call entirely, then
+re-captured the exact Attack-strike/Cast-peak/Victory-rear frames that showed the blotch. With the
+outline pass off, every blotch vanished completely -- confirmed, not assumed, the outline pass was
+the cause, not the toon fill underneath it.
+
+**Root cause:** `griffin_anim.glb`'s wings are a bundle of many thin, independently-decimated
+feather-card islands with not reliably consistent winding (already known and worked around for the
+toon fill pass -- see `DrawBeasts`' `CullNone` comment -- but never addressed for the Outline pass,
+which is single-sided with REVERSED culling). A first fix attempt scaled the outline push-out
+DISTANCE to zero on wing/tail-tip bones (`Toon.fx`'s new `BoneOutlineMask` uniform, built once per
+model load by `Game1.BuildBoneOutlineMask` from joint names, reused via the SAME BlendIndices/
+BlendWeight already uploaded for skinning -- no new vertex attribute, no GLB schema change, no
+Blender exporter plumbing). This measurably shrank the blotches but didn't fully clear them --
+re-rendering and zooming into the residual patch showed it was the SAME SIZE at mask 0.15 and mask
+0.0, which a push-out-distance scale can never explain (thickness only changes how far a shell pokes
+through, not whether a whole triangle renders). Diagnosed further: a mis-wound card's surface is
+KEPT (not culled) under `CullCounterClockwise`, so its full front face renders flat in `OutlineColor`
+regardless of push-out distance -- the real brief-suggested fix for this is "skip the hull for wing
+submeshes," which this mesh has no separate draw call to simply omit. Implemented per-pixel instead:
+`VSOutput` carries an interpolated `OutlineMask`, and `PS_Outline` does `clip(input.OutlineMask -
+0.5)` -- a mis-wound wing/tail-tip triangle is discarded outright, regardless of winding or push-out
+distance. Confirmed clean afterward: re-rendered and zoomed into every previously-blotched frame
+(Attack's strike frame, Cast's peak-hold frames, Victory's rear-up frames) -- all clear. Also
+confirmed NO regression on Idle/Move (which never had this issue) and on the Swarmling's own outline
+pass (untouched, its mask stays 1.0 everywhere -- no wing-card bundle on that rig).
+
+### 2. KO's final contact-sheet frame snapping to neutral -- FIXED
+
+Root-caused exactly as the lead suspected: the contact-sheet/MP4 capture's own last-frame formula
+(`frameIndex/(frames-1)*duration`) lands on `t == duration` exactly at the last sample, and
+`AnimatedPose`'s sampler unconditionally WRAPPED every clip's time (`Wrap(duration, duration)`,
+whose floating-point modulo is 0) -- silently re-evaluating the bind/neutral pose instead of holding
+KO's authored collapsed final pose. Fixed with a per-clip loop flag, sourced from data, not
+hardcoded twice: `keyed.py`'s new `CLIP_LOOP` dict (`Idle`/`Move`/`Victory` = loop/wrap, `Attack`/
+`Hit`/`Cast`/`KO` = one-shot/clamp) is written into `keyed_event_markers.json` alongside the existing
+event markers, forwarded by `export_glb.py` into the `griffin_anim_events.json` sidecar's new `loop`
+map, and read by `Game1.LoadPilotClipLoop`/`LoopFor`. `AnimatedPose.ComputeWorldMatricesBlended`
+gained `loopFrom`/`loopTo` parameters (default `true`, so every pre-round-16 call site is unaffected)
+that CLAMP instead of WRAP when `false`. Confirmed fixed: re-captured KO's contact sheet and the full
+reel -- the last frame now holds the exact same collapsed pose as the second-to-last frame (checked
+pixel-identical by eye), instead of snapping upright.
+
+### 3. KO's foreleg tear (flipped triangles) -- investigated rigorously, NOT fixed, reverted
+
+Four variants were actually rendered and gated, not guessed, chasing the brief's "fold the wrist
+rather than over-bend the elbow" suggestion:
+1. **Original** (thigh 34/shin -30 at front_buckle, 46/-42 at collapse): 812 flipped triangles --
+   this round's starting point.
+2. **Thigh/shin reduced to Attack's own proven-safe envelope (22/-14, which Attack itself passes
+   clean on) plus a new foot-bone ("wrist") rotation:** 4565 flips -- much worse. The toe bones stay
+   at their own rest rotation while the foot (their direct parent) swings hard underneath them,
+   twisting the foot/toe junction far more than thigh/shin bend ever did.
+3. **Thigh/shin reduced alone, no foot rotation, spine_02 raised for a "chest drops onto the
+   forearms" read:** still 2662 flips -- also worse, and counter-intuitively so (a SMALLER bend at
+   the actual worst frame produced MORE flips, not fewer -- this deformation is not simply monotonic
+   in bend angle).
+4. **Thigh/shin back to the original magnitude, spine_02 still raised (isolating the spine change
+   alone):** 2521 flips -- confirms the regression in #3 was never really about leg-bend angle, it
+   was the spine_02 increase (the restricted vertex set does pick up a little spine_01 weight,
+   apparently enough to matter at this pose's extremes).
+
+Reverted KO's `front_buckle`/`collapse` poses to their exact original v15 values (variant 1, the only
+one of the four that doesn't regress the gate this was meant to fix) -- shipping any of the "fixes"
+would have made the targeted defect measurably worse, which defeats the point. **Honestly: Part 3 was
+not achieved this round.** The `battle_clips` flip count is 674 in the final build (vs v15's 531) --
+not from any KO change (KO's pose is byte-for-byte unchanged from v15), but from item 4 below's Cast
+leg adjustment shifting the combined Cast+Hit+KO+Victory total; KO's own worst-flip frame/triangle is
+unchanged. Visual inspection (not just the gate number) of every KO contact-sheet frame at full
+resolution shows the stagger/buckle/collapse progression reading correctly, with no severe,
+obviously-broken tear visible at normal viewing distance -- consistent with this gate's established
+pattern (v9/v14): a real, failing, unresolved weighting defect, concentrated in a small recurring set
+of triangles, not a catastrophic visible break.
+
+### 4. Cast's forelegs splaying forward at the peak -- FIXED
+
+Both forelegs previously lifted by the same amount at `peak`/`peak_hold` (`thigh=-14/shin=8` each),
+reading as both paws sliding forward together rather than a rear. Changed to asymmetric: FL lifts
+slightly (`thigh=-9/shin=5`, a reduced version of the old uniform lift), FR stays close to
+planted/neutral (`thigh=-2/shin=1`) for balance. This edit is correctly authored and -- after item 5
+below's fix -- correctly reaches the shipped GLB: re-rendered and zoomed into the peak frame, one
+foreleg now reads as extended/lifted while the other stays tucked near the body, not both kicking
+forward in lockstep.
+
+### 5. Self-discovered: a leg-bone rotation-mode bug in `export_glb.py` has silently dropped every
+### keyed clip's leg-pose keyframes from the shipped GLB, since Attack was introduced -- FIXED
+
+While verifying item 4, re-rendering the "fixed" Cast peak frame showed NO visible leg difference at
+all from v15. Rather than assume the render was "close enough," this was investigated directly: a
+byte-for-byte `cmp` of the newly-exported GLB against the v15-committed one came back **completely
+identical**, despite `griffin_keyed.blend` (checked directly in Blender) unambiguously containing the
+new, correct Cast leg values. Traced to the actual cause, not guessed: `export_glb.py`'s armature
+(loaded from `--move`, i.e. `griffin_move.blend`, gait.py's own output) has its **leg pose bones in
+QUATERNION rotation_mode** (left that way by gait.py's own direct-world-matrix IK posing code), while
+every keyed.py clip (Idle/Attack/Cast/Hit/KO/Victory) is authored entirely via `rotation_euler` under
+explicit XYZ mode (keyed.py sets this on **its own** armature at its own script start -- `rotation_
+mode` is a property of a pose bone on a specific armature object, not something that travels with an
+Action when the action alone is appended into a different file's armature, which is exactly what
+export_glb.py does). A pose bone's `rotation_euler` property always stores whatever was last written
+to it -- reading it back directly confirmed the edited values were there -- but Blender only uses that
+property to compute the bone's actual applied transform when `rotation_mode` is an Euler order; in
+QUATERNION mode the untouched (still-identity) `rotation_quaternion` drives the pose instead, so every
+Euler leg keyframe from every keyed clip was silently discarded during export, with NO error or
+warning. Confirmed directly: `leg_FL_thigh`/`leg_FR_thigh`/`leg_BR_thigh` were QUATERNION on a fresh
+load of `griffin_move.blend`, while `spine_02`/`head`/`wing_L_01` were XYZ -- exactly matching which
+bones' keyed-clip pose changes silently failed to export (every LEG bone) versus which ones worked
+(everything else, which is why Attack/Hit/KO/Victory's spine/head/wing/jaw motion has always read
+correctly on screen, masking the missing leg motion underneath it).
+
+**This means every keyed clip's authored leg poses -- Attack's strike-frame leg brace, Cast's rear
+stance, Hit's leg brace, KO's front/hind buckle, Victory's rear-up stance -- have been silently inert
+in every exported GLB since Attack was introduced (round 10), not just this round's Cast edit.** The
+clips still read as reasonably correct on screen because spine/neck/head/wing/jaw motion (all XYZ
+mode, unaffected) carries most of each pose's visual read, and because the legs simply stayed at
+whatever pose Move/Idle last left them in rather than snapping to an obviously-wrong extreme -- easy
+to miss without directly comparing exported bytes.
+
+**Fix:** `export_glb.py` now normalises every pose bone on the `--move` armature to XYZ rotation mode
+immediately after opening the file, before any keyed action is appended or pushed onto an NLA strip,
+matching keyed.py's own convention. Confirmed fixed, not just theorised: re-exported, `cmp` against
+v15 now reports a genuine byte difference (GLB grew from 993,920 to 1,000,020 bytes -- leg channels
+now carry real per-frame keyframe data instead of being optimised away as constant), and re-rendering
+Cast's peak frame now visibly shows the asymmetric foreleg lift from item 4. Re-ran the full `verify.
+py` gate suite afterward (which reads `griffin_keyed.blend`/`griffin_move.blend` directly, never
+through `export_glb.py`, so it was never affected by this bug and its numbers are unchanged) to
+confirm no regression, then regenerated and re-inspected every contact sheet and MP4 against the
+corrected GLB (see below) -- all 7 clips still read correctly, several (Attack's strike leg brace,
+Cast's rear stance) now show real leg motion that was previously silently missing.
+
+### Gates, sheets, MP4s
+
+`verify.py`'s full gate suite (`scratchpad/anim-pilot/v16/verify_report.json`, unaffected by item 5's
+bug since it never goes through export_glb.py): all jitter/loop-seam/interpenetration/walk-direction/
+foot-orientation/toe-fan gates pass, unchanged from v15. The pre-existing Move/Attack edge-stretch
+gate is unchanged (9.56x/3.32x -- untouched this round). `toe_deformation`: `move` unchanged (2.73x/
+812 flips); `idle_attack` unchanged and passing (1.27x/0 flips); `battle_clips` worst-stretch improved
+slightly (1.61x -> 1.49x, still over the 1.35x target) and worst-flip-count moved from 531 to 674 --
+not from any KO change (KO's own pose is byte-for-byte unchanged from v15, confirmed by reverting
+every attempted change in item 3 above), but from Cast's leg adjustment (item 4) shifting the combined
+Cast+Hit+KO+Victory `battle_clips` total; KO's own worst-flip frame/triangle is unchanged.
+
+Contact sheets (`scratchpad/anim-pilot/review_v16/final/contact_sheet_*.png`, 8 sheets incl.
+move_side) and MP4s + the full reordered reel (`scratchpad/anim-pilot/video_v16/griffin_*.mp4`,
+same ffmpeg settings and frame/loop counts as v15) regenerated TWICE this round -- once before item
+5's fix was found, then discarded and regenerated again afterward against the corrected GLB, since
+the first pass's renders were silently missing every clip's leg motion -- for all 7 clips from the
+real Live3D runtime, inspected frame-by-frame against the FINAL, corrected build:
+- **Idle, Move, Move (side):** unaffected by item 5 (gait.py/Move already drove legs correctly via
+  direct world-matrix IK, not Euler keyframes) and unaffected by item 1 (no wing-card outline issue
+  at these poses); unchanged from v15, clean.
+- **Attack:** wing blotch gone (item 1); the strike pose's foreleg brace is now actually visible for
+  the first time (item 5) -- reads as a real plant/brace on the strike frame, not inert legs.
+- **Cast:** wing blotch gone (item 1); the peak pose now genuinely shows one foreleg lifted, the
+  other grounded (items 4 + 5 together).
+- **Hit:** clean, reads as a sharp recoil + recovery; legs brace slightly on the recoil frame (now
+  visible per item 5).
+- **Victory:** wing blotch gone (item 1); rear-up leg stance now visible (item 5).
+- **KO:** last frame now correctly holds the collapsed pose (item 2's fix) instead of snapping
+  upright; legs now actually buckle/collapse as keyed (item 5) instead of staying inert; the foreleg
+  tear (item 3) remains, not visually catastrophic at normal viewing distance (zoomed crops of the
+  front-foot/thigh region at the buckle and collapse poses show normal-looking geometry, no dark
+  torn mass) but a real, still-failing gate.
+- **Full reel** (idle -> move -> attack -> hit -> cast -> victory -> ko, `Game1.PilotReelSegments`):
+  600 frames @ 60fps (9.96s), both event markers (`hit_react`, `cast_release`) logged exactly once at
+  the correct times, and the last two captured frames are pixel-identical (confirming the reel also
+  ends on KO's held collapse, not a snap-back).
+
+Mesh unchanged at 8000 tris / 41 bones; GLB grew slightly to 0.954 MiB (993,920 -> 1,000,020 bytes,
+item 5's fix giving leg bones real per-frame animation data instead of being silently optimised to a
+constant), still well under the 2 MiB budget; 7 NLA clips; events sidecar now also carries the `loop`
+map. Live3D gates green: build 0 warnings, `dotnet format` clean, BeastCraft.Desktop build 0 warnings,
+EditModeTests 1663/1663 passed, `git diff main --stat -- src .github BeastCraft.slnx` empty.
+
 ## v9: max-edge-stretch gate + weight/render fixes -- partial progress, honestly not fully resolved
 ## (lead-review round 9)
 

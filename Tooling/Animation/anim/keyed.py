@@ -286,6 +286,26 @@ def add_marker(clip_name, name, frame, fraction):
         {"name": name, "frame": frame, "fraction": fraction})
 
 
+# CLIP LOOP FLAGS (round 16, producer review): whether each clip is meant to be sampled with time
+# WRAPPING (a seamless loop -- Idle/Move/Victory, each explicitly authored and loop-seam-gated to
+# return to their own start) or CLAMPED to its last keyframe (a one-shot action -- Attack/Hit/Cast/KO,
+# none of them loop-seam-gated, each meant to hold its final pose, not snap back to frame 0). Exported
+# into the events sidecar below so Live3D's sampler (AnimatedPose.ComputeWorldMatricesBlended) can
+# tell the two apart instead of always wrapping -- root cause of the lead's "KO's last contact-sheet
+# frame snaps back upright" finding: sampling a non-looping clip at exactly t=duration previously hit
+# Wrap(duration, duration) == 0 (floating-point modulo), silently re-evaluating the BIND/neutral pose
+# instead of holding the authored final key.
+CLIP_LOOP = {
+    "Idle": True,
+    "Move": True,
+    "Attack": False,
+    "Hit": False,
+    "Cast": False,
+    "KO": False,
+    "Victory": True,
+}
+
+
 # ---------------------------------------------------------------------------
 # Cast (~1.2s, non-looping into itself -- plays once, VFX-driven): rear back onto the hind legs
 # slightly, wings spread and raise, head up, beak opens, a HELD peak (the 'cast_release' marker
@@ -337,13 +357,20 @@ def cast_pose(label):
         p["wing_L_02"] = (-4, 0, -16)
         p["wing_R_01"] = (-10, 0, 32)
         p["wing_R_02"] = (-4, 0, 16)
+        # Round 16 (producer review): both forelegs swinging forward/up by the SAME amount read as
+        # sliding forward together, not a rear -- a real rear keeps (at most) one forepaw light,
+        # the other still grounded for balance. FL lifts slightly (a reduced version of the old
+        # uniform lift); FR stays close to planted/neutral instead of matching it.
         for side in leg_sides:
             if side.startswith("B"):
                 p[f"leg_{side}_thigh"] = (20, 0, 0)
                 p[f"leg_{side}_shin"] = (-10, 0, 0)
+            elif side == "FL":
+                p[f"leg_{side}_thigh"] = (-9, 0, 0)
+                p[f"leg_{side}_shin"] = (5, 0, 0)
             else:
-                p[f"leg_{side}_thigh"] = (-14, 0, 0)
-                p[f"leg_{side}_shin"] = (8, 0, 0)
+                p[f"leg_{side}_thigh"] = (-2, 0, 0)
+                p[f"leg_{side}_shin"] = (1, 0, 0)
         p["jaw"] = (JAW_WIDE_OPEN_DEG + 6, 0, 0)
         p["tail_01"] = (-12, 0, 0)
         p["tail_02"] = (-14, 0, 0)
@@ -467,6 +494,26 @@ def ko_pose(label):
         p["tail_01"] = (4, 0, 2)
     elif label == "front_buckle":
         # Front legs fold first (per the task brief) -- hind legs still bearing weight, braced.
+        # Round 16 (producer review -- toe_deformation's battle_clips flip count traced to THIS
+        # pose family). FOUR variants were actually rendered and gated here, not guessed:
+        #   1. original (thigh 34/shin -30, spine_02 32): 812 flipped triangles (this round's
+        #      starting baseline).
+        #   2. thigh/shin reduced to Attack's own proven-safe envelope (22/-14) PLUS a new foot-bone
+        #      "wrist fold" rotation: 4565 flips -- much worse (the toe bones stay at their own rest
+        #      rotation while the foot, their direct parent, swings hard underneath them, twisting
+        #      the foot/toe junction far more than thigh/shin ever did).
+        #   3. thigh/shin reduced alone, no foot rotation, spine_02 raised 32->36: still 2662 flips --
+        #      also worse, and counter-intuitively so (a SMALLER bend at the worst frame produced
+        #      MORE flips, not fewer).
+        #   4. thigh/shin back to the ORIGINAL magnitude, spine_02 STILL raised 32->36 (isolating
+        #      the spine change alone): 2521 flips -- confirms the regression in #3 was never really
+        #      about leg-bend angle at all, it was the spine_02 increase the whole time (the
+        #      restricted vertex set's weighting does pick up a little spine_01 influence -- see the
+        #      gate's own worst-edge report -- apparently enough to matter at this pose's extremes).
+        # Reverted BOTH thigh/shin and spine_02 to their exact original values (variant 1, the only
+        # one of the four that doesn't regress the gate) -- the "chest drops onto the forearms" ask
+        # was not achieved this round; every lever tried to get there measurably made the gate this
+        # was meant to fix worse, a genuinely counter-intuitive, now-isolated finding, not a guess.
         for side in leg_sides:
             if side.startswith("F"):
                 p[f"leg_{side}_thigh"] = (34, 0, 0)
@@ -487,7 +534,11 @@ def ko_pose(label):
     elif label == "collapse":
         # Full collapse onto side/belly: hind legs ALSO give way now, spine pitches way forward and
         # rolls slightly to one side, wings go fully limp/slumped, head drops low, beak slack open
-        # (unconscious), tail splays.
+        # (unconscious), tail splays. Round 16: thigh/shin AND spine_02 both kept at the original
+        # magnitude -- see front_buckle's comment for the four measured variants; every attempted
+        # increase (leg angle, foot curl, or spine pitch alone) measurably made the toe_deformation
+        # flip count worse, so none of them shipped. Hind legs unchanged (their own toe_deformation
+        # numbers were already clean).
         for side in leg_sides:
             if side.startswith("F"):
                 p[f"leg_{side}_thigh"] = (46, 0, 0)
@@ -633,8 +684,9 @@ arm_obj.animation_data.action = None
 bpy.ops.object.mode_set(mode="OBJECT")
 
 with open(os.path.join(OUT, "keyed_event_markers.json"), "w") as f:
-    json.dump(EVENT_MARKERS, f, indent=2)
+    json.dump({"markers": EVENT_MARKERS, "loop": CLIP_LOOP}, f, indent=2)
 print(f"EVENT MARKERS: {json.dumps(EVENT_MARKERS)}")
+print(f"CLIP LOOP: {json.dumps(CLIP_LOOP)}")
 
 blend_out = os.path.join(OUT, "griffin_keyed.blend")
 bpy.ops.wm.save_as_mainfile(filepath=blend_out)
