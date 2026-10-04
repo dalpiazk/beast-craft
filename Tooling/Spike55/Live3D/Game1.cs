@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Numerics;
+using System.Text.Json;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -55,6 +56,20 @@ namespace BeastCraft.Spike55.Live3D
         private SpringJointConfig _springWingR;
         private int _pilotFrameIndex;
         private int _pilotWarmupFramesLeft = 6; // let the window/GPU settle before the first capture
+
+        // Round 15: griffin_anim.glb's sidecar event-marker JSON (export_glb.py writes
+        // griffin_anim_events.json next to it -- Tooling/Animation/anim/keyed.py's EVENT_MARKERS, e.g.
+        // Cast's "cast_release" VFX cue, Hit's "hit_react"). Keyed by clip name (matching
+        // AnimatedPose.Clip's names), each entry a marker's fraction (0..1) through that clip's own
+        // duration -- fraction, not the authored frame number, is what's actually usable here since
+        // this runtime's clip duration (from the GLB's own animation sampler) is the authority, not
+        // keyed.py's 24fps bake. Null/empty if the sidecar is missing (e.g. griffin_live.glb has none).
+        private Dictionary<string, List<(string Name, float Fraction)>> _pilotEventMarkers;
+        // Crossing-detection state for --pilot-sequence logging (see LogPilotEventMarkerCrossings):
+        // the previous captured frame's (clip, time-within-clip), so a marker is logged exactly once,
+        // the first captured frame whose time has reached or passed it.
+        private AnimatedPose.Clip _pilotMarkerLastClip = (AnimatedPose.Clip)(-1);
+        private float _pilotMarkerLastTime = -1f;
 
         // Cached effect parameters (avoid a string-keyed lookup in EffectParameterCollection every draw
         // call -- looked up once here instead of via Parameters["..."] in the hot path).
@@ -301,6 +316,8 @@ namespace BeastCraft.Spike55.Live3D
                 _springTail = new SpringJointConfig(AnimatedPose.FindNodeIndexByName(_bodyModel, "tail_04"), 90f, 6f);
                 _springWingL = new SpringJointConfig(AnimatedPose.FindNodeIndexByName(_bodyModel, "wing_L_03"), 140f, 8f);
                 _springWingR = new SpringJointConfig(AnimatedPose.FindNodeIndexByName(_bodyModel, "wing_R_03"), 140f, 8f);
+
+                _pilotEventMarkers = LoadPilotEventMarkers(Path.Combine(contentRoot, "model", "griffin_anim_events.json"));
             }
 
             _bodyMesh = GpuMesh.Build(GraphicsDevice, _bodyModel);
@@ -1041,11 +1058,35 @@ namespace BeastCraft.Spike55.Live3D
         private const float PilotIdleInLen = 1.5f;
         private const float PilotMoveLen = 1.2f;
         private const float PilotAttackLen = 1.0f;
-        private const float PilotIdleOutLen = 0.6f;
         private const float PilotCrossfade = 0.2f;
+        // Round 15: the reel now sequences all 7 clips, in the order the task brief specifies --
+        // idle -> move -> attack -> hit -> cast -> victory -> KO -- each held for a representative
+        // slice (full duration for the three new one-shot/short clips, same trimmed slices as
+        // before for idle/move/attack), crossfaded between every pair. KO is last and does NOT
+        // crossfade back to idle (it's a deliberate non-looping end-state -- see keyed.py) -- the
+        // reel simply ends on KO's held final pose.
+        private static readonly (AnimatedPose.Clip Clip, float Len)[] PilotReelSegments =
+        {
+            (AnimatedPose.Clip.Idle, PilotIdleInLen),
+            (AnimatedPose.Clip.Move, PilotMoveLen),
+            (AnimatedPose.Clip.Attack, PilotAttackLen),
+            (AnimatedPose.Clip.Hit, 0.5f),
+            (AnimatedPose.Clip.Cast, 1.2f),
+            (AnimatedPose.Clip.Victory, 2.0f),
+            (AnimatedPose.Clip.KO, 1.4f),
+        };
 
-        private static float PilotReelDuration() =>
-            PilotIdleInLen + PilotCrossfade + PilotMoveLen + PilotCrossfade + PilotAttackLen + PilotCrossfade + PilotIdleOutLen;
+        private static float PilotReelDuration()
+        {
+            float total = 0f;
+            for (int i = 0; i < PilotReelSegments.Length; i++)
+            {
+                total += PilotReelSegments[i].Len;
+                if (i < PilotReelSegments.Length - 1)
+                    total += PilotCrossfade;
+            }
+            return total;
+        }
 
         private float ClipDuration(AnimatedPose.Clip clip)
         {
@@ -1054,6 +1095,10 @@ namespace BeastCraft.Spike55.Live3D
                 AnimatedPose.Clip.Idle => _bodyModel.IdleAnimation,
                 AnimatedPose.Clip.Move => _bodyModel.MoveAnimation,
                 AnimatedPose.Clip.Attack => _bodyModel.AttackAnimation,
+                AnimatedPose.Clip.Cast => _bodyModel.CastAnimation,
+                AnimatedPose.Clip.Hit => _bodyModel.HitAnimation,
+                AnimatedPose.Clip.KO => _bodyModel.KOAnimation,
+                AnimatedPose.Clip.Victory => _bodyModel.VictoryAnimation,
                 _ => null,
             };
             return anim?.Duration ?? 1f;
@@ -1061,13 +1106,95 @@ namespace BeastCraft.Spike55.Live3D
 
         /// <summary>How many frames --pilot-sequence should render in total: one pass over the crossfaded
         /// reel's own duration at --pilot-fps for "reel" (the GIF deliverable), or --frames evenly spaced
-        /// across exactly one loop of the named clip's own duration for "idle"/"move"/"attack" (the
-        /// contact-sheet deliverable -- Tooling/Animation/README.md's gate).</summary>
+        /// across exactly one loop of the named clip's own duration for a single clip (the contact-sheet
+        /// deliverable -- Tooling/Animation/README.md's gate).</summary>
         private int TotalPilotFrames()
         {
             if (string.Equals(_options.PilotClip, "reel", StringComparison.OrdinalIgnoreCase))
                 return Math.Max(1, (int)MathF.Ceiling(PilotReelDuration() * _options.PilotFps));
             return Math.Max(1, _options.PilotFrames);
+        }
+
+        private static AnimatedPose.Clip ParseClipName(string name) => name.ToLowerInvariant() switch
+        {
+            "move" => AnimatedPose.Clip.Move,
+            "attack" => AnimatedPose.Clip.Attack,
+            "cast" => AnimatedPose.Clip.Cast,
+            "hit" => AnimatedPose.Clip.Hit,
+            "ko" => AnimatedPose.Clip.KO,
+            "victory" => AnimatedPose.Clip.Victory,
+            _ => AnimatedPose.Clip.Idle,
+        };
+
+        /// <summary>Reads export_glb.py's griffin_anim_events.json sidecar (Tooling/Animation/anim/
+        /// keyed.py's EVENT_MARKERS, re-keyed by export_glb.py -- see its header comment) into a
+        /// clip-name-keyed lookup of (marker name, fraction-through-clip). Tolerant of a missing file
+        /// (older/rebuilt content without the round-15 clips) and of any parse failure -- this is a
+        /// pilot-harness diagnostic aid, not gameplay-critical, so a bad/missing sidecar just means no
+        /// markers get logged, never a crash.</summary>
+        private static Dictionary<string, List<(string Name, float Fraction)>> LoadPilotEventMarkers(string path)
+        {
+            var result = new Dictionary<string, List<(string Name, float Fraction)>>(StringComparer.OrdinalIgnoreCase);
+            if (!File.Exists(path))
+                return result;
+            try
+            {
+                using var doc = JsonDocument.Parse(File.ReadAllText(path));
+                if (!doc.RootElement.TryGetProperty("markers", out var markersEl))
+                    markersEl = doc.RootElement; // tolerate a sidecar that's just {clip: [...]} with no wrapper
+                foreach (var clipProp in markersEl.EnumerateObject())
+                {
+                    var list = new List<(string Name, float Fraction)>();
+                    foreach (var markerEl in clipProp.Value.EnumerateArray())
+                    {
+                        string name = markerEl.TryGetProperty("name", out var n) ? n.GetString() : "marker";
+                        float fraction = markerEl.TryGetProperty("fraction", out var f) ? f.GetSingle() : 0f;
+                        list.Add((name, fraction));
+                    }
+                    result[clipProp.Name] = list;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[pilot] warning: failed to load event markers from {path}: {ex.Message}");
+            }
+            return result;
+        }
+
+        /// <summary>Called once per captured --pilot-sequence frame (not per instance -- markers are a
+        /// property of the reel's timeline, not of any one beast) with the just-rendered frame's
+        /// (clipFrom, tFrom) from GetPilotPoseParams. Logs (Console.WriteLine) the first captured frame
+        /// whose time has reached or passed each of that clip's markers, exactly once per crossing --
+        /// tracks the previous captured frame's (clip, time) in _pilotMarkerLast* to detect the crossing.
+        /// A clip change (including the reel wrapping back to its first segment) resets the tracked time
+        /// to "before the clip start" so that clip's own markers can still fire from frame zero.</summary>
+        private void LogPilotEventMarkerCrossings(AnimatedPose.Clip clip, float timeInClip)
+        {
+            if (_pilotEventMarkers == null || _pilotEventMarkers.Count == 0)
+                return;
+            if (clip != _pilotMarkerLastClip || timeInClip < _pilotMarkerLastTime)
+            {
+                // New clip segment (or a loop wrap within the same clip): start fresh so this
+                // segment's own markers aren't skipped as "already passed".
+                _pilotMarkerLastClip = clip;
+                _pilotMarkerLastTime = -1f;
+            }
+
+            if (_pilotEventMarkers.TryGetValue(clip.ToString(), out var markers))
+            {
+                float duration = ClipDuration(clip);
+                foreach (var (name, fraction) in markers)
+                {
+                    float markerTime = fraction * duration;
+                    if (markerTime > _pilotMarkerLastTime && markerTime <= timeInClip)
+                    {
+                        Console.WriteLine(
+                            $"[pilot] event marker '{name}' fired -- clip={clip} frame={_pilotFrameIndex} t={timeInClip:F3}s (fraction {fraction:F2})");
+                    }
+                }
+            }
+
+            _pilotMarkerLastTime = timeInClip;
         }
 
         /// <summary>Maps a captured frame index to the (fromClip, fromTime, toClip, toTime, blend) that
@@ -1078,12 +1205,7 @@ namespace BeastCraft.Spike55.Live3D
         {
             if (!string.Equals(_options.PilotClip, "reel", StringComparison.OrdinalIgnoreCase))
             {
-                var clip = _options.PilotClip.ToLowerInvariant() switch
-                {
-                    "move" => AnimatedPose.Clip.Move,
-                    "attack" => AnimatedPose.Clip.Attack,
-                    _ => AnimatedPose.Clip.Idle,
-                };
+                var clip = ParseClipName(_options.PilotClip);
                 float duration = ClipDuration(clip);
                 int frames = Math.Max(1, _options.PilotFrames);
                 float t = frames > 1 ? frameIndex / (float)(frames - 1) * duration : 0f;
@@ -1093,31 +1215,43 @@ namespace BeastCraft.Spike55.Live3D
                 return;
             }
 
-            float s1 = PilotIdleInLen;
-            float s2 = s1 + PilotCrossfade;
-            float s3 = s2 + PilotMoveLen;
-            float s4 = s3 + PilotCrossfade;
-            float s5 = s4 + PilotAttackLen;
-            float s6 = s5 + PilotCrossfade;
-            float s7 = s6 + PilotIdleOutLen;
-
+            // Generic N-segment crossfaded sequence (round 15 -- replaces the old hard-coded
+            // idle/move/attack-only 7-boundary version with a data-driven walk over
+            // PilotReelSegments, so adding/reordering clips doesn't need new boundary variables).
+            float reelDuration = PilotReelDuration();
             float simTime = frameIndex / (float)Math.Max(1, _options.PilotFps);
-            float t2 = simTime % s7;
+            float t2 = simTime % reelDuration;
 
-            if (t2 < s1)
-            { clipFrom = clipTo = AnimatedPose.Clip.Idle; tFrom = tTo = t2; blend = 0f; }
-            else if (t2 < s2)
-            { clipFrom = AnimatedPose.Clip.Idle; clipTo = AnimatedPose.Clip.Move; tFrom = t2; tTo = t2 - s1; blend = (t2 - s1) / PilotCrossfade; }
-            else if (t2 < s3)
-            { clipFrom = clipTo = AnimatedPose.Clip.Move; tFrom = tTo = t2 - s2; blend = 0f; }
-            else if (t2 < s4)
-            { clipFrom = AnimatedPose.Clip.Move; clipTo = AnimatedPose.Clip.Attack; tFrom = t2 - s2; tTo = t2 - s3; blend = (t2 - s3) / PilotCrossfade; }
-            else if (t2 < s5)
-            { clipFrom = clipTo = AnimatedPose.Clip.Attack; tFrom = tTo = t2 - s4; blend = 0f; }
-            else if (t2 < s6)
-            { clipFrom = AnimatedPose.Clip.Attack; clipTo = AnimatedPose.Clip.Idle; tFrom = t2 - s4; tTo = t2 - s5; blend = (t2 - s5) / PilotCrossfade; }
-            else
-            { clipFrom = clipTo = AnimatedPose.Clip.Idle; tFrom = tTo = t2 - s6; blend = 0f; }
+            float cursor = 0f;
+            for (int i = 0; i < PilotReelSegments.Length; i++)
+            {
+                var (clip, len) = PilotReelSegments[i];
+                float holdEnd = cursor + len;
+                if (t2 < holdEnd || i == PilotReelSegments.Length - 1)
+                {
+                    clipFrom = clipTo = clip;
+                    tFrom = tTo = Math.Max(0f, t2 - cursor);
+                    blend = 0f;
+                    return;
+                }
+                float fadeEnd = holdEnd + PilotCrossfade;
+                if (t2 < fadeEnd)
+                {
+                    var next = PilotReelSegments[i + 1].Clip;
+                    clipFrom = clip;
+                    clipTo = next;
+                    tFrom = t2 - cursor;
+                    tTo = t2 - holdEnd;
+                    blend = (t2 - holdEnd) / PilotCrossfade;
+                    return;
+                }
+                cursor = fadeEnd;
+            }
+            // Unreachable (the loop's last-segment branch above always returns), but keeps the
+            // compiler happy about definite assignment.
+            clipFrom = clipTo = AnimatedPose.Clip.Idle;
+            tFrom = tTo = 0f;
+            blend = 0f;
         }
 
         /// <summary>Pilot-mode equivalent of UpdateInstancePose: evaluates a crossfaded pose (see
@@ -1261,6 +1395,13 @@ namespace BeastCraft.Spike55.Live3D
                 }
                 else
                 {
+                    // Round 15: log any event marker (e.g. Cast's "cast_release", Hit's "hit_react" --
+                    // Tooling/Animation/anim/keyed.py) crossed by the frame about to be captured, using
+                    // the same (clipFrom, tFrom) GetPilotPoseParams already computed for this frame's
+                    // pose in UpdateInstancePosePilot.
+                    GetPilotPoseParams(_pilotFrameIndex, out var markerClip, out var markerTime, out _, out _, out _);
+                    LogPilotEventMarkerCrossings(markerClip, markerTime);
+
                     // SaveScreenshot itself creates the output directory if needed.
                     string path = Path.Combine(_options.PilotSequenceDir, $"frame_{_pilotFrameIndex:D4}.png");
                     SaveScreenshot(path);

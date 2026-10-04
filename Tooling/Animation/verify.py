@@ -200,7 +200,13 @@ if MOVE_BLEND:
 if KEYED_BLEND:
     arm_obj = load(KEYED_BLEND)
     scene = bpy.context.scene
-    for clip_name, is_loop in (("Idle", True), ("Attack", False)):
+    # Round 15: four new battle clips, same jitter/loop-seam checks as Idle/Attack. Victory is
+    # built with a deliberately near-neutral final pose (loop-friendly per the task brief) so it's
+    # checked as a loop too; Cast/Hit/KO are each a one-shot (Cast/Hit return toward neutral but
+    # aren't meant to tile seamlessly into themselves the way Idle/Victory are; KO explicitly ends
+    # on a held, non-neutral collapsed pose and must NOT loop).
+    for clip_name, is_loop in (("Idle", True), ("Attack", False), ("Cast", False), ("Hit", False),
+                                ("KO", False), ("Victory", True)):
         action = bpy.data.actions.get(clip_name)
         if action is None:
             continue
@@ -279,6 +285,33 @@ if MOVE_BLEND and "move" in report:
         below_ground_report[side] = {"min_toe_z": min_z, "pass": min_z > -0.01}
         print(f"  leg {side} min toe z: {min_z:.4f} -> {'PASS' if min_z > -0.01 else 'FAIL'}")
     report["move"]["interpenetration_ground"] = below_ground_report
+
+# ---------------------------------------------------------------------------
+# Round 15: ground-interpenetration for the new battle clips, "where applicable" per the task
+# brief -- Cast/Hit/Victory all keep (or return) the feet near ground level and should never clip
+# through it, same -0.01 budget as Move. KO is deliberately EXCLUDED: it's a full collapse onto
+# the ground by design (the task brief's own wording), so a "feet never go below ground" check
+# would be checking the wrong thing for that specific clip.
+# ---------------------------------------------------------------------------
+if KEYED_BLEND:
+    arm_obj = load(KEYED_BLEND)
+    leg_sides = sorted({n.name.split("_")[1] for n in arm_obj.data.bones if n.name.startswith("leg_")})
+    for clip_name in ("Cast", "Hit", "Victory"):
+        action = bpy.data.actions.get(clip_name)
+        if action is None:
+            continue
+        clip_ground_report = {}
+        for side in leg_sides:
+            toe_suffixes = ("toe_in", "toe_mid", "toe_out") if f"leg_{side}_toe_in" in arm_obj.data.bones \
+                else ("toe",)
+            min_z = min(
+                p.z for suffix in toe_suffixes
+                for _, p in sample_action_bone_positions(arm_obj, action, f"leg_{side}_{suffix}", "tail")
+            )
+            clip_ground_report[side] = {"min_toe_z": min_z, "pass": min_z > -0.01}
+            print(f"  {clip_name} leg {side} min toe z: {min_z:.4f} -> "
+                  f"{'PASS' if min_z > -0.01 else 'FAIL'}")
+        report.setdefault(clip_name.lower(), {})["interpenetration_ground"] = clip_ground_report
 
 # ---------------------------------------------------------------------------
 # Round 9: max edge-stretch across Move/Attack. A long thin dark sliver/line visible in the toon
@@ -812,6 +845,11 @@ if KEYED_BLEND:
     r = check_toe_deformation(KEYED_BLEND, ["Idle", "Attack"])
     if r is not None:
         toe_deform_results["idle_attack"] = r
+    # Round 15: the four new battle clips also pose the foreleg/toe-fan bones (Cast/Victory rear
+    # up, Hit/KO brace/buckle the legs) -- check them against the same mesh-deformation gate.
+    r = check_toe_deformation(KEYED_BLEND, ["Cast", "Hit", "KO", "Victory"])
+    if r is not None:
+        toe_deform_results["battle_clips"] = r
 if toe_deform_results:
     report["toe_deformation"] = {
         "pass": all(r["pass"] for r in toe_deform_results.values()),

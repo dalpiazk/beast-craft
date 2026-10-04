@@ -15,13 +15,18 @@ namespace BeastCraft.Spike55.Live3D
     /// computes matrices, it never touches a vertex).</summary>
     public static class AnimatedPose
     {
-        public enum Clip { Idle, Move, Attack }
+        // Round 15: four new battle clips (Cast, Hit, KO, Victory) -- Tooling/Animation/anim/keyed.py.
+        public enum Clip { Idle, Move, Attack, Cast, Hit, KO, Victory }
 
         private static Animation AnimationFor(GltfSkinnedModel model, Clip clip) => clip switch
         {
             Clip.Idle => model.IdleAnimation,
             Clip.Move => model.MoveAnimation,
             Clip.Attack => model.AttackAnimation,
+            Clip.Cast => model.CastAnimation,
+            Clip.Hit => model.HitAnimation,
+            Clip.KO => model.KOAnimation,
+            Clip.Victory => model.VictoryAnimation,
             _ => null,
         };
 

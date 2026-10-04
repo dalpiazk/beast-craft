@@ -13,6 +13,7 @@ import bpy
 import sys
 import os
 import math
+import json
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import common
@@ -262,8 +263,378 @@ print(f"ATTACK ACTION: {len(ATTACK_KEYS)} key poses ({', '.join(ATTACK_LABELS)})
       f"{ATTACK_FRAMES} frames @ {FPS}fps, {n2} fcurves, strike frame={strike_frame}")
 
 reset_all()
+
+# ---------------------------------------------------------------------------
+# Round 15 (producer-approved v14; next round -- four new battle clips: Cast, Hit, KO, Victory).
+# Same principles as Idle/Attack above: sparse hand-keyed poses, Bezier EASE_IN_OUT, anticipation/
+# follow-through/arcs, legs stay planted (no leg-bone rotation) unless the clip specifically needs
+# otherwise (Cast/Victory rear up, KO collapses -- all three touch leg bones deliberately, same FK-
+# only approach Attack's foreleg rake already established: no ground-contact verification, since
+# this file has never driven locomotion IK -- see its own docstring). Toe bones are never touched
+# directly in any clip here, in any of the 6 hand-keyed clips old or new -- they stay at local
+# rest/identity, which IS "following the foot in local space," the same correct-by-construction
+# behaviour round 14 established for gait.py's FK-driven toe fan.
+#
+# EVENT MARKERS: per the task brief, exported alongside the GLB (a sidecar JSON here, not glTF
+# extras -- both are explicitly allowed; the sidecar is simpler and needs no custom exporter
+# plumbing) and logged by Live3D when the pilot sequence crosses that frame during playback.
+EVENT_MARKERS = {}  # clip_name -> [{"name": str, "frame": int, "fraction": float}, ...]
+
+
+def add_marker(clip_name, name, frame, fraction):
+    EVENT_MARKERS.setdefault(clip_name, []).append(
+        {"name": name, "frame": frame, "fraction": fraction})
+
+
+# ---------------------------------------------------------------------------
+# Cast (~1.2s, non-looping into itself -- plays once, VFX-driven): rear back onto the hind legs
+# slightly, wings spread and raise, head up, beak opens, a HELD peak (the 'cast_release' marker
+# fires here, for VFX to key off), then settle back toward neutral.
+# ---------------------------------------------------------------------------
+CAST_SECONDS = 1.2
+CAST_FRAMES = int(round(CAST_SECONDS * FPS))
+cast_action = bpy.data.actions.new("Cast")
+cast_action.use_fake_user = True
+arm_obj.animation_data.action = cast_action
+
+CAST_KEYS = [0.0, 0.30, 0.55, 0.78, 1.0]
+CAST_LABELS = ["neutral", "rise", "peak", "peak_hold", "settle"]
+
+
+def cast_pose(label):
+    p = rest_pose()
+    if label == "neutral":
+        p["jaw"] = (JAW_CLOSED_DEG, 0, 0)
+    elif label == "rise":
+        # Wind-up: weight shifts back onto the hind legs (hind thighs compress slightly, forelegs
+        # lighten/lift a touch), chest/head start rising, wings begin spreading, beak cracking
+        # open -- the codeable anticipation rule (counter-motion before the main action, here
+        # "down and back" before "up and forward").
+        p["spine_01"] = (-4, 0, 0)
+        p["spine_02"] = (-8, 0, 0)
+        p["neck_01"] = (-4, 0, 0)
+        p["head"] = (-6, 0, 0)
+        p["wing_L_01"] = (-2, 0, -10)
+        p["wing_R_01"] = (-2, 0, 10)
+        for side in leg_sides:
+            if side.startswith("B"):
+                p[f"leg_{side}_thigh"] = (10, 0, 0)  # hind legs compress, bearing more weight
+            else:
+                p[f"leg_{side}_thigh"] = (-6, 0, 0)  # forelegs lighten
+        p["jaw"] = (JAW_CLOSED_DEG + 8, 0, 0)
+        p["tail_01"] = (-6, 0, 0)
+    elif label in ("peak", "peak_hold"):
+        # Full rear: hind legs braced and bent, forelegs lifted/tucked, chest and head thrown up,
+        # wings fully spread and raised, beak wide open -- the "cast" silhouette. peak_hold repeats
+        # this pose exactly (a genuine hold, not just a slow approach) so the VFX marker has a
+        # real window to read from, not an instantaneous passing pose.
+        p["spine_01"] = (-10, 0, 0)
+        p["spine_02"] = (-22, 0, 0)
+        p["neck_01"] = (-14, 0, 0)
+        p["neck_02"] = (-16, 0, 0)
+        p["head"] = (-20, 0, 0)
+        p["wing_L_01"] = (-10, 0, -32)
+        p["wing_L_02"] = (-4, 0, -16)
+        p["wing_R_01"] = (-10, 0, 32)
+        p["wing_R_02"] = (-4, 0, 16)
+        for side in leg_sides:
+            if side.startswith("B"):
+                p[f"leg_{side}_thigh"] = (20, 0, 0)
+                p[f"leg_{side}_shin"] = (-10, 0, 0)
+            else:
+                p[f"leg_{side}_thigh"] = (-14, 0, 0)
+                p[f"leg_{side}_shin"] = (8, 0, 0)
+        p["jaw"] = (JAW_WIDE_OPEN_DEG + 6, 0, 0)
+        p["tail_01"] = (-12, 0, 0)
+        p["tail_02"] = (-14, 0, 0)
+    elif label == "settle":
+        p["jaw"] = (JAW_CLOSED_DEG, 0, 0)  # back to a closed-beak neutral, ready to loop into Idle
+    return p
+
+
+for frac, label in zip(CAST_KEYS, CAST_LABELS):
+    f = 1 + round(frac * CAST_FRAMES)
+    scene.frame_set(f)
+    apply_pose(cast_pose(label))
+    keyframe_pose(f, ALL_POSE_BONES)
+    if label == "peak":
+        add_marker("Cast", "cast_release", f, frac)
+
+common.set_interpolation(cast_action, "BEZIER", "EASE_IN_OUT")
+print(f"CAST ACTION: {len(CAST_KEYS)} key poses ({', '.join(CAST_LABELS)}) over {CAST_FRAMES} "
+      f"frames @ {FPS}fps, marker 'cast_release' at frame "
+      f"{EVENT_MARKERS['Cast'][0]['frame']}")
+
+# ---------------------------------------------------------------------------
+# Hit (~0.5s, non-looping): sharp recoil away from an impact -- head and chest snap back, wings
+# flinch -- then a quick recovery. Marker 'hit_react' at the recoil extreme (the impact beat).
+# ---------------------------------------------------------------------------
+reset_all()
+HIT_SECONDS = 0.5
+HIT_FRAMES = int(round(HIT_SECONDS * FPS))
+hit_action = bpy.data.actions.new("Hit")
+hit_action.use_fake_user = True
+arm_obj.animation_data.action = hit_action
+
+HIT_KEYS = [0.0, 0.22, 0.42, 1.0]
+HIT_LABELS = ["neutral", "recoil", "settle_start", "recover"]
+
+
+def hit_pose(label):
+    p = rest_pose()
+    if label == "neutral":
+        p["jaw"] = (JAW_CLOSED_DEG, 0, 0)
+    elif label == "recoil":
+        # Sharp snap-back: head/neck/chest pitch away (opposite sense from Attack's forward
+        # strike-snap), wings flinch into a tight tucked flare, legs brace (a small compress, not
+        # a full crouch) -- all bones reach their extreme on this ONE frame, reached fast (the
+        # strike-sharpening EASE_IN trick below), which is what reads as an "impact," not a slow
+        # lean.
+        p["spine_01"] = (-6, 0, 0)
+        p["spine_02"] = (-14, 0, 0)
+        p["neck_01"] = (-10, 0, 0)
+        p["neck_02"] = (-14, 0, 0)
+        p["head"] = (-18, 0, 0)
+        p["wing_L_01"] = (-8, 0, -20)
+        p["wing_R_01"] = (-8, 0, 20)
+        for side in leg_sides:
+            p[f"leg_{side}_thigh"] = (6, 0, 0)
+        p["tail_01"] = (8, 0, 0)
+        p["jaw"] = (JAW_CLOSED_DEG - 6, 0, 0)
+    elif label == "settle_start":
+        # Partway back toward neutral -- the quick recovery's first step, not an instant snap-back
+        # (a real recoil eases out, even a fast one).
+        p["spine_01"] = (-2, 0, 0)
+        p["spine_02"] = (-5, 0, 0)
+        p["neck_01"] = (-3, 0, 0)
+        p["head"] = (-5, 0, 0)
+        p["wing_L_01"] = (-2, 0, -6)
+        p["wing_R_01"] = (-2, 0, 6)
+        p["jaw"] = (JAW_CLOSED_DEG, 0, 0)
+    elif label == "recover":
+        p["jaw"] = (JAW_CLOSED_DEG, 0, 0)
+    return p
+
+
+for frac, label in zip(HIT_KEYS, HIT_LABELS):
+    f = 1 + round(frac * HIT_FRAMES)
+    scene.frame_set(f)
+    apply_pose(hit_pose(label))
+    keyframe_pose(f, ALL_POSE_BONES)
+    if label == "recoil":
+        add_marker("Hit", "hit_react", f, frac)
+
+common.set_interpolation(hit_action, "BEZIER", "EASE_IN_OUT")
+# Sharpen the recoil's IN edge, same principle as Attack's strike frame -- neutral->recoil should
+# read as abrupt/fast (an impact), not eased in.
+recoil_frame = 1 + round(HIT_KEYS[1] * HIT_FRAMES)
+for fcu in common.iter_action_fcurves(hit_action):
+    for kp in fcu.keyframe_points:
+        if round(kp.co[0]) == recoil_frame:
+            kp.easing = "EASE_IN"
+print(f"HIT ACTION: {len(HIT_KEYS)} key poses ({', '.join(HIT_LABELS)}) over {HIT_FRAMES} "
+      f"frames @ {FPS}fps, marker 'hit_react' at frame {EVENT_MARKERS['Hit'][0]['frame']}")
+
+# ---------------------------------------------------------------------------
+# KO (~1.4s, NON-LOOPING -- ends on a held collapsed pose, does not return to neutral): stagger,
+# front legs buckle first, full collapse onto side/belly, wings slump, head drops, final hold.
+# ---------------------------------------------------------------------------
+reset_all()
+KO_SECONDS = 1.4
+KO_FRAMES = int(round(KO_SECONDS * FPS))
+ko_action = bpy.data.actions.new("KO")
+ko_action.use_fake_user = True
+arm_obj.animation_data.action = ko_action
+
+KO_KEYS = [0.0, 0.18, 0.40, 0.70, 1.0]
+KO_LABELS = ["neutral", "stagger", "front_buckle", "collapse", "final_hold"]
+
+
+def ko_pose(label):
+    p = rest_pose()
+    if label == "neutral":
+        p["jaw"] = (JAW_CLOSED_DEG, 0, 0)
+    elif label == "stagger":
+        # Off-balance wobble before the legs actually give way -- a small sideways/forward lean,
+        # head drooping slightly, wings loosening.
+        p["spine_01"] = (4, 0, 3)
+        p["spine_02"] = (8, 0, 4)
+        p["neck_01"] = (6, 0, 2)
+        p["head"] = (10, 0, 2)
+        p["wing_L_01"] = (6, 0, 8)
+        p["wing_R_01"] = (6, 0, -8)
+        p["jaw"] = (JAW_CLOSED_DEG + 4, 0, 0)
+        p["tail_01"] = (4, 0, 2)
+    elif label == "front_buckle":
+        # Front legs fold first (per the task brief) -- hind legs still bearing weight, braced.
+        for side in leg_sides:
+            if side.startswith("F"):
+                p[f"leg_{side}_thigh"] = (34, 0, 0)
+                p[f"leg_{side}_shin"] = (-30, 0, 0)
+            else:
+                p[f"leg_{side}_thigh"] = (6, 0, 0)
+        p["spine_01"] = (20, 0, 5)
+        p["spine_02"] = (32, 0, 6)
+        p["neck_01"] = (18, 0, 4)
+        p["neck_02"] = (16, 0, 3)
+        p["head"] = (24, 0, 3)
+        p["wing_L_01"] = (14, 0, 16)
+        p["wing_L_02"] = (8, 0, 10)
+        p["wing_R_01"] = (14, 0, -16)
+        p["wing_R_02"] = (8, 0, -10)
+        p["jaw"] = (JAW_CLOSED_DEG + 10, 0, 0)
+        p["tail_01"] = (10, 0, 4)
+    elif label == "collapse":
+        # Full collapse onto side/belly: hind legs ALSO give way now, spine pitches way forward and
+        # rolls slightly to one side, wings go fully limp/slumped, head drops low, beak slack open
+        # (unconscious), tail splays.
+        for side in leg_sides:
+            if side.startswith("F"):
+                p[f"leg_{side}_thigh"] = (46, 0, 0)
+                p[f"leg_{side}_shin"] = (-42, 0, 0)
+            else:
+                p[f"leg_{side}_thigh"] = (30, 0, 0)
+                p[f"leg_{side}_shin"] = (-18, 0, 0)
+        p["spine_01"] = (36, 0, 10)
+        p["spine_02"] = (48, 0, 12)
+        p["neck_01"] = (30, 0, 8)
+        p["neck_02"] = (28, 0, 6)
+        p["head"] = (40, 0, 8)
+        p["wing_L_01"] = (24, 0, 26)
+        p["wing_L_02"] = (16, 0, 18)
+        p["wing_R_01"] = (24, 0, -22)
+        p["wing_R_02"] = (16, 0, -14)
+        p["jaw"] = (JAW_WIDE_OPEN_DEG, 0, 0)
+        p["tail_01"] = (18, 0, 10)
+        p["tail_02"] = (14, 0, 12)
+    elif label == "final_hold":
+        # Repeats "collapse" exactly -- a genuine held final frame (this clip does not loop and is
+        # not followed by anything that needs a different end pose).
+        return ko_pose("collapse")
+    return p
+
+
+for frac, label in zip(KO_KEYS, KO_LABELS):
+    f = 1 + round(frac * KO_FRAMES)
+    scene.frame_set(f)
+    apply_pose(ko_pose(label))
+    keyframe_pose(f, ALL_POSE_BONES)
+
+common.set_interpolation(ko_action, "BEZIER", "EASE_IN_OUT")
+print(f"KO ACTION: {len(KO_KEYS)} key poses ({', '.join(KO_LABELS)}) over {KO_FRAMES} frames "
+      f"@ {FPS}fps (non-looping, held final pose)")
+
+# ---------------------------------------------------------------------------
+# Victory (~2.0s, LOOP-FRIENDLY END -- the final pose is close to neutral/rest so it transitions
+# smoothly back into Idle): rear up, wings fully spread with a flap (out then a downbeat), head
+# tossed back with beak open, settle into a proud stance.
+# ---------------------------------------------------------------------------
+reset_all()
+VICTORY_SECONDS = 2.0
+VICTORY_FRAMES = int(round(VICTORY_SECONDS * FPS))
+victory_action = bpy.data.actions.new("Victory")
+victory_action.use_fake_user = True
+arm_obj.animation_data.action = victory_action
+
+VICTORY_KEYS = [0.0, 0.22, 0.38, 0.52, 0.72, 1.0]
+VICTORY_LABELS = ["neutral", "rear_up", "flap_out", "flap_down", "toss_head", "proud_settle"]
+
+
+def victory_pose(label):
+    p = rest_pose()
+    if label == "neutral":
+        p["jaw"] = (JAW_CLOSED_DEG, 0, 0)
+    elif label == "rear_up":
+        # Rear up onto the hind legs (same "weight back" mechanism as Cast's wind-up, pushed
+        # further -- Victory is the bigger, more triumphant version of that same silhouette).
+        p["spine_01"] = (-8, 0, 0)
+        p["spine_02"] = (-16, 0, 0)
+        p["neck_01"] = (-8, 0, 0)
+        p["head"] = (-10, 0, 0)
+        for side in leg_sides:
+            if side.startswith("B"):
+                p[f"leg_{side}_thigh"] = (16, 0, 0)
+                p[f"leg_{side}_shin"] = (-8, 0, 0)
+            else:
+                p[f"leg_{side}_thigh"] = (-10, 0, 0)
+        p["tail_01"] = (-8, 0, 0)
+    elif label == "flap_out":
+        # Wings sweep fully out/up -- the flap's up-stroke.
+        p["spine_01"] = (-8, 0, 0)
+        p["spine_02"] = (-18, 0, 0)
+        p["neck_01"] = (-8, 0, 0)
+        p["head"] = (-8, 0, 0)
+        p["wing_L_01"] = (-14, 0, -40)
+        p["wing_L_02"] = (-6, 0, -22)
+        p["wing_R_01"] = (-14, 0, 40)
+        p["wing_R_02"] = (-6, 0, 22)
+        for side in leg_sides:
+            if side.startswith("B"):
+                p[f"leg_{side}_thigh"] = (16, 0, 0)
+                p[f"leg_{side}_shin"] = (-8, 0, 0)
+            else:
+                p[f"leg_{side}_thigh"] = (-10, 0, 0)
+        p["tail_01"] = (-10, 0, 0)
+    elif label == "flap_down":
+        # The flap's down-stroke -- wings sweep down/forward past neutral, a real flap cycle (not
+        # just a static spread-and-hold), chest puffs with the effort.
+        p["spine_01"] = (-6, 0, 0)
+        p["spine_02"] = (-10, 0, 0)
+        p["neck_01"] = (-4, 0, 0)
+        p["head"] = (-4, 0, 0)
+        p["wing_L_01"] = (14, 0, -10)
+        p["wing_L_02"] = (8, 0, -4)
+        p["wing_R_01"] = (14, 0, 10)
+        p["wing_R_02"] = (8, 0, 4)
+        for side in leg_sides:
+            if side.startswith("B"):
+                p[f"leg_{side}_thigh"] = (10, 0, 0)
+            else:
+                p[f"leg_{side}_thigh"] = (-6, 0, 0)
+        p["tail_01"] = (-4, 0, 0)
+    elif label == "toss_head":
+        # Head tossed back, beak open -- the triumphant "call" beat, wings holding a proud spread.
+        p["spine_01"] = (-6, 0, 0)
+        p["spine_02"] = (-14, 0, 0)
+        p["neck_01"] = (-14, 0, 0)
+        p["neck_02"] = (-18, 0, 0)
+        p["head"] = (-24, 0, 0)
+        p["wing_L_01"] = (-6, 0, -24)
+        p["wing_R_01"] = (-6, 0, 24)
+        p["jaw"] = (JAW_WIDE_OPEN_DEG + 4, 0, 0)
+        for side in leg_sides:
+            if side.startswith("B"):
+                p[f"leg_{side}_thigh"] = (12, 0, 0)
+            else:
+                p[f"leg_{side}_thigh"] = (-8, 0, 0)
+        p["tail_01"] = (-6, 0, 0)
+    elif label == "proud_settle":
+        # Settle EXACTLY back to neutral/rest (not just "close") -- verify.py's loop-seam gate
+        # checks this precisely (<0.5 deg max bone delta between frame 0 and the final frame); an
+        # earlier version left a small +/-2 deg spine/head offset here, which read fine by eye but
+        # failed that gate at 2.0 deg. Beak closed, matching neutral and Idle's own rest pose, so
+        # looping Victory -> Idle is a true seamless continuation, not just a visually-close one.
+        p["jaw"] = (JAW_CLOSED_DEG, 0, 0)
+    return p
+
+
+for frac, label in zip(VICTORY_KEYS, VICTORY_LABELS):
+    f = 1 + round(frac * VICTORY_FRAMES)
+    scene.frame_set(f)
+    apply_pose(victory_pose(label))
+    keyframe_pose(f, ALL_POSE_BONES)
+
+common.set_interpolation(victory_action, "BEZIER", "EASE_IN_OUT")
+print(f"VICTORY ACTION: {len(VICTORY_KEYS)} key poses ({', '.join(VICTORY_LABELS)}) over "
+      f"{VICTORY_FRAMES} frames @ {FPS}fps (loop-friendly end)")
+
+reset_all()
 arm_obj.animation_data.action = None
 bpy.ops.object.mode_set(mode="OBJECT")
+
+with open(os.path.join(OUT, "keyed_event_markers.json"), "w") as f:
+    json.dump(EVENT_MARKERS, f, indent=2)
+print(f"EVENT MARKERS: {json.dumps(EVENT_MARKERS)}")
 
 blend_out = os.path.join(OUT, "griffin_keyed.blend")
 bpy.ops.wm.save_as_mainfile(filepath=blend_out)

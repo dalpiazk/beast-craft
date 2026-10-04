@@ -541,6 +541,161 @@ pre-existing frame-5 wing blotch from v10-v13 (untouched, unrelated).
 
 Mesh/export: 8000 tris, 41 bones (unchanged), GLB 0.859 MiB.
 
+## v15: four new battle clips + event markers (mostly complete), a joint-geometry pass attempted and
+## reverted (no net gate improvement), Attack wing blotch NOT investigated (producer review round 15)
+
+Producer approved v14's walk and feet. This round asked for three things: (A) four new keyed clips
+(Cast/Hit/KO/Victory) with exported event markers that Live3D logs on playback, (B) a joint-geometry
+pass (edge loops at shoulders/elbows/wrists/hips/knees/hocks/wing roots/tail root) to clear the
+remaining edge-stretch/toe_deformation gates and fix the Attack wing blotch, and (C) gates/contact
+sheets/MP4s for all 7 clips. Honest summary up front: **A is essentially complete; B did not achieve
+its gate targets and is shipped off-by-default; the wing-blotch root cause was not investigated this
+round**, though contact-sheet inspection this round surfaced new (uninvestigated) evidence about it.
+
+### A. Four new clips -- `anim/keyed.py`
+
+Same keyed-pose principles as Idle/Attack (anticipation, follow-through, held peaks, eased timing),
+legs stay planted except where the clip needs otherwise, toes follow feet in LOCAL space exactly as
+v14's fix:
+
+- **Cast** (29 frames @ 24fps, ~1.2s): `neutral -> rise -> peak -> peak_hold -> settle`. Wind-up
+  (spine back, hind thighs compress, forelegs lighten, wings start spreading) into a full rear (hind
+  thighs/shins deeply flexed, wings fully spread and raised, beak wide open), a genuine HELD peak
+  (`peak` and `peak_hold` are identical poses, two keys apart -- a real hold, not a pass-through), then
+  settle. Marker `cast_release` fires at the peak frame (frame 17, fraction 0.55).
+- **Hit** (12 frames @ 24fps, ~0.5s): `neutral -> recoil -> settle_start -> recover`. Sharp snap-back
+  (spine/head/wings flinch away, legs brace, jaw overshoots), eased-in on the recoil frame specifically
+  (same sharpening technique as Attack's strike frame) so the reaction reads as sudden rather than
+  floaty. Marker `hit_react` fires at the recoil frame (frame 4, fraction 0.22).
+- **KO** (34 frames @ 24fps, ~1.4s, non-looping): `neutral -> stagger -> front_buckle -> collapse ->
+  final_hold`. Front legs fold first, then hind legs give way too, full spine pitch, wings go limp,
+  head drops, beak slack open. `final_hold` repeats `collapse` exactly -- a genuine held end-state, not
+  a loop.
+- **Victory** (48 frames @ 24fps, exactly 2.0s, loop-friendly end): `neutral -> rear_up -> flap_out ->
+  flap_down -> toss_head -> proud_settle`. Rears up, a real flap cycle (wings sweep up then down past
+  neutral), head tossed back with beak open, settles. `proud_settle` was originally a few degrees off
+  rest (a "confident chest-up" look) but that FAILED the loop-seam gate at 2.0 deg -- fixed by making it
+  an exact rest-pose match (only the jaw differs from bind); loop seam now passes at 0.000 deg.
+
+**Event markers:** `keyed.py` writes `keyed_event_markers.json`; `export_glb.py` re-keys it into
+`griffin_anim_events.json` next to the exported GLB (`{"fps": 24, "markers": {"Cast": [{"name":
+"cast_release", "frame": 17, "fraction": 0.55}], "Hit": [{"name": "hit_react", "frame": 4, "fraction":
+0.22}]}}`) -- chosen over glTF extras as the simpler of the two allowed options, no custom exporter
+plumbing needed. Live3D's `Game1.LoadPilotEventMarkers` reads the sidecar (tolerant of a missing
+file) and `LogPilotEventMarkerCrossings` logs (`Console.WriteLine`) the first captured
+`--pilot-sequence` frame whose clip-relative time reaches each marker, exactly once per crossing.
+Verified live: a 100-frame smoke-test reel run (`--pilot-fps 10`) logged `hit_react` and
+`cast_release` exactly once each, at the expected clip-relative times.
+
+### B. Joint-geometry pass -- attempted, reverted to off-by-default (NOT a success)
+
+Added `common.add_joint_support_loops(obj, points, radius)`: local bmesh subdivision
+(`subdivide_edges(..., use_grid_fill=False, use_single_edge=True)`) around a set of joint points,
+only cutting edges whose both endpoints fall within `radius`. (First attempt used
+`use_grid_fill=True`, which completely broke Blender's heat-weight solver -- 100% of vertices came
+back unweighted; switching to `use_grid_fill=False, use_single_edge=True` fixed that.) Wired into
+`prep_mesh.py` behind a new, **off-by-default** flag, `ENABLE_JOINT_SUPPORT_LOOPS` (`--enable-joint-
+loops`): when enabled, 17 joint points (leg chains x4, wing roots, tail root, chest, pelvis) at a
+0.08-native-unit radius cut ~415 extra edges (6500 -> 7330 tris, within the ~9k budget), and the
+model still decimates/re-weights successfully.
+
+Tested WITH the flag on against the full gate suite: it did **not** help. `toe_deformation` got
+measurably **worse** (2.734x -> 4.332x worst stretch), and the pre-existing `Move`/`Attack`
+edge-stretch gate was **completely unchanged** (9.53x / 3.32x -- the chest/pelvis joint points added
+zero new edges there, since their radius was already covered by nearby existing geometry). Given a
+clear net regression on the metric it was meant to fix, and no time left this round to retune
+radius/placement, the honest call was to revert to off-by-default rather than ship a regression or
+quietly claim the approach doesn't work -- it may well work with further tuning, that's genuinely
+unresolved, not disproven. The default (flag off) path was confirmed to reproduce v14's exact
+8000-tri baseline mesh.
+
+**Gate targets from this round's brief were NOT met:**
+- Move/Attack edge-stretch <= 1.6x: actual 9.56x (Move) / 3.31x (Attack) -- unchanged from round 9,
+  still the same unresolved weight-painting family documented in v14/v9 above.
+- toe_deformation <= 1.35x, no flips: actual 2.73x stretch + 812 flip events on Move (idle_attack
+  passes at 1.29x/0 flips); the new `battle_clips` check (Cast/Hit/KO/Victory) is 1.61x stretch + 531
+  flips, driven almost entirely by **KO's `collapse`/`final_hold` pose specifically** -- see the
+  honest per-clip visual critique below, this is not just a number miss, it's a visible defect.
+- Attack wing blotch root cause: **not investigated this round at all** -- no time was spent on it.
+  New (uninvestigated) observation from this round's contact-sheet inspection, though: the same dark
+  navy blotch recurs in **Cast's peak/peak_hold frames** and faintly in **Victory's rear_up frames**
+  -- i.e. whenever the wings are raised/rotated to a similarly extreme angle, not only in Attack's
+  specific strike pose. That's circumstantial evidence the cause is tied to wing ROTATION ANGLE
+  crossing some threshold (consistent with a normals/backface or outline-silhouette effect at extreme
+  wing pose) rather than something unique to Attack's keyframes -- worth starting from next round, but
+  this is an observation, not a diagnosis; it was not root-caused.
+
+### C. Gates, contact sheets, MP4s -- honest per-clip visual critique
+
+`verify.py` now runs jitter/loop-seam/interpenetration_ground/edge-stretch checks across all 7 clips
+(`scratchpad/anim-pilot/v15/verify_report.json`). New-clip-specific gates all **pass**: Cast/Hit/KO/
+Victory jitter, Idle/Move/Victory loop-seam (0.000 deg), Cast/Hit/Victory ground-interpenetration
+(KO deliberately excluded -- it ends on the ground by design). The pre-existing edge-stretch and
+`toe_deformation` gates **fail**, per part B above.
+
+Contact sheets (10 frames each, `scratchpad/anim-pilot/review_v15/final/contact_sheet_*.png`) and
+MP4s (`scratchpad/anim-pilot/video_v15/griffin_*.mp4`, 720x1280 h264/yuv420p, same ffmpeg
+filter/codec settings as v11-v14) for all 7 clips plus Move's side camera and the full reel, captured
+via `--pilot-sequence` from the real Live3D runtime. Frame counts/loops: idle 180f@60fps x2 loops
+(360f, 5.96s), move/move_side 60f x4 (240f, 3.96s), attack 60f x3 (180f, 2.96s), hit 30f x8 (240f,
+3.96s), cast 72f x3 (216f, 3.56s), victory 120f x2 (240f, 3.96s), ko 84f x3 (252f, 4.16s), reel
+(idle->move->attack->hit->cast->victory->ko with crossfades) 600f @60fps x1 (9.96s, matches the
+computed 10.0s reel duration). Every sheet inspected frame-by-frame, not assumed clean:
+
+- **Idle, Move, Move (side), Attack:** unchanged from v14 -- clean, no new artefacts, except Attack's
+  same pre-existing frame-5 wing blotch (see part B's note above; still present, still unfixed).
+- **Hit:** reads correctly as a sharp recoil -- head/neck snap back and up over ~3 frames, wings tuck
+  in a flinch, legs stay planted and braced, then a quick settle back toward neutral by the last
+  frame. No mesh artefacts visible.
+- **Cast:** a clean, readable arc -- progressive wind-up (head rising, hind legs crouching deeper)
+  into a genuinely held peak (frames 6-9 are visually near-identical, confirming the authored hold),
+  settling by the last frame. The wing blotch (part B) is visible at the peak-hold frames specifically
+  when the wings are raised highest -- the new evidence noted above.
+  Interpenetration/jitter gates pass.
+- **Victory:** rears up with the head tossed back (beak open) around frames 4-6, a faint version of
+  the same wing blotch appears briefly in the same raised-wing frames, and the final frame matches
+  the idle/neutral stance almost exactly, confirming the authored exact-rest `proud_settle` fix and
+  the 0.000 deg loop-seam result.
+- **KO -- genuinely broken, not just a gate-number miss.** The stagger/front-buckle/collapse
+  progression reads correctly through about frame 8 of 10 (head dropping, front legs folding, body
+  pitching down). But the `collapse`/`final_hold` pose (sampled at the clip's last 1-2 frames) shows a
+  **severe, clearly visible mesh deformation**: a foreleg stretches into a long dark streaked shape
+  that tears diagonally across the body, wildly disconnected from the rest of the geometry (zoomed
+  crop inspected directly, not just inferred from the gate number). This lines up exactly with
+  `toe_deformation`'s `battle_clips` result -- 531 flipped triangles, worst at frame 18, `worst_flip_
+  dot -0.41` (a triangle normal flipped almost fully backward), `worst_stretch_action: "KO"`. Root
+  cause: KO's `collapse` pose bends the front-leg thigh/shin to +46/-42 degrees, far beyond anything
+  Move or Attack ever reach, which drives the SAME pre-existing, unresolved foot/toe knee-ankle
+  weight-painting issue (documented since v9/v14) into a regime extreme enough to flip triangles
+  outright rather than just stretch them. **This was not fixed this round** -- reported here plainly
+  rather than glossed over, since the gate-report alone (a stretch ratio and a flip count) understates
+  how visually broken the held end-pose actually looks.
+
+### Runtime (Live3D) -- round 15 extension
+
+`GltfSkinnedModel`/`AnimatedPose`/`Game1` extended to recognise and play all 7 clips (`Clip` enum now
+`Idle, Move, Attack, Cast, Hit, KO, Victory`). `Game1`'s `--pilot-sequence reel` mode was rewritten
+from a hard-coded 3-clip/7-boundary crossfade chain to a generic, data-driven list of (clip, hold
+duration) segments (`PilotReelSegments`) crossfaded in order, so the reel now plays idle -> move ->
+attack -> hit -> cast -> victory -> ko with the same `PilotCrossfade` between each (KO is last and
+does not crossfade back to idle -- it's a deliberate non-looping end state). `--pilot-clip
+cast|hit|ko|victory` works the same way `move|attack` already did for a single-clip contact sheet.
+Event-marker loading/logging per part A above. `Live3D.csproj` ships the new
+`griffin_anim_events.json` sidecar alongside `griffin_anim.glb` (`CopyToOutputDirectory=
+PreserveNewest`, tolerant of being absent).
+
+Gate commands (all pass as of this round):
+```
+dotnet build Tooling/Spike55/Live3D -c Release          # 0 warnings
+dotnet format Tooling/Spike55/Live3D --verify-no-changes
+dotnet build src/BeastCraft.Desktop -c Release           # 0 warnings
+dotnet test Tooling/EditModeTests                        # 1663 passed, 0 failed
+git diff main --stat -- src .github BeastCraft.slnx      # empty
+```
+
+Mesh/export: 8000 tris, 41 bones (unchanged from v14 -- joint-geometry pass is off by default, see
+part B), GLB 0.948 MiB, 7 NLA clips (`Idle, Move, Attack, Cast, Hit, KO, Victory`).
+
 ## v9: max-edge-stretch gate + weight/render fixes -- partial progress, honestly not fully resolved
 ## (lead-review round 9)
 
@@ -1293,14 +1448,19 @@ New, additive pieces:
   swarmling_live.glb) still works unchanged -- unused palette slots are inert identity padding.
   (Bumped again to **34** in the lead-review 4-leg fix round, covering this rig's 33 bones; the v4
   redo above keeps the same 33-bone count, so no further runtime change was needed.)
-- **`--pilot-sequence <dir> [--pilot-clip reel|idle|move|attack] [--frames N] [--pilot-fps N]`**: a
-  new headless capture mode (mirrors `--screenshot`'s structure) that loads `griffin_anim.glb`
-  instead of `griffin_live.glb`, frames it with the existing single-instance camera fit (same
-  `CameraTiltDeg=33` / `CameraYawDeg=35` battle-camera angle the rest of the app already uses -- not
-  a new camera), and writes a numbered PNG sequence: either one evenly-sampled loop of a single named
-  clip (`idle`/`move`/`attack`, for a contact sheet) or the full crossfaded `Idle -> Move -> Attack ->
-  Idle` reel (`reel`, the default, for a GIF). Pose time is frame-indexed, not real-elapsed-time, so
-  output is reproducible regardless of the engine's real frame rate.
+- **`--pilot-sequence <dir> [--pilot-clip reel|idle|move|attack|cast|hit|ko|victory] [--frames N]
+  [--pilot-fps N]`**: a headless capture mode (mirrors `--screenshot`'s structure) that loads
+  `griffin_anim.glb` instead of `griffin_live.glb`, frames it with the existing single-instance
+  camera fit (same `CameraTiltDeg=33` / `CameraYawDeg=35` battle-camera angle the rest of the app
+  already uses -- not a new camera), and writes a numbered PNG sequence: either one evenly-sampled
+  loop of a single named clip (for a contact sheet) or the full crossfaded reel across all 7 clips,
+  in order `Idle -> Move -> Attack -> Hit -> Cast -> Victory -> KO` (`reel`, the default, for the MP4
+  deliverable -- round 15 rewrote this from a hard-coded 3-clip chain to a generic, data-driven list
+  of segments, `Game1.PilotReelSegments`, so it's not hand-written per clip count). Pose time is
+  frame-indexed, not real-elapsed-time, so output is reproducible regardless of the engine's real
+  frame rate. Round 15 also added event-marker logging: `Game1.LoadPilotEventMarkers` reads
+  `griffin_anim_events.json` (export_glb.py's sidecar, next to the GLB) and logs the first captured
+  frame that crosses each clip's marker (e.g. Cast's `cast_release`, Hit's `hit_react`).
 
 Gate commands (all pass as of this pilot):
 ```

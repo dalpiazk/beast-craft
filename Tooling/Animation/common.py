@@ -213,6 +213,51 @@ def decimate_to_tris(obj, target_tris, protect_vertex_group=None):
     return current, after
 
 
+def add_joint_support_loops(obj, points, radius):
+    """Round 15 (lead review: "clear the remaining stretch/blotch issues properly... add edge loops
+    at the joints... then re-weight"): a targeted LOCAL subdivision (bmesh subdivide_edges, cuts=1)
+    around each given 3D point (same coordinate space as obj's current vertex positions -- this
+    pipeline's prep_mesh.py calls it on the native-space mesh, before common.normalise_transform
+    runs), instead of the weight-reassignment-only approach every prior round (9, 10, 12, 13, 14)
+    used to fight the SAME class of edge-stretch symptom at the SAME joint regions without ever
+    fully resolving it (see Tooling/Animation/README.md's own "whack-a-mole" history). The actual
+    mechanism: linear blend skinning's "candy-wrapper" stretch at a bone-ownership transition is
+    fundamentally a function of how COARSE the triangles spanning that transition are -- a vertex
+    directly on a sharp two-bone boundary has to average both bones' full rotations with no
+    intermediate steps; adding real geometry (more vertices, hence more individually-weightable
+    points) between two differently-moving bones gives the heat/automatic weighting solver room to
+    build an actual gradient across several vertices instead of one hard snap, which is the one
+    lever this pipeline had never pulled before (every prior fix only ever reassigned or stripped
+    WEIGHT VALUES on the mesh's existing, coarse vertex set).
+
+    Only edges whose BOTH endpoints fall within `radius` of a given point are subdivided, so the
+    extra geometry stays local to each joint and doesn't bleed into surrounding fine/coarse areas.
+    UVs (and any other custom data layer -- vertex colour, etc.) are preserved automatically:
+    bmesh's subdivide interpolates every custom data layer along with vertex position, it does not
+    discard them, so this needs no separate UV-preservation step. Returns the number of edges cut
+    (for the caller's own before/after triangle-count bookkeeping -- this function does not itself
+    measure triangle counts, to avoid an extra bmesh round-trip; call common.topology_stats before
+    and after if you need exact numbers)."""
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.mode_set(mode="EDIT")
+    bm = bmesh.from_edit_mesh(obj.data)
+    bm.verts.ensure_lookup_table()
+    selected_vert_idx = set()
+    for p in points:
+        pv = mathutils.Vector(p)
+        for v in bm.verts:
+            if (v.co - pv).length <= radius:
+                selected_vert_idx.add(v.index)
+    edges_to_cut = [e for e in bm.edges
+                    if e.verts[0].index in selected_vert_idx and e.verts[1].index in selected_vert_idx]
+    if edges_to_cut:
+        bmesh.ops.subdivide_edges(bm, edges=edges_to_cut, cuts=1, use_grid_fill=False,
+                                   use_single_edge=True)
+    bmesh.update_edit_mesh(obj.data)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    return len(edges_to_cut)
+
+
 # ---------------------------------------------------------------------------
 # Retopology (round-7 lead review): Meshy's quad-remesh output is severely fragmented at the
 # vertex-index level (hundreds to 1000+ "connected components" by edge adjacency, even though most

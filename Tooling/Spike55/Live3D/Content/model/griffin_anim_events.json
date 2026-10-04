@@ -1,0 +1,19 @@
+{
+  "fps": 24,
+  "markers": {
+    "Cast": [
+      {
+        "name": "cast_release",
+        "frame": 17,
+        "fraction": 0.55
+      }
+    ],
+    "Hit": [
+      {
+        "name": "hit_react",
+        "frame": 4,
+        "fraction": 0.22
+      }
+    ]
+  }
+}

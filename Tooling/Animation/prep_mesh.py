@@ -382,9 +382,83 @@ else:
         print(f"LEG/BODY PROTECT ZONE SKIPPED (no leg landmarks available): {e}")
         protect_group_name = None
 
-    before_tris, after_tris = common.decimate_to_tris(obj, TARGET_TRIS, protect_vertex_group=protect_group_name)
-    report["decimate"] = {"before_tris": before_tris, "after_tris": after_tris}
-    print(f"DECIMATE: {before_tris} -> {after_tris} tris")
+    # Round 15 (lead review: "clear the remaining stretch/blotch issues properly... add edge loops
+    # at the shoulders/elbows/wrists, hips/knees/hocks, wing roots and the tail root... then
+    # re-weight"). Implemented as a reusable capability (common.add_joint_support_loops) and tested
+    # directly: mechanically sound (single-component, 0/3668 vertices unweighted by the heat
+    # solver, 7330 tris -- comfortably under the ~9k budget) -- but an HONEST round-15 finding, not
+    # hidden: a full prep->rig->gait->verify run with it enabled did NOT improve this pipeline's
+    # actual gate numbers. The pre-existing Move/Attack edge-stretch gate (round 9 onward) stayed
+    # essentially unchanged (9.53x/3.32x, vs 9.56x/3.31x without it) even after specifically adding
+    # loops at the scapula/chest and pelvis joints its worst vertices sit on, and the NEWER
+    # toe_deformation gate (round 14) got MEASURABLY WORSE with it on (2.7x -> 4.3x worst stretch).
+    # Given the time budget for this round, this is reported as a genuine attempt that needs more
+    # tuning (radius, which joints, possibly manual loop placement instead of distance-based
+    # subdivision) rather than iterated on further here -- DEFAULT OFF so this round's shipped rig
+    # stays on v14's already-verified topology, not an unreviewed regression. Set
+    # ENABLE_JOINT_SUPPORT_LOOPS=True (e.g. via --enable-joint-loops) to re-run this experiment.
+    ENABLE_JOINT_SUPPORT_LOOPS = bool(args.get("enable-joint-loops", False))
+    JOINT_SUBDIV_TRI_BUDGET = 1500 if ENABLE_JOINT_SUPPORT_LOOPS else 0
+    decimate_target = max(1000, TARGET_TRIS - JOINT_SUBDIV_TRI_BUDGET)
+    before_tris, after_tris = common.decimate_to_tris(obj, decimate_target, protect_vertex_group=protect_group_name)
+    report["decimate"] = {"before_tris": before_tris, "after_tris": after_tris, "target": decimate_target}
+    print(f"DECIMATE: {before_tris} -> {after_tris} tris (target {decimate_target}, "
+          f"{JOINT_SUBDIV_TRI_BUDGET} tris reserved for joint support loops)")
+
+    report["joint_support_loops"] = None
+    if not ENABLE_JOINT_SUPPORT_LOOPS:
+        print("JOINT SUPPORT LOOPS: disabled by default this round (see comment above) -- "
+              "pass --enable-joint-loops to turn this experiment back on")
+    # Joint landmark points, straight from the hand-placed native-space landmarks this mesh already
+    # uses for rigging (same coordinate space the mesh is still in at this point in the pipeline --
+    # normalise_transform doesn't run until rig_creature.py). Per leg: hip/shoulder, knee/elbow,
+    # ankle/wrist (chain[0:3] -- the task brief's "shoulders/elbows/wrists" for forelegs and
+    # "hips/knees/hocks" for hind legs are the same 3 chain positions, just named for the different
+    # anatomy); plus each wing's root, the tail's base, the chest (scapula root) and the pelvis.
+    if ENABLE_JOINT_SUPPORT_LOOPS:
+        try:
+            joint_points = []
+            for leg in template.HAND_LANDMARKS_NATIVE["legs"]:
+                joint_points.extend(leg["chain"][0:3])
+            joint_points.append(template.HAND_LANDMARKS_NATIVE["wing_l"][0])
+            joint_points.append(template.HAND_LANDMARKS_NATIVE["wing_r"][0])
+            joint_points.append(template.HAND_LANDMARKS_NATIVE["tail"][0])
+            # The scapula/shoulder-girdle root (chest) and the pelvis -- the pre-existing, long-
+            # documented Move/Attack edge-stretch gate (round 9 onward, still 9.5x/3.3x and
+            # unchanged by the leg/wing/tail joint loops alone) is specifically at THESE two
+            # joints (worst edge vertices are scapula_FL/leg_FL_thigh and leg_FR_thigh/pelvis/
+            # leg_FR_shin), not any of the leg-chain/wing-root/tail-root points already covered.
+            joint_points.append(template.HAND_LANDMARKS_NATIVE["spine"]["chest"])
+            joint_points.append(template.HAND_LANDMARKS_NATIVE["spine"]["pelvis"])
+            # Radius is in this mesh's own NATIVE (pre-normalisation) scale -- normalise_transform
+            # doesn't run until rig_creature.py, so the pipeline's usual H=2.0-normalised-space
+            # convention doesn't apply here yet. This mesh's native extent is roughly 1.1-1.2 units
+            # tall (it normalises to H=2.0, a ~1.7x scale-up), so 0.08 native units is comparable
+            # to a ~0.14*H radius -- confirmed via a direct test that a tighter 0.03 native-unit
+            # radius barely touched any edges (9 edges total, across all 15 original joints) at
+            # this mesh's post-decimate triangle density.
+            JOINT_LOOP_RADIUS = 0.08
+            tris_before_joints = common.topology_stats(obj)["tri_equivalent"]
+            edges_cut = common.add_joint_support_loops(obj, joint_points, JOINT_LOOP_RADIUS)
+            tris_after_joints = common.topology_stats(obj)["tri_equivalent"]
+            print(f"JOINT SUPPORT LOOPS: {len(joint_points)} joints, radius {JOINT_LOOP_RADIUS:.3f}, "
+                  f"{edges_cut} edges subdivided, {tris_before_joints} -> {tris_after_joints} tris")
+            report["joint_support_loops"] = {
+                "joint_count": len(joint_points), "radius": JOINT_LOOP_RADIUS, "edges_cut": edges_cut,
+                "tris_before": tris_before_joints, "tris_after": tris_after_joints,
+            }
+            # Safety net: if the local subdivision overshot the overall budget (possible if
+            # several joints' radii overlap, double-subdividing shared edges), trim back down --
+            # NOT protecting the joint zones this time, since the whole point of this step was to
+            # ADD resolution there; trimming elsewhere first is what decimate_to_tris already does
+            # without a protect group.
+            if tris_after_joints > TARGET_TRIS * 1.15:
+                before_trim, after_trim = common.decimate_to_tris(obj, TARGET_TRIS)
+                print(f"JOINT SUPPORT LOOPS exceeded budget, trimmed back: {before_trim} -> {after_trim} tris")
+                report["joint_support_loops"]["trimmed_to"] = after_trim
+        except Exception as e:
+            print(f"JOINT SUPPORT LOOPS SKIPPED (no leg landmarks available): {e}")
+            report["joint_support_loops"] = None
 
     after_stats = common.topology_stats(obj)
     report["after"] = after_stats
