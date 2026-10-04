@@ -860,7 +860,7 @@ def build_leg_masks(obj, H, legs, radius=0.09):
     return masks
 
 
-def fix_hip_weight_gradient(obj, H, legs, bone_roles, belly_half_width_frac=0.35):
+def fix_hip_weight_gradient(obj, H, legs, bone_roles, belly_half_width_frac=0.35, enable_pass1=True):
     """Lead-review round 5: fixes the Move-clip hip/belly tear at its diagnosed mechanism -- not a
     hard-mask boundary (round 4's masks already excluded the thigh segment there, which made no
     difference), but ordinary linear-blend skinning showing a "candy-wrapper" collapse at any
@@ -880,6 +880,22 @@ def fix_hip_weight_gradient(obj, H, legs, bone_roles, belly_half_width_frac=0.35
        leg's thigh/shin/foot/toe weight on that vertex. A vertex can still blend its owner leg's
        thigh with that leg's own parent (pelvis/spine_02) and with spine_01/tail/etc as auto-
        weighting already had it -- only cross-leg blending is removed.
+       **Round 9 finding, worth recording even though the attempted fix below was reverted:** this
+       distance gate lets a belly vertex equidistant between FL's and BL's hip-knee segments (same
+       side, front-vs-back, different gait phase) keep weight on both, which the new max-edge-
+       stretch gate flags as a stretched sliver. The obvious-looking fix -- drop the distance gate
+       entirely and force single-leg ownership on EVERY vertex with 2+ legs' weight, however far
+       from either leg's own segment -- was tried and made the worst-edge ratio WORSE, not better
+       (14x -> 43x on this mesh, confirmed directly, same for a second attempt that stripped ALL leg
+       weight from unmasked vertices instead of picking a winner, which got worse again, 43x -> 34x
+       at a DIFFERENT vertex but still far above target). The actual mechanism: a genuinely
+       ambiguous belly vertex sits between two independently-moving influences (either two legs, or
+       a leg and the nearly-static spine/pelvis) with too FEW vertices spanning the transition on
+       this decimated mesh for ANY single weight-ownership rule to avoid a hard jump somewhere along
+       it -- forcing a winner just relocates the hard boundary, it doesn't remove it. The fix that
+       actually worked (see prep_mesh.py's belly-protect vertex group) is geometric: give the
+       transition more vertices to spread the SAME existing gradient over, rather than changing
+       which bone owns which vertex. This pass is kept at its original, safer distance-gated scope.
     2. **Belly-centre vertices never touch a thigh.** Vertices near the body's own X centreline,
        between the two hind hips in X and at/above hind-hip height, are forced to drop ALL leg
        (thigh/shin/foot/toe) weight entirely, relying on pelvis/spine_01 -- the task brief's
@@ -901,16 +917,48 @@ def fix_hip_weight_gradient(obj, H, legs, bone_roles, belly_half_width_frac=0.35
         hip_a, hip_b = hind[0]["hip"], hind[1]["hip"]
         belly_cx = (hip_a.x + hip_b.x) / 2.0
         belly_half_width = abs(hip_a.x - hip_b.x) * belly_half_width_frac
-        belly_min_z = min(hip_a.z, hip_b.z) - 0.05 * H
+        belly_min_z = min(hip_a.z, hip_b.z) - 0.05 * H  # round 9: tried lowering this (to 0.2*H) to
+        # catch hind BL/BR-ambiguous vertices below the old threshold too -- measured WORSE (more
+        # flagged edges, higher worst ratio), not better: widening the forced-off-every-thigh zone
+        # just created a new, larger hard boundary at the zone's own (now lower) edge. Reverted.
     else:
         belly_cx, belly_half_width, belly_min_z = 0.0, 0.0, 1e9
 
+    # Round 9, pass 0: the SAME hind-left/hind-right (opposite-phase) ambiguity pass 2 targets, but
+    # found just BELOW pass 2's own height cutoff -- confirmed as the single most visually dominant
+    # artefact in Move: the longest POSED edge in the whole mesh (0.92 units, nearly 3x longer than
+    # the next-longest) connects a leg_BL-dominant vertex to a leg_BR-dominant one. Widening pass
+    # 2's height threshold to catch it was tried and made OTHER pairs worse (more flagged edges
+    # overall -- see belly_min_z's own comment); this is a narrower, pair-specific version instead:
+    # any vertex carrying BOTH substantial leg_BL_* and leg_BR_* weight (the exact opposite-phase
+    # pair, regardless of its x/z position) drops all leg weight, relying on pelvis. Scoped to just
+    # this one historically-confirmed problem pair (not every leg-pair combination) specifically
+    # because widening the net further already measured worse, not better.
+    bl_group_ids = leg_group_ids.get("BL", set())
+    br_group_ids = leg_group_ids.get("BR", set())
+    pair_forced = 0
+    if bl_group_ids and br_group_ids:
+        for vi, v in enumerate(me.vertices):
+            bl_w = sum(g.weight for g in v.groups if g.group in bl_group_ids)
+            br_w = sum(g.weight for g in v.groups if g.group in br_group_ids)
+            if bl_w > 0.08 and br_w > 0.08:
+                # Strip ONLY the BL/BR pair itself -- an earlier version stripped every leg's
+                # weight here (reusing pass 2's "strip all legs" loop), which over-fired on a
+                # scapula_FR-dominant vertex that had picked up a few percent of BL/BR noise from
+                # cleanup_weights' own smoothing and lost its legitimate scapula_FR/FR weight too,
+                # making THAT vertex's own mismatch with its neighbours worse, not better.
+                for gi in bl_group_ids | br_group_ids:
+                    for g in list(v.groups):
+                        if g.group == gi:
+                            obj.vertex_groups[gi].remove([vi])
+                pair_forced += 1
+
     cross_leg_removed = 0
-    belly_forced = 0
+    belly_forced = pair_forced
     for vi, v in enumerate(me.vertices):
         p = v.co
 
-        # Pass 2 first (belly centre): if this vertex is squarely between the two hind hips, strip
+        # Pass 2 (belly centre): if this vertex is squarely between the two hind hips, strip
         # every leg group outright regardless of distance to any one thigh.
         if belly_half_width > 0 and abs(p.x - belly_cx) < belly_half_width and p.z > belly_min_z:
             removed_any = False
@@ -925,6 +973,8 @@ def fix_hip_weight_gradient(obj, H, legs, bone_roles, belly_half_width_frac=0.35
             continue
 
         # Pass 1 (single-leg ownership near a thigh): find the nearest leg's hip-knee segment.
+        if not enable_pass1:
+            continue
         best_side, best_d = None, None
         for side, (hip, knee) in thigh_knee.items():
             d = _point_segment_dist(p, hip, knee)
@@ -945,6 +995,51 @@ def fix_hip_weight_gradient(obj, H, legs, bone_roles, belly_half_width_frac=0.35
             cross_leg_removed += 1
 
     return cross_leg_removed, belly_forced
+
+
+def fix_wing_root_bleed(obj, H, lm, bone_roles, max_dist_frac=0.15):
+    """Round 9: the same class of bug fix_hip_weight_gradient targets for legs, found at the wing
+    root instead. The task brief asked for "wings weighted to wing bones + a soft blend to spine_02
+    at the root" -- automatic heat weighting does blend wing vertices with spine_02/scapula near the
+    root, but that blend doesn't reliably decay to zero by the time it should: confirmed directly
+    (verify.py's max-edge-stretch probe) that a vertex well out along the wing (wing_L_02-dominant,
+    not even the root-most wing_L_01) still carried 10%+ weight on spine_02, which stretches a
+    sliver of geometry during Idle/Attack's wing flap (spine_02 barely moves; the wing bones sweep
+    through a large rotation, so even a small residual weight on spine_02 pulls that vertex
+    noticeably out of line with its wing-dominant neighbours). Zeros spine_02/scapula_{side} weight
+    on any wing vertex farther than `max_dist_frac * H` from that wing's own root landmark point --
+    keeps the intended root blend close to the root, removes it everywhere it bled further than
+    that. Must run BEFORE common.cleanup_weights (like fix_hip_weight_gradient), and again after it
+    (cleanup_weights' own smoothing re-spreads weight across group boundaries same as for legs)."""
+    me = obj.data
+    group_index = {g.name: g.index for g in obj.vertex_groups}
+    roots = {"wing_L": lm.get("wing_l_pts", [lm.get("chest")])[0],
+             "wing_R": lm.get("wing_r_pts", [lm.get("chest")])[0]}
+    blend_bone_names = {"spine_02", "scapula_FL", "scapula_FR"}
+    blend_group_ids = {group_index[n] for n in blend_bone_names if n in group_index}
+    wing_group_ids = {
+        side: {group_index[n] for n, role in bone_roles.items() if role == side and n in group_index}
+        for side in roots
+    }
+    max_dist = max_dist_frac * H
+    fixed = 0
+    for vi, v in enumerate(me.vertices):
+        has_blend = any(g.group in blend_group_ids for g in v.groups)
+        if not has_blend:
+            continue
+        for side, root in roots.items():
+            if not any(g.group in wing_group_ids[side] for g in v.groups):
+                continue
+            if (v.co - root).length > max_dist:
+                removed_any = False
+                for g in list(v.groups):
+                    if g.group in blend_group_ids:
+                        obj.vertex_groups[g.group].remove([vi])
+                        removed_any = True
+                if removed_any:
+                    fixed += 1
+            break
+    return fixed
 
 
 def build_bones(eb, lm, H):

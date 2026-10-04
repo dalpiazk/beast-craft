@@ -268,6 +268,79 @@ if MOVE_BLEND and "move" in report:
         print(f"  leg {side} min toe z: {min_z:.4f} -> {'PASS' if min_z > -0.01 else 'FAIL'}")
     report["move"]["interpenetration_ground"] = below_ground_report
 
+# ---------------------------------------------------------------------------
+# Round 9: max edge-stretch across Move/Attack. A long thin dark sliver/line visible in the toon
+# render (contact_sheet_move_side.png, contact_sheet_attack.png -- lead-review round 9) traced
+# directly to mesh edges whose two endpoint vertices are skinned to independently-moving bones (most
+# often two different legs, or a leg vs. the far-away root/spine) -- the edge's bind-pose length is
+# often tiny (easy to miss by eye on the rest pose) but balloons once the two bones move apart,
+# stretching a visible triangle across the model. This gate measures exactly that: for every mesh
+# edge, (posed length at this frame) / (bind-pose length), across every frame of Move and Attack,
+# and fails if the worst ratio anywhere exceeds MAX_STRETCH_RATIO. Reports the single worst triangle
+# (both its edge and which bones its two vertices are weighted to, so the failure is actionable
+# without re-deriving it by hand).
+MAX_STRETCH_RATIO = 1.6
+
+
+def check_edge_stretch(blend_path, action_name):
+    bpy.ops.wm.open_mainfile(filepath=blend_path)
+    mesh_obj = next(o for o in bpy.data.objects if o.type == "MESH")
+    arm_obj = next(o for o in bpy.data.objects if o.type == "ARMATURE")
+    action = bpy.data.actions.get(action_name)
+    if action is None:
+        return None
+    if arm_obj.animation_data is None:
+        arm_obj.animation_data_create()
+    arm_obj.animation_data.action = action
+    scene = bpy.context.scene
+    me = mesh_obj.data
+    bind_pos = [v.co.copy() for v in me.vertices]
+    edges = [(e.vertices[0], e.vertices[1]) for e in me.edges]
+    bind_len = [(bind_pos[a] - bind_pos[b]).length for a, b in edges]
+
+    f0, f1 = action.frame_range
+    worst_ratio, worst_edge, worst_frame = 0.0, None, None
+    for f in range(int(f0), int(f1) + 1):
+        scene.frame_set(f)
+        depsgraph = bpy.context.evaluated_depsgraph_get()
+        eval_obj = mesh_obj.evaluated_get(depsgraph)
+        eval_mesh = eval_obj.to_mesh()
+        posed = [v.co.copy() for v in eval_mesh.vertices]
+        eval_obj.to_mesh_clear()
+        for i, (a, b) in enumerate(edges):
+            bl = bind_len[i]
+            if bl < 1e-5:
+                continue
+            ratio = (posed[a] - posed[b]).length / bl
+            if ratio > worst_ratio:
+                worst_ratio, worst_edge, worst_frame = ratio, (a, b), f
+
+    result = {"worst_ratio": worst_ratio, "pass": worst_ratio <= MAX_STRETCH_RATIO}
+    if worst_edge is not None:
+        a, b = worst_edge
+        for vi, label in ((a, "vertex_a"), (b, "vertex_b")):
+            v = me.vertices[vi]
+            groups = sorted(((mesh_obj.vertex_groups[g.group].name, round(g.weight, 3))
+                              for g in v.groups), key=lambda x: -x[1])
+            result[label] = {"index": vi, "bind_pos": list(round(c, 4) for c in bind_pos[vi]),
+                              "bone_weights": groups}
+        result["worst_frame"] = worst_frame
+        print(f"  {action_name} max edge-stretch: {worst_ratio:.2f}x at frame {worst_frame}, "
+              f"edge ({a},{b}) -> {'PASS' if result['pass'] else 'FAIL'}")
+        print(f"    vertex {a}: {result['vertex_a']['bone_weights']}")
+        print(f"    vertex {b}: {result['vertex_b']['bone_weights']}")
+    else:
+        print(f"  {action_name} max edge-stretch: no edges found -> PASS")
+    return result
+
+
+if MOVE_BLEND:
+    report["move_edge_stretch"] = check_edge_stretch(MOVE_BLEND, "Move")
+if KEYED_BLEND:
+    attack_stretch = check_edge_stretch(KEYED_BLEND, "Attack")
+    if attack_stretch is not None:
+        report["attack_edge_stretch"] = attack_stretch
+
 with open(os.path.join(OUT, "verify_report.json"), "w") as f:
     json.dump(report, f, indent=2)
 print("VERIFY DONE")

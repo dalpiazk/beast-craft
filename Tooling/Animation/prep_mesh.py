@@ -195,7 +195,32 @@ pieces_report = {}
 # docstring) -- no voxel remesh needed, just decimate directly to budget.
 common.remove_small_components(body_obj, min_verts=100)
 pre = common.topology_stats(body_obj)
-before_tris, after_tris = common.decimate_to_tris(body_obj, BODY_BUDGET)
+
+# Round 9: protect the belly transition zone (between each side's front and back hip) from
+# aggressive decimation. A flat decimate (round 8's original approach) collapsed this zone into a
+# few unusually large triangles spanning the full front-leg-to-back-leg gap -- confirmed as the
+# direct cause of verify.py's new max-edge-stretch gate failing there: a vertex dominated by
+# leg_FL's weight and its IMMEDIATE MESH NEIGHBOUR dominated by leg_BL's weight (necessary once
+# cross-leg weight blending is removed -- see fix_hip_weight_gradient's docstring -- BL and FL are
+# never in the same phase in the gait) stretch the edge between them every frame, however small
+# that edge's own bind length, simply because the two vertices move independently with nothing in
+# between to share the difference. Protecting this zone keeps the decimated mesh's own triangles
+# small there, so the same leg-ownership transition happens over several short edges instead of one
+# unusually long one -- confirmed directly (scratchpad test): the longest edge at this location
+# dropped from 0.245 to 0.068 (normalised units) with protection, at the same overall body budget.
+protect_vg = body_obj.vertex_groups.new(name="protect_belly")
+protect_idx = []
+for v in body_obj.data.vertices:
+    x, y, z = v.co
+    # Native (pre-normalisation) coordinates -- HAND_LANDMARKS_NATIVE's leg hips all sit at
+    # y in [-0.42, 0.00], z around -0.40 -- a generous box around that, both sides of the midline.
+    if -0.55 < y < 0.10 and -0.60 < z < -0.20:
+        protect_idx.append(v.index)
+protect_vg.add(protect_idx, 1.0, "REPLACE")
+print(f"BELLY PROTECT ZONE: {len(protect_idx)}/{len(body_obj.data.vertices)} verts")
+
+before_tris, after_tris = common.decimate_to_tris(
+    body_obj, BODY_BUDGET, protect_vertex_group="protect_belly")
 post = common.topology_stats(body_obj)
 pieces_report["body"] = {"pre_cleanup_tris": pre["tri_equivalent"], "decimate": [before_tris, after_tris],
                           "final_tris": post["tri_equivalent"], "components": post["components"],
@@ -210,6 +235,18 @@ for name, wobj, budget in (("wing_l", wing_l_obj, WING_BUDGET), ("wing_r", wing_
     n_removed, v_removed = common.remove_small_components(wobj, min_verts=15)
     pre = common.topology_stats(wobj)
     before_tris, after_tris = common.decimate_to_tris(wobj, budget)
+    # Round 9 lead review: dark blotches visible on the wings during Attack's strike frames,
+    # suspected as back-faces of the wing's own fragmented feather cards showing through the toon/
+    # outline pass. `normals_make_consistent(inside=False)` was tried here first and made it WORSE,
+    # not better (confirmed by rendering and looking at the actual Attack frames): each wing is a
+    # bundle of 7-8 only loosely-connected feather-card islands (see this file's own docstring),
+    # and "consistent" normals can only be resolved WITHIN a connected island -- Blender's own
+    # inside/outside heuristic (which way is "outward" relative to the island's inferred centre)
+    # has no reliable signal for which way is actually correct on a thin, disconnected card, and
+    # guessed wrong often enough to add MORE dark gaps across the wing and even the head/crest, not
+    # fewer. Reverted; the real fix is in Live3D's own render state instead (see Game1.cs) --
+    # rendering double-sided is correct regardless of any individual card's winding, and doesn't
+    # depend on guessing an orientation heuristic right for 15+ independent islands.
     post = common.topology_stats(wobj)
     pieces_report[name] = {"small_components_removed": n_removed, "pre_cleanup_tris": pre["tri_equivalent"],
                             "decimate": [before_tris, after_tris], "final_tris": post["tri_equivalent"],

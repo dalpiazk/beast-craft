@@ -165,13 +165,45 @@ print(f"LEG WEIGHT RESTRICTION: removed {removed} out-of-chain group memberships
 # belly-centre vertices forced off every thigh). Runs on top of restrict_leg_weights (which only
 # ever touched the knee-ankle-foot region, not the thigh/hip area this targets) and still before
 # cleanup_weights' renormalise.
-cross_leg_removed, belly_forced = template.fix_hip_weight_gradient(obj, H, lm["legs"], bone_roles)
+cross_leg_removed, belly_forced = template.fix_hip_weight_gradient(obj, H, lm["legs"], bone_roles, enable_pass1=False)
 report["weighting"]["hip_gradient_cross_leg_removed"] = cross_leg_removed
 report["weighting"]["hip_gradient_belly_forced"] = belly_forced
 print(f"HIP WEIGHT GRADIENT: {cross_leg_removed} vertices had a cross-leg thigh weight removed, "
       f"{belly_forced} belly-centre vertices forced off every thigh")
 
+# Round 9: the same class of fix as fix_hip_weight_gradient, for the wing root -- see
+# fix_wing_root_bleed's docstring.
+wing_bleed_fixed = template.fix_wing_root_bleed(obj, H, lm, bone_roles)
+report["weighting"]["wing_root_bleed_fixed"] = wing_bleed_fixed
+print(f"WING ROOT BLEED: {wing_bleed_fixed} vertices had an out-of-range spine_02/scapula weight removed")
+
 common.cleanup_weights(obj, limit=4)
+
+# Round 9 lead review: a flat-shaded close-up and a new verify.py max-edge-stretch gate both found
+# long stretched slivers in Move/Attack, traced to belly vertices carrying weight on TWO different
+# legs (confirmed: e.g. leg_BL_thigh=0.43/leg_FL_thigh=0.32 on the same vertex -- BL and FL are
+# never in phase in the gait, so that vertex gets pulled two directions every frame, stretching a
+# triangle clear across the body). restrict_leg_weights/fix_hip_weight_gradient above already
+# target exactly this, and DID remove it -- but cleanup_weights' own vertex_group_smooth call (just
+# above) unintentionally spread the removed weight back in from neighbouring vertices that still
+# legitimately carry it, since smoothing has no notion that a boundary it's softening was put there
+# on purpose. Re-running both restriction passes here, AFTER smoothing, makes the restriction the
+# true final word; common.normalize_weights (not a second full cleanup_weights call, which would
+# just reintroduce the same contamination again) renormalises what's left without smoothing it back.
+removed_post_smooth = common.restrict_leg_weights(obj, leg_masks, bone_roles)
+cross_leg_removed_post_smooth, belly_forced_post_smooth = template.fix_hip_weight_gradient(
+    obj, H, lm["legs"], bone_roles, enable_pass1=False)
+wing_bleed_fixed_post_smooth = template.fix_wing_root_bleed(obj, H, lm, bone_roles)
+common.normalize_weights(obj)
+report["weighting"]["post_smooth_leg_restriction_removed"] = removed_post_smooth
+report["weighting"]["post_smooth_hip_gradient_cross_leg_removed"] = cross_leg_removed_post_smooth
+report["weighting"]["post_smooth_hip_gradient_belly_forced"] = belly_forced_post_smooth
+report["weighting"]["post_smooth_wing_root_bleed_fixed"] = wing_bleed_fixed_post_smooth
+print(f"POST-SMOOTH RE-RESTRICTION: leg={removed_post_smooth} "
+      f"hip_gradient_cross_leg={cross_leg_removed_post_smooth} "
+      f"hip_gradient_belly={belly_forced_post_smooth} "
+      f"wing_root_bleed={wing_bleed_fixed_post_smooth}")
+
 worst, avg = common.max_influences_per_vertex(obj)
 report["weighting"]["max_influences_after_cleanup"] = worst
 report["weighting"]["avg_influences_after_cleanup"] = avg

@@ -1323,8 +1323,24 @@ namespace BeastCraft.Spike55.Live3D
             // glTF/OpenGL's winding convention is the opposite of MonoGame/XNA's default
             // (RasterizerState.CullCounterClockwise, which treats *clockwise* as front-facing) -- the
             // griffin_live.glb index data was loaded as-is (no re-winding), so the front-facing set
-            // under glTF's right-handed CCW convention is CullClockwise's kept set here.
-            GraphicsDevice.RasterizerState = RasterizerState.CullClockwise;
+            // under glTF's right-handed CCW convention would be CullClockwise's kept set here.
+            //
+            // Round 9 (anim-pilot griffin, lead review): the main toon pass is drawn double-sided
+            // (CullNone) instead, not single-sided -- griffin_anim.glb's wings are a bundle of many
+            // (7-8 per wing) only loosely-connected feather-card islands (see Tooling/Animation/
+            // prep_mesh.py's docstring), each decimated independently, with no reliable way to force
+            // every card's winding consistently outward (tried: Blender's own
+            // normals_make_consistent "inside/outside" heuristic guessed wrong often enough on
+            // these thin disconnected cards to make the dark gaps WORSE, not better -- confirmed by
+            // rendering actual Attack frames before reverting that attempt). A single-sided,
+            // winding-dependent cull was always going to be fragile against a wing made of many
+            // independent islands; double-sided removes the dependency on winding being consistent
+            // at all, at the cost of drawing each triangle's backface too -- a small, acceptable
+            // GPU cost for this pilot's mesh budgets, and harmless on any OTHER beast's mesh that IS
+            // a clean, consistently-wound single shell (CullNone draws its backfaces too, but they
+            // sit behind the already-drawn front faces in the depth buffer, so nothing visible
+            // changes there).
+            GraphicsDevice.RasterizerState = RasterizerState.CullNone;
             var toonTechnique = _toonEffect.Techniques["Toon"];
             foreach (var inst in _instances)
                 DrawInstance(inst, toonTechnique);

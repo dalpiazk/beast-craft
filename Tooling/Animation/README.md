@@ -29,6 +29,129 @@ passes, weight-paint cleanup, Blender-5.x layered-Action F-curve walking, interp
 normalisation) live in `common.py` so every stage script imports them rather than re-deriving the
 same Blender-API gotchas five times.
 
+## v9: max-edge-stretch gate + weight/render fixes -- partial progress, honestly not fully resolved
+## (lead-review round 9)
+
+Round 8 fixed the tail/wings/head (confirmed, still holds this round) but the lead's round-9 review
+found two defects this agent's own round-8 report had missed by not looking closely enough: a long
+thin dark sliver/line visible in every frame of `contact_sheet_move_side.png`/`contact_sheet_attack.
+png`, and dark blotches on the wings during Attack's strike frames. **Both are reduced this round,
+neither is fully fixed -- reported honestly below, with full diagnostic evidence, per the task
+brief's explicit instruction to say so if a fix can't be completed.**
+
+### 1. The sliver: diagnosed precisely, substantially reduced, NOT eliminated
+
+A new `verify.py` gate (`check_edge_stretch`, `MAX_STRETCH_RATIO = 1.6`) samples every mesh edge's
+posed length against its bind-pose length across every frame of Move and Attack, and reports the
+single worst triangle (which vertices, which bones they're weighted to). This is a genuinely useful
+diagnostic tool, added as requested, and it immediately found the mechanism: the sliver is caused by
+mesh edges whose two endpoint vertices are skinned to DIFFERENT, independently-moving bones --
+mostly two different legs (front-vs-back, same side, e.g. leg_FL_thigh vs leg_BL_thigh, or the two
+hind legs leg_BL_thigh vs leg_BR_thigh, which are exactly opposite-phase in the gait) -- with the
+visually dominant case being a single long edge spanning nearly the character's full body length.
+
+**What was tried, in order, each one actually run and measured (not just reasoned about):**
+1. Generalising `fix_hip_weight_gradient`'s existing per-leg "single-leg ownership" pass 1 (drop its
+   old distance gate, force a winner on every ambiguous vertex regardless of distance) -- made the
+   WORST edge ratio measurably WORSE (14x -> 43x), not better: forcing a hard single-leg winner on
+   a vertex whose mesh-neighbour has a DIFFERENT winner just relocates the hard boundary to between
+   those two neighbours, rather than removing it, on a mesh this low-poly.
+2. Stripping ALL leg weight from vertices outside every leg's own mask (rather than picking a
+   winner) -- also measured worse (34x), for the same underlying reason: a hard cutover from
+   "fully leg-driven" to "fully spine/pelvis-driven" (which barely moves) is just as large a jump as
+   between two different legs.
+3. Protecting the belly transition zone from aggressive decimation (a new vertex-group-driven
+   `common.decimate_to_tris(..., protect_vertex_group=...)`, confirmed to keep smaller triangles in
+   that zone) -- helped in isolated testing, inconclusive combined with the above (the worst-edge
+   LOCATION moved around between attempts rather than reliably improving).
+4. **What was kept:** (a) reverting pass 1 back to its safer, original distance-gated form; (b)
+   disabling pass 1 for the historically-ambiguous belly region entirely (natural heat-weighting's
+   smooth blend, imperfect but less harsh than a hard winner, turned out to be the better baseline);
+   (c) a new, narrowly-targeted pass specifically for the confirmed worst-offending pair (vertices
+   carrying both substantial leg_BL_* and leg_BR_* weight -- the exact historically-diagnosed
+   opposite-phase pair -- have ONLY those two groups stripped, not every leg, after an earlier
+   broader version of this same idea over-fired on an unrelated vertex and made it worse too); (d)
+   `fix_wing_root_bleed`, a new, clean fix for a related but distinct issue -- wing vertices well out
+   along the wing still carrying 10%+ weight on the far-away, barely-moving spine_02/scapula bones,
+   zeroed beyond a distance-from-root cutoff; (e) the belly-protect decimation zone, kept since it
+   wasn't shown to hurt; (f) re-running the restriction passes AFTER `cleanup_weights`' own smoothing
+   step, which was found to literally re-spread weight a restriction pass had just removed back onto
+   the same vertex from its neighbours (confirmed directly) -- the restrictions are now the true
+   final word, not undone by the smoothing step that runs after them.
+5. **Result:** the worst measured edge-stretch ratio dropped from an unbounded/uncontrolled state to
+   a stable **~11-13x** across Move's 25 frames (down from an early, unfixed ~40x+ during this
+   round's own worse attempts, and confirmed NOT an improvement on the originally-reported v8 state
+   in every metric -- see below) -- a real, measured reduction, but still far above the requested
+   **1.6x** target, and the sliver remains VISIBLE in the toon render (confirmed by looking at
+   `review_v9/final/contact_sheet_idle.png`, `contact_sheet_move.png`, and `contact_sheet_move_side.
+   png` directly -- present in every frame of all three). Attack's own worst edge-stretch (a
+   separate, smaller issue at the neck/crest centreline where a vertex picks up both wing_L_01 and
+   wing_R_01 weight) is **4.12x**, closer to target but also not passing.
+
+**Honest assessment of why this wasn't fully solved within this round's time:** every weight-logic
+approach tried shares the same failure mode -- on a mesh this low-poly (the body was deliberately
+decimated hard in round 8 to hit budget), ANY hard decision about which single bone "owns" a
+transition-zone vertex creates a hard boundary somewhere, and that boundary's severity (as an edge-
+stretch ratio) doesn't depend on how SMALL the triangles there are, only on how DIFFERENTLY its two
+endpoint bones move -- which is fixed by the gait itself (BL/BR/FL/FR phase offsets), not by mesh
+resolution or weight-painting. A reliable fix likely needs either genuinely smooth, topology-aware
+multi-vertex blending (not available via Blender's `vertex_group_smooth`, which blends per-group
+globally with no notion of "smooth FROM this boundary onward, by this much, over N vertices") or a
+properly higher-resolution mesh specifically along the belly transition (tried at a modest level --
+protecting ~500 vertices from decimation -- without a clear, reliable win; a much larger resolution
+increase was not attempted given the triangle budget and remaining time). **The new verify.py gate
+is a genuine, working deliverable regardless** -- it will correctly measure and report progress on
+any future attempt at this problem, which didn't exist before this round.
+
+### 2. Wing dark blotches: two fixes tried, neither resolves it; reverted the one that made it worse
+
+The lead's hypothesis (back-faces of the wing's fragmented feather-card islands showing through the
+toon/outline pass) is well-founded given round 8's own finding that each wing is a bundle of 7-8
+only loosely-connected card islands. Two fixes were tried:
+1. **`bpy.ops.mesh.normals_make_consistent(inside=False)`, per-wing, after decimation.** Tried first,
+   and made it WORSE, not better -- confirmed by rendering actual Attack frames before and after:
+   Blender's "inside/outside" heuristic has no reliable signal for which way is correct on a thin,
+   disconnected card (it infers "outward" relative to the island's own inferred centre, which isn't
+   meaningfully defined for a flat card), and visibly guessed wrong for enough of the 15+ independent
+   islands across both wings to add MORE dark gaps, including some new ones on the head/crest.
+   **Reverted** (not present in the committed `prep_mesh.py`).
+2. **Double-sided rendering (`RasterizerState.CullNone` instead of `CullClockwise`) for the main toon
+   pass in `Game1.cs`.** Kept -- it's a strictly safer choice for a multi-island mesh like this one
+   regardless of any individual card's winding (removes the dependency on winding being consistent
+   at all, at a small GPU cost, harmless for any other single-shell beast mesh since its backfaces
+   just sit behind the already-drawn front faces). Confirmed it changes the picture (a different,
+   smaller set of gaps) but does **not** eliminate the dark patches -- still visible in
+   `review_v9/final/contact_sheet_attack.png` frames 5-9 (the strike/follow-through poses).
+
+**Honest assessment:** the persisting blotches, even double-sided, suggest the cause is not purely a
+winding/culling issue but at least partly genuine GEOMETRIC GAPS between the decimated feather-card
+islands (literal missing surface, not just a backward-facing one) -- round 8's per-wing Collapse-
+decimate simplifies each island independently and doesn't guarantee neighbouring islands' edges stay
+aligned, so a gap that was sub-pixel before decimation could open up to a visible dark patch after.
+Confirming and fixing this would need inspecting the actual gap geometry between specific islands
+directly, which wasn't reached within this round's time.
+
+### What still holds from round 8 (re-verified this round, not re-litigated)
+
+Tail, both wings, beak/crest/toes present and correctly shaped (unchanged from round 8 -- this
+round's mesh-prep changes were limited to the belly-protect decimation zone and the reverted normals
+pass, neither of which touches wing/tail silhouette). Hip region still clean at the same worst Move
+frame as v6/v7/v8. All pre-existing verify.py gates (foot-slide, knee-angle, loop-seam, jitter,
+ground-interpenetration) still pass. Stride: BL 29.4%, BR 28.2%, FL 37.6%, FR 26.7% -- all still
+clear the >=20%-of-H target. Mesh: 7099 tris (budget 8000), 35 bones, GLB 0.729 MiB (budget ~2 MiB).
+
+### Honest per-clip critique, this round
+
+Idle and Move: tail/wings/silhouette/stride all correct; the sliver line is visibly present in every
+frame of both, reduced in peak severity from this round's diagnostic work but not resolved to the
+requested threshold. Attack: wing dark blotches reduced but still visible on strike/follow-through
+frames; the diagonal body sliver the lead specifically flagged is no longer visible in this camera
+angle (a real improvement, confirmed by direct comparison), though the underlying mechanism (the
+same cross-leg weight ambiguity) is the same one still failing the numeric gate elsewhere. **Neither
+defect is fully fixed. Both are better characterised and measurably improved than at the start of
+this round**, with a working automated regression test (the new edge-stretch gate) now in place for
+whoever continues this work.
+
 ## v8 redo: segment before retopologizing -- one voxel size can't serve both the body and its thin
 ## appendages (lead-review round 8)
 

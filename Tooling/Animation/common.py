@@ -180,11 +180,21 @@ def topology_stats(obj):
     }
 
 
-def decimate_to_tris(obj, target_tris):
+def decimate_to_tris(obj, target_tris, protect_vertex_group=None):
     """Collapse-decimate obj (in place, applied) down to approximately target_tris triangles.
     Safe on a single-component, manifold-ish mesh (per Spike #55's finding: Collapse decimation
     shatters a mesh fragmented into hundreds of disconnected islands, but this pipeline's
-    prep_mesh.py only calls this after confirming the mesh is a single component)."""
+    prep_mesh.py only calls this after confirming the mesh is a single component).
+
+    `protect_vertex_group`, if given (a vertex group name on obj, weight 1.0 for vertices to
+    protect), keeps MORE resolution on those vertices by decimating everywhere else harder to
+    compensate for the same overall budget -- round 9 finding: a flat decimate can collapse a
+    narrow-but-important transition zone (e.g. the belly between front and back legs) into a few
+    unusually large triangles, which then show as stretched slivers once skinned (see prep_mesh.py's
+    own comment at its call site for the full story). Confirmed empirically which of Decimate's
+    `invert_vertex_group` settings actually protects (not the one that sounds right from the name
+    alone): `invert_vertex_group=True` with `vertex_group_factor=1.0` is the setting that keeps
+    group-weight-1.0 vertices at higher resolution."""
     stats = topology_stats(obj)
     current = stats["tri_equivalent"]
     if current <= target_tris:
@@ -193,6 +203,10 @@ def decimate_to_tris(obj, target_tris):
     mod = obj.modifiers.new("PrepDecimate", "DECIMATE")
     mod.decimate_type = "COLLAPSE"
     mod.ratio = ratio
+    if protect_vertex_group and protect_vertex_group in obj.vertex_groups:
+        mod.vertex_group = protect_vertex_group
+        mod.vertex_group_factor = 1.0
+        mod.invert_vertex_group = True
     bpy.context.view_layer.objects.active = obj
     bpy.ops.object.modifier_apply(modifier=mod.name)
     after = topology_stats(obj)["tri_equivalent"]
@@ -716,6 +730,55 @@ def restrict_leg_weights(obj, leg_masks, bone_roles):
     return removed
 
 
+def strip_leg_weight_outside_masks(obj, leg_masks, bone_roles):
+    """Round 9: for any vertex NOT inside ANY leg's own mask (`leg_masks`, from `build_leg_masks`),
+    zeros EVERY leg_* bone's weight on it entirely -- relying on spine/pelvis/scapula to cover that
+    region instead of picking a "winner" leg for it. A vertex this far from every leg's own mask is,
+    by construction, in an ambiguous transition zone between two (or more) legs; automatic heat
+    weighting still assigns it SOME leg weight there (whichever bones are geometrically nearest,
+    even if neither leg is genuinely close), and an earlier fix that picked a single winner for such
+    a vertex (keeping only its highest-weighted leg) just relocated the hard boundary to wherever
+    that winner's own weight starts losing to a mesh-neighbour's -- the new max-edge-stretch gate
+    doesn't care how small the edge is, only how much it grows relative to bind length, and two
+    different legs' bones always move independently in a lateral-sequence gait regardless of mesh
+    resolution there. Confirmed as the actual fix (not the single-winner approach, which measurably
+    made the worst-edge ratio WORSE, not better -- see the round-9 README section for the numbers):
+    removing ALL leg influence from the genuinely-unmasked belly/chest zone removes the
+    independently-moving pull outright, rather than redistributing it. Must run BEFORE
+    cleanup_weights (and again after, like restrict_leg_weights/fix_hip_weight_gradient -- cleanup_
+    weights' own smoothing re-spreads weight across group boundaries same as for those). Returns the
+    number of vertices that had at least one leg-group weight removed."""
+    me = obj.data
+    masked = set()
+    for vids in leg_masks.values():
+        masked |= set(vids)
+    leg_group_ids = {g.index for g in obj.vertex_groups
+                      if bone_roles.get(g.name, "").startswith("leg_")}
+    if not leg_group_ids:
+        return 0
+    stripped = 0
+    for vi, v in enumerate(me.vertices):
+        if vi in masked:
+            continue
+        total = sum(g.weight for g in v.groups)
+        leg_total = sum(g.weight for g in v.groups if g.group in leg_group_ids)
+        if leg_total <= 0.0:
+            continue
+        if total - leg_total <= 1e-6:
+            # This vertex has ONLY leg weight and nothing else to fall back on -- stripping it
+            # entirely would leave it completely unweighted (confirmed as a real failure mode:
+            # an earlier version of this function did exactly that, 19 vertices wound up with no
+            # weight at all). Leave its leg weight alone rather than orphan it; rare enough
+            # (a genuinely unmasked vertex with no spine/pelvis/scapula weight at all from auto-
+            # weighting) that it isn't worth a more elaborate nearest-bone fallback for this pilot.
+            continue
+        for g in list(v.groups):
+            if g.group in leg_group_ids:
+                obj.vertex_groups[g.group].remove([vi])
+        stripped += 1
+    return stripped
+
+
 def cleanup_weights(obj, limit=3):
     """Scripted weight-paint cleanup, per the methodology doc section 2: limit influences,
     normalise, clean near-zero, smooth. All plain bpy.ops, fully headless.
@@ -746,6 +809,26 @@ def cleanup_weights(obj, limit=3):
     bpy.ops.object.vertex_group_smooth(group_select_mode="ALL", factor=0.6, repeat=3)
     bpy.ops.object.vertex_group_limit_total(limit=limit)  # re-cap: smooth can reintroduce influences
     bpy.ops.object.vertex_group_clean(group_select_mode="ALL", limit=0.01)
+    bpy.ops.object.vertex_group_normalize_all(lock_active=False)
+    bpy.ops.object.mode_set(mode="OBJECT")
+
+
+def normalize_weights(obj):
+    """Renormalises every vertex's group weights to sum to 1, with no smoothing/limiting/cleaning.
+    Round 9 finding: `cleanup_weights`'s own `vertex_group_smooth` call re-spreads weight across
+    EVERY group on the mesh, including back onto a group a hard-restriction pass (`restrict_leg_
+    weights`, `fix_hip_weight_gradient`) had just zeroed for a specific vertex -- confirmed
+    directly: a belly vertex with its cross-leg `leg_FL_thigh` weight removed by `fix_hip_weight_
+    gradient` had that SAME weight back (within floating-point rounding) after `cleanup_weights`
+    ran, because its immediate neighbours still legitimately carry `leg_FL_thigh` weight and
+    smoothing blends across that boundary with no awareness that the boundary was intentional. The
+    fix is to re-run the hard-restriction passes AFTER `cleanup_weights`' smooth step (as the true
+    final word), then just renormalise -- not run the full cleanup (limit/clean/smooth) again, which
+    would just reintroduce the same contamination a second time."""
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.mode_set(mode="WEIGHT_PAINT")
     bpy.ops.object.vertex_group_normalize_all(lock_active=False)
     bpy.ops.object.mode_set(mode="OBJECT")
 
