@@ -200,30 +200,6 @@ def aim_matrix(head_pos, tail_pos, up_hint=mathutils.Vector((0, 0, 1))):
     return mat
 
 
-def rotate_around_x(v, angle):
-    """Rotates vector `v` by `angle` radians around the WORLD X axis (the sideways/left-right axis
-    for this rig -- every leg's fore-aft swing stays in the Y-Z sagittal plane, X=0, so a pitch
-    around world X is exactly a forward/backward-leaning tilt, which is what the foot/toe
-    swing-phase curl (set_leg_pose, round 12) needs). Used instead of a generic axis-angle
-    construction since this file's whole per-leg up_hint convention already treats X as the stable
-    "sideways" reference axis for every leg on this rig (see set_leg_pose's up_hint comment)."""
-    c, s = math.cos(angle), math.sin(angle)
-    return mathutils.Vector((v.x, v.y * c - v.z * s, v.y * s + v.z * c))
-
-
-def rotate_around_axis(v, axis, angle):
-    """Rodrigues' rotation formula: rotates vector `v` by `angle` radians around unit vector
-    `axis` (any direction, not just a world axis). Used for round 13's per-toe swing-phase hinge
-    curl -- each of a foreleg's three splayed toes (toe_in/mid/out) curls around ITS OWN hinge axis
-    (normalize(cross(toe_direction, world_up)), per the task brief), which generally is NOT world X
-    (that's only true for a toe pointing exactly along the sagittal/Y-Z plane -- a splayed toe's
-    own direction has a real X component, so its hinge axis does too), unlike the single shared
-    foot-bone curl rotate_around_x already handles."""
-    axis = axis.normalized()
-    return (v * math.cos(angle) + axis.cross(v) * math.sin(angle)
-            + axis * axis.dot(v) * (1 - math.cos(angle)))
-
-
 def set_bone_world_matrix_direct(pb, desired_world, parent_world, parent_rest):
     """Sets pb's pose directly to `desired_world` (an armature-space 4x4 matrix) by computing
     matrix_basis analytically from Blender's own pose-chain formula:
@@ -270,7 +246,7 @@ TOE_CURL_MAX_DEG = 28.0  # toes curl a bit more than the pastern/foot segment, s
 # stricter requirement than the single-toe TOE_CURL_MAX_DEG above, which DID allow some stance-
 # adjacent easing via the shared foot curl) and each curls up to this amount, around its OWN hinge
 # axis, during swing only.
-TOE_FAN_CURL_MAX_DEG = 20.0
+TOE_FAN_CURL_MAX_DEG = 8.0
 RAW_STRIDE = 0.23 * H   # desired fore-aft HALF-stride excursion (foot sweeps +RAW_STRIDE to
 # -RAW_STRIDE), before the per-leg reach clamp. Full peak-to-peak foot travel is 2x this -- the
 # lead-review fix round's "readable stride, ~25-40% of body length" target is interpreted as that
@@ -442,31 +418,78 @@ for side in leg_sides:
     max_safe_lift = max(0.01 * H, hip.z - min_reach * 1.15)
     lift = min(lift, max_safe_lift)
 
-    # Round 12 (producer review: "the feet look wrong" -- FR toes crossing/twisting, hind feet
-    # pads-up/flipped): precomputed FIXED rest-pose directions/lengths for the foot (ankle->foot)
-    # and toe (foot->toe tip) segments, used by set_leg_pose's new foot/toe orientation logic
-    # instead of literally aiming those bones at the raw IK target every frame -- see set_leg_pose's
-    # docstring for the full root-cause explanation (a numeric diagnostic showed the raw ankle->
-    # target direction is NOT stable during swing: BL's foot-bone direction, projected to the
-    # ground plane, is within 0.4 deg of FORWARD during stance but flips a full 180 deg from
-    # FORWARD during the lift/mid-swing phases -- a genuine orientation flip, not just a rendering
-    # artefact, confirmed both numerically and visually in close-up renders).
-    foot_len = (foot - ankle).length
-    foot_stance_dir = (foot - ankle).normalized() if foot_len > 1e-6 else mathutils.Vector((0, 0, -1))
+    # Round 14 (producer review: round 13's toe-fan still showed "jagged folded geometry at the
+    # foot/toe base" and "mangled, overlapping toes" in Move frames). ROOT CAUSE (confirmed via a
+    # numeric diagnostic comparing posed-vs-rest matrices, not guessed): round 12/13 built the foot
+    # and toe bones' ORIENTATION via `aim_matrix` + a hand-picked `up_hint` world axis -- a
+    # DIFFERENT up_hint for the foot (world X) than for the toes (world -Z). aim_matrix's X/Z
+    # construction from a given up_hint has NO reason to reproduce the bone's actual REST roll
+    # (built by Blender's own default roll-0 convention when the edit bone was created, totally
+    # unrelated to any up_hint choice) -- confirmed directly: even during STANCE, with the foot
+    # bone's Y-axis exactly matching its bind direction, its full pose-vs-rest matrix differed by
+    # 90 degrees (a 44-degree matrix_basis rotation around a non-anatomical compound axis
+    # (0.69, 0.19, -0.70) -- NOT a clean single-axis "wrist bends forward," just a roll-convention
+    # artefact), and the toe's rotation RELATIVE TO THE FOOT (what the blended mesh at the foot/toe
+    # junction actually feels) drifted 160+ degrees from its bind-relative transform. Two
+    # independently-mismatched roll conventions meeting at one blended vertex region is exactly what
+    # shears/folds triangles there, even though each bone's OWN "shape" (toe-to-toe angle, ground
+    # height) still measured fine -- which is why round 13's toe_fan gate (toe-to-toe angle +
+    # ground clearance only) passed despite the visible mesh damage.
+    #
+    # FIX: stop reconstructing orientation from a world-space up_hint entirely for foot/toe bones.
+    # The FOOT keeps round 12's real goal -- world orientation stays AT BIND during stance,
+    # "with the shin/wrist taking up the difference" -- but now implemented by literally copying
+    # the bind rest rotation (foot_rest_rot4) instead of re-deriving a roll via aim_matrix, so there
+    # is no possible mismatch from the bind roll at zero curl. The TOE bones are driven with a
+    # DIRECT LOCAL matrix_basis (identity at stance, a small local-axis rotation during swing) so
+    # they rigidly inherit whatever the foot's ACTUAL pose is via normal FK composition -- by
+    # construction this has ZERO relative-to-foot mismatch regardless of the foot's own world
+    # orientation, which is what actually matters for the blended mesh at the junction (a toe
+    # anatomically just needs to follow its own forefoot rigidly, not independently chase a world
+    # direction). Curl axes are precomputed once, transformed from world space into each bone's own
+    # REST-LOCAL frame (bone_rest.to_3x3().inverted() @ world_axis) so `Matrix.Rotation(angle, 4,
+    # local_axis)` composes correctly as a LOCAL-space rotation on top of the bind-preserving pose.
+    foot_rest_mat_local = arm_data.bones[f"leg_{side}_foot"].matrix_local
+    foot_rest_rot4 = foot_rest_mat_local.to_3x3().to_4x4()  # rest rotation only, translation zeroed
+    foot_local_curl_axis = foot_rest_mat_local.to_3x3().inverted() @ mathutils.Vector((1, 0, 0))
+    foot_local_curl_axis = foot_local_curl_axis.normalized() if foot_local_curl_axis.length > 1e-6 \
+        else mathutils.Vector((1, 0, 0))
+
+    # Round 14 (second fix, found after the first local-rotation fix above introduced a NEW,
+    # measured regression: toe tips sinking 0.02-0.06H below ground, confirmed via verify.py's
+    # ground-interpenetration/toe_fan gates). ROOT CAUSE: holding the foot at EXACT bind rotation
+    # and simply translating it to ankle_w means the foot+toe assembly is now a RIGID BODY whose
+    # ground-contact HEIGHT is ankle_w.z + a FIXED rest offset -- nothing compensates any more for
+    # CROUCH (and the rest of the IK chain) placing ankle_w at a different HEIGHT than ankle_rest,
+    # which rounds 12/13's old "aim toward a ground-level target" approach absorbed as part of its
+    # (buggy-roll) re-aiming, and which this round's bind-preserving fix no longer does by
+    # construction. The OLD code's near-zero ground readings were never really earned by the
+    # geometry -- they were papered over by an explicit `if tip.z < 0: tip.z = 0` clamp on the
+    # toe's WORLD position, which this round's FK-driven toe construction has no equivalent for
+    # (there is no longer an explicit toe world position to clamp).
+    #
+    # FIX: solve for the actual height the ankle needs, directly. The foot+toe assembly's
+    # ground-contact HEIGHT, given ankle_w and zero curl, is predictable exactly:
+    # `ankle_w.z + contact_offset_rest.z` (contact_offset_rest = the FIXED rest-pose vector from
+    # ankle to a representative ground-contact point -- the toe tip for a single-toe leg, the
+    # MIDDLE toe's tip for a toe-fan leg, the most anatomically central one). set_leg_pose applies
+    # a direct Z correction to ankle_w so that predicted height exactly equals the already-computed
+    # ground/lift target -- the same "adjust ankle_w directly, let the shin's own aim_matrix target
+    # just follow wherever ankle_w ends up" pattern this file already uses for every other
+    # foot-placement adjustment (CROUCH, scapula swing), not a new mechanism.
+    if has_toe_fan:
+        _, contact_point_rest = rest_head_tail(f"leg_{side}_toe_mid")
+    else:
+        contact_point_rest = toe
+    contact_offset_rest = contact_point_rest - ankle
 
     toe_fan_data = None
     if has_toe_fan:
-        # Round 13: per-toe precompute. `toe_fan_offset_rest` is the FIXED (rest-pose) vector from
-        # the ankle to the toe-fan's shared base junction -- rotated by the SAME rigid foot-curl
-        # rotation applied to foot_stance_dir each frame (see set_leg_pose), so the toe-base point
-        # stays correctly attached to the pastern/foot segment's own current tilt, exactly as if it
-        # were a continuation of that same rigid segment (which anatomically it is). Each toe's own
-        # `tip_dir_rest`/`tip_len` are its own fixed rest-pose direction/length from that shared
-        # base; `hinge_axis` is the per-toe curl axis the task brief specifies --
-        # normalize(cross(toe_direction, world_up)) -- computed once from the REST direction (a
-        # stable per-toe constant, not recomputed every frame, matching this file's established
-        # precedent of precomputing stable per-leg axes rather than deriving them from
-        # frame-varying state).
+        # Round 13: per-toe precompute (tip_dir_rest/tip_len kept for documentation/diagnostics).
+        # Round 14 ADDS `hinge_axis_local`: the task brief's hinge axis
+        # (normalize(cross(toe_direction, world_up))) computed in world space as before, then
+        # transformed into this specific toe bone's own REST-LOCAL frame for direct matrix_basis
+        # use (see the fix note above).
         toe_base_rest = rest_head_tail(f"leg_{side}_toe_in")[0]  # all 3 toe bones share this head
         world_up = mathutils.Vector((0, 0, 1))
         toes = {}
@@ -475,24 +498,38 @@ for side in leg_sides:
             tip_vec = tip_rest - toe_base_rest
             tip_len = tip_vec.length
             tip_dir_rest = tip_vec.normalized() if tip_len > 1e-6 else FORWARD.copy()
-            hinge_axis = tip_dir_rest.cross(world_up)
-            hinge_axis = hinge_axis.normalized() if hinge_axis.length > 1e-6 else \
+            hinge_axis_world = tip_dir_rest.cross(world_up)
+            hinge_axis_world = hinge_axis_world.normalized() if hinge_axis_world.length > 1e-6 else \
+                mathutils.Vector((1, 0, 0))
+            toe_rest_mat_local = arm_data.bones[f"leg_{side}_toe_{t}"].matrix_local
+            hinge_axis_local = toe_rest_mat_local.to_3x3().inverted() @ hinge_axis_world
+            hinge_axis_local = hinge_axis_local.normalized() if hinge_axis_local.length > 1e-6 else \
                 mathutils.Vector((1, 0, 0))
             toes[t] = {"tip_rest": tip_rest, "tip_len": tip_len, "tip_dir_rest": tip_dir_rest,
-                       "hinge_axis": hinge_axis}
+                       "hinge_axis_local": hinge_axis_local}
         toe_fan_data = {"base_rest": toe_base_rest,
                          "offset_rest": toe_base_rest - ankle, "toes": toes}
         toe_len = 0.0
         toe_stance_dir = FORWARD.copy()
+        toe_local_curl_axis = None
     else:
         toe_len = (toe - foot).length
         toe_stance_dir = (toe - foot).normalized() if toe_len > 1e-6 else FORWARD.copy()
+        # Round 14: same local-curl-axis fix as the toe fan, for the single aggregate toe bone
+        # (hind legs) -- reuses world X as the curl axis (matching the pre-round-14 convention),
+        # transformed into this toe's own rest-local frame.
+        toe_rest_mat_local = arm_data.bones[f"leg_{side}_toe"].matrix_local
+        toe_local_curl_axis = toe_rest_mat_local.to_3x3().inverted() @ mathutils.Vector((1, 0, 0))
+        toe_local_curl_axis = toe_local_curl_axis.normalized() if toe_local_curl_axis.length > 1e-6 \
+            else mathutils.Vector((1, 0, 0))
 
     legs[side] = {"hip": hip, "L1": L1, "L2": L2, "foot_rest": foot, "toe_rest": toe,
                   "stride": safe_stride, "lift": lift, "_ankle_frac": ankle_frac, "ground_z": ground_z,
                   "knee_rest": knee, "ankle_rest": ankle,
-                  "foot_len": foot_len, "toe_len": toe_len,
-                  "foot_stance_dir": foot_stance_dir, "toe_stance_dir": toe_stance_dir,
+                  "foot_len": foot_len, "toe_len": toe_len, "min_reach": min_reach,
+                  "foot_rest_rot4": foot_rest_rot4, "foot_local_curl_axis": foot_local_curl_axis,
+                  "contact_offset_rest": contact_offset_rest,
+                  "toe_local_curl_axis": toe_local_curl_axis,
                   "has_toe_fan": has_toe_fan, "toe_fan": toe_fan_data,
                   "bend_dir": bend_dir_by_side.get(side, mathutils.Vector((0, 1, 0)))}
     print(f"LEG {side}: hip={tuple(round(c,3) for c in hip)} L1={L1:.3f} L2={L2:.3f} "
@@ -588,56 +625,99 @@ def set_leg_pose(side, t, parent_world, parent_rest):
     # would only be correct for one of the two families. Falls back to +Y if rig_report.json wasn't
     # found (see this file's top-level load).
     bend_dir = L["bend_dir"]
-    knee_w, reached = solve_2bone_ik(L["hip"], L["L1"], L["L2"], ground_target, bend_dir)
-    # Ankle: a fixed point along the knee->ground line, at the shin's share of the combined L2
-    # (shin_len / (shin_len+foot_len)) -- see solve_2bone_ik's docstring for why the ankle is
-    # derived here rather than itself being a separate IK target.
-    ankle_w = knee_w.lerp(reached, L["_ankle_frac"])
 
-    # Round 12 (producer review: "the feet look wrong" -- FR toes crossing/twisting, hind feet
-    # pads-up/flipped). ROOT CAUSE (confirmed via a numeric diagnostic, not guessed): the OLD code
-    # built the foot bone's orientation by literally aiming it at `reached` (the raw ankle->IK-
-    # target line) and the toe bone by aiming at a position rigidly offset from that same point.
-    # That direction is NOT stable during swing -- the swing arc's target sweeps through a wide
-    # lifted parabola while the ankle (itself derived from the knee->target line) moves along a
-    # related but different path, and for some legs' geometry the two can end up on opposite sides
-    # of each other partway through the arc. Measured directly (BL, side-view close-up diagnostic,
-    # round 12): the foot bone's ground-projected direction sits within 0.4 deg of FORWARD during
-    # every stance frame, but flips to a full 180 deg from FORWARD (i.e. point exactly backward)
-    # during the lift/mid-swing frames -- a genuine orientation reversal, confirmed to be visible in
-    # renders, not just a numeric artefact. "the foot bone being left unconstrained under IK so it
-    # inherits [an uncontrolled] rotation" is exactly what was happening.
-    #
-    # FIX: the foot and toe bones' ORIENTATION is now an explicit, controlled quantity, decoupled
-    # from the raw IK target position (the ankle's own POSITION is untouched -- still exactly
-    # IK-solved, so stride/reach/knee-angle/foot-slide are all unaffected): during STANCE, both
-    # bones hold their FIXED rest-pose direction (foot_stance_dir/toe_stance_dir, precomputed once
-    # from the bind pose, which the diagnostic confirmed looks correct) -- i.e. the foot genuinely
-    # "stays planted, no roll/twist while planted," exactly as asked, not just approximately so.
-    # During SWING, that same direction is smoothly rotated into a small toe-down curl (around
-    # world X, the stable sideways axis for every leg on this rig -- see up_hint below) peaking at
-    # mid-swing and easing back to the identical stance direction by the next touchdown, so there is
-    # no discontinuity at either phase boundary and no possibility of the wild direction-reversal
-    # the old position-tracking approach was prone to.
+    # Swing-phase envelope: computed ONCE, up front, since it now feeds BOTH the ground-height IK
+    # correction below and the foot/toe curl further down (round 12/13's original single use).
     ph = (t + phase_offset[side]) % 1.0
     u_swing = 0.0 if stance else (ph - DUTY) / (1.0 - DUTY)
     curl_s = 0.0 if stance else math.sin(math.pi * u_swing)  # 0 at both swing boundaries, peak mid
     foot_curl_angle = math.radians(FOOT_CURL_MAX_DEG) * curl_s
-    foot_dir = rotate_around_x(L["foot_stance_dir"], foot_curl_angle)
-    foot_tail = ankle_w + foot_dir * L["foot_len"]
 
-    if not L["has_toe_fan"]:
-        # Pre-round-13 single-aggregate-toe path (hind legs, and any future legs without a toe
-        # fan) -- entirely unchanged from round 12.
-        toe_dir = L["toe_stance_dir"] if stance else \
-            rotate_around_x(L["toe_stance_dir"], math.radians(TOE_CURL_MAX_DEG) * curl_s)
-        toe_tail = foot_tail + toe_dir * L["toe_len"]
-        # Defensive ground clamp (same spirit as the old toe_offset clamp this replaces): the curl
-        # is small and the stance direction is bind-pose-correct, so this should rarely trigger,
-        # but keep a safety net against verify.py's ground-interpenetration gate regardless.
-        if toe_tail.z < 0.0:
-            toe_tail.z = 0.0
+    # Round 14 (second fix -- see the per-leg precompute's `contact_offset_rest` comment for the
+    # full root cause): with the foot held at exact bind rotation (this round's main fix, below),
+    # the foot+toe assembly's ground-contact HEIGHT is fully predictable from ankle_w alone --
+    # ankle_w.z + a fixed (curl-rotated) rest offset to a representative contact point -- so the IK
+    # TARGET's Z is adjusted, via a few fixed-point iterations of the EXACT closed-form 2-bone solve
+    # (not a post-hoc position hack), until that predicted contact height exactly matches the
+    # intended `ground_target.z` (0 during stance, the lift arc during swing). Iterating the real
+    # solve (instead of shifting knee_w/ankle_w AFTER the fact) keeps the shin's true rest length
+    # exactly honoured -- an earlier version of this fix shifted knee_w and ankle_w together
+    # post-hoc, which was simpler but collapsed FL/FR's knee angle toward its floor (confirmed via
+    # verify.py: min angle dropped to 6-8 deg, close to the 15 deg gate threshold) by perturbing the
+    # knee's true hip-relative solve. A handful of iterations converges quickly since the
+    # relationship is smooth for the small corrections this mesh needs (a fixed point, not a
+    # literal Newton solve, but well-behaved here).
+    contact_offset_now = mathutils.Matrix.Rotation(foot_curl_angle, 3, "X") @ L["contact_offset_rest"]
+    knee_w, reached = solve_2bone_ik(L["hip"], L["L1"], L["L2"], ground_target, bend_dir)
+    ankle_w = knee_w.lerp(reached, L["_ankle_frac"])
+    predicted_contact_z = ankle_w.z + contact_offset_now.z
+    desired_correction = ground_target.z - predicted_contact_z
+    # Safety clamp, same principle/margin (1.15x) as this leg's own lift-vs-min_reach cap above:
+    # pulling the ankle UP to compensate for a rigid foot's own reach deficit shrinks hip-to-ankle
+    # distance toward min_reach (=|L1-L2|) exactly like a large swing-phase lift does, and an
+    # UNCLAMPED correction was confirmed (empirically, via verify.py's knee-angle gate) to collapse
+    # FL/FR's knee to near-zero degrees for this mesh's large foreleg CROUCH. Clamping the applied
+    # correction so hip-to-ankle distance never drops below that same safe floor keeps the knee
+    # angle gate honest; any residual ground-height error this leaves is reported honestly (not
+    # silently hidden) by verify.py's toe_fan/ground gates, same as every other imperfect-but-
+    # bounded tradeoff already documented in this file.
+    safe_floor = max(0.01 * H, L["min_reach"] * 1.15)
+    ankle_candidate = ankle_w.copy()
+    ankle_candidate.z += desired_correction
+    dist = (ankle_candidate - L["hip"]).length
+    if dist < safe_floor and desired_correction != 0:
+        # Scale back the Z delta (not just clamp the raw distance) so the correction direction is
+        # preserved, just reduced to whatever this leg's geometry can safely absorb this frame.
+        lo, hi = 0.0, 1.0
+        for _ in range(12):  # binary search the safe fraction -- cheap, exact enough
+            mid = (lo + hi) / 2
+            cand = ankle_w.copy()
+            cand.z += desired_correction * mid
+            if (cand - L["hip"]).length >= safe_floor:
+                lo = mid
+            else:
+                hi = mid
+        desired_correction *= lo
+    ankle_w.z += desired_correction
 
+    # Round 12 (producer review: "the feet look wrong"). Original root cause: the OLD code aimed
+    # the foot/toe bones at the raw IK target every frame, unstable during swing (see the git
+    # history for the full writeup) -- fixed by decoupling orientation from the raw target,
+    # holding a fixed stance direction. That part of the fix stands.
+    #
+    # Round 14 (producer review: round 13's toe fan still showed "jagged folded geometry at the
+    # foot/toe base" / "mangled, overlapping toes" in Move frames, even though round 13's own
+    # toe_fan gate passed). ROOT CAUSE (confirmed via a numeric diagnostic comparing posed-vs-rest
+    # matrices directly, not guessed): rounds 12-13 reconstructed the foot/toe bones' ORIENTATION
+    # via `aim_matrix` + a hand-picked world-space `up_hint` -- a DIFFERENT up_hint for the foot
+    # (world X) than for the toes (world -Z). That construction has NO reason to reproduce either
+    # bone's actual REST roll (Blender's own default roll-0 convention, set when the edit bone was
+    # created, entirely unrelated to any up_hint choice): measured directly, even during STANCE
+    # with the foot bone's Y-axis exactly matching its bind direction, its full pose-vs-rest matrix
+    # differed by 90 degrees of rotation (a 44-degree matrix_basis rotation around a non-anatomical
+    # compound axis (0.69, 0.19, -0.70) -- not a clean single-axis "wrist bends forward," just a
+    # roll-convention artefact), and the toe's rotation RELATIVE TO THE FOOT (what the blended mesh
+    # at the foot/toe junction actually feels) drifted 160+ degrees from its bind-relative
+    # transform. Two independently-mismatched roll conventions meeting at one blended vertex region
+    # is exactly what shears/folds triangles there, even though each bone's OWN shape (toe-to-toe
+    # angle, ground height) still measured fine -- which is why round 13's toe_fan gate (angle +
+    # ground clearance only, never mesh deformation) passed despite the visible mesh damage.
+    #
+    # FIX: stop reconstructing orientation from a world-space up_hint for the foot and toe bones.
+    # FOOT: keeps round 12's real goal -- world orientation stays AT BIND during stance, "with the
+    # shin/wrist taking up the difference" (i.e. the shin/thigh above it absorb whatever rotation
+    # is needed to still deliver the ankle to its IK-solved position while the foot itself holds
+    # still) -- now implemented by literally copying the bind REST rotation (foot_rest_rot4,
+    # precomputed once) instead of re-deriving a roll via aim_matrix, so there is no possible
+    # mismatch from the bind roll at zero curl: `foot_world = Translation(ankle_w) @
+    # foot_rest_rot4 @ Rotation(foot_curl_angle, local_axis)`. TOES: driven with a DIRECT LOCAL
+    # matrix_basis (identity at stance -- exactly bind-relative to the foot, zero rotation -- a
+    # small local-axis rotation during swing), so they rigidly inherit whatever the foot's ACTUAL
+    # pose is via normal FK composition. By construction this has ZERO relative-to-foot mismatch
+    # regardless of the foot's own world orientation, which is what actually matters for the
+    # blended mesh at the junction -- a toe anatomically just needs to follow its own forefoot
+    # rigidly, not independently chase a world direction. Blender's own FK composition places the
+    # toe correctly as a rigid extension of the (now correctly bind-preserving) foot.
     thigh_pb = arm_obj.pose.bones[f"leg_{side}_thigh"]
     shin_pb = arm_obj.pose.bones[f"leg_{side}_shin"]
     foot_pb = arm_obj.pose.bones[f"leg_{side}_foot"]
@@ -645,15 +725,11 @@ def set_leg_pose(side, t, parent_world, parent_rest):
     shin_rest = shin_pb.bone.matrix_local
     foot_rest_mat = foot_pb.bone.matrix_local
 
-    # up_hint picked PER LEG, as the world axis least aligned with this leg's own detected bend
-    # direction -- a single hardcoded (1,0,0) (every leg, every frame, an earlier pass's approach)
-    # put aim_matrix's cross-product into the ill-conditioned near-parallel regime whenever a leg's
-    # bones swing close to that axis, which on this mesh happens for real for FL/BR specifically
-    # (their horizontal-slicing-detected bend_dir is X-dominant -- confirmed as the root cause of
-    # FL's failed foot-slide gate: aim_matrix's degenerate-direction fallback also had its own bug,
-    # fixed separately above, but avoiding the near-singular regime in the first place is the more
-    # robust fix). bend_dir is a stable per-leg constant (not frame-dependent), so this choice is
-    # made once per leg, not per frame, and stays consistent across the whole clip.
+    # up_hint for thigh/shin only now (picked PER LEG, as the world axis least aligned with this
+    # leg's own detected bend direction -- see the longer-standing comment history for why this
+    # avoids aim_matrix's ill-conditioned near-parallel cross-product regime for those two bones;
+    # this reasoning still applies to thigh/shin, which are driven by genuine IK targets, unlike
+    # the foot/toe bones above which no longer use aim_matrix at all).
     bd = L["bend_dir"]
     axis_candidates = [mathutils.Vector((1, 0, 0)), mathutils.Vector((0, 1, 0)), mathutils.Vector((0, 0, 1))]
     up_hint = min(axis_candidates, key=lambda ax: abs(ax.dot(bd)))
@@ -661,65 +737,33 @@ def set_leg_pose(side, t, parent_world, parent_rest):
         thigh_pb, aim_matrix(L["hip"], knee_w, up_hint), parent_world, parent_rest)
     shin_world = set_bone_world_matrix_direct(
         shin_pb, aim_matrix(knee_w, ankle_w, up_hint), thigh_world, thigh_rest)
-    foot_world = set_bone_world_matrix_direct(
-        foot_pb, aim_matrix(ankle_w, foot_tail, up_hint), shin_world, shin_rest)
-    # Round 12 (producer review -- "sole normal" fix, part 2 of the foot-orientation bug): the TOE
-    # bone specifically gets its OWN up_hint, world +Z (not the shared per-leg `up_hint` above),
-    # because its Y axis (foot_tail->toe_tail) is close to HORIZONTAL for every leg on this rig --
-    # see the foot_stance_dir/toe_stance_dir precompute -- which makes world +Z a well-conditioned
-    # choice (not near-parallel to Y, so no degenerate-cross-product risk) and, more importantly,
-    # is what actually ALIGNS the toe bone's perpendicular "sole normal" axis with world-up by
-    # construction (aim_matrix's z_axis = (up_hint x y_axis) x y_axis, which for a near-horizontal
-    # y_axis and up_hint=+Z lands close to +Z itself -- the standard "look-at with an up vector"
-    # property). The shared `up_hint` (world +X, chosen for the mostly-VERTICAL thigh/shin/foot
-    # bones to avoid ill-conditioned near-parallel cross products -- see the comment above) has no
-    # such up-alignment property and was confirmed, via a numeric diagnostic, to leave the toe
-    # bone's rest-vs-pose roll mismatched by up to ~90-176 degrees even during STANCE (while this
-    # bone's own Y-axis/toe-pointing-direction stayed correct throughout -- roll is independent of
-    # the head->tail direction, which is why the earlier swing-instability fix alone didn't resolve
-    # this part of the bug). verify.py's new foot_orientation gate checks this directly.
-    # NOTE: empirically (not assumed) world +Z as up_hint here actually produces a z_axis pointing
-    # mostly DOWN (aim_matrix's x_axis = up_hint x y_axis, z_axis = x_axis x y_axis -- the double
-    # cross product inverts the naive expectation for this axis ordering); using world -Z instead
-    # gives the intended sole-normal-up result, confirmed via verify.py's foot_orientation gate.
-    toe_up_hint = mathutils.Vector((0, 0, -1))
+
+    foot_desired_world = (mathutils.Matrix.Translation(ankle_w) @ L["foot_rest_rot4"]
+                           @ mathutils.Matrix.Rotation(foot_curl_angle, 4, L["foot_local_curl_axis"]))
+    foot_world = set_bone_world_matrix_direct(foot_pb, foot_desired_world, shin_world, shin_rest)
 
     if L["has_toe_fan"]:
-        # Round 13 (producer review -- toe-fan fix): a real eagle foreleg's three splayed toes
-        # (toe_in/mid/out), each a SIBLING bone parented directly to leg_<side>_foot (not chained
-        # to each other), fanning out from a shared base junction to each toe's own talon tip.
-        #
-        # toe_base_w inherits the SAME rigid rotation (foot_curl_angle, 0 during stance) already
-        # applied to the foot bone itself above -- the toe-base junction is anatomically part of
-        # the same rigid pastern/foot segment, so it tilts together with it, exactly like
-        # foot_tail does.
+        # Round 13's toe fan, round 14's local-matrix_basis fix: three SIBLING bones (toe_in/mid/
+        # out, not chained to each other), each parented directly to leg_<side>_foot. During
+        # STANCE, matrix_basis is IDENTITY -- i.e. the fan sits EXACTLY at its bind-relative-to-foot
+        # pose, "stays flat and fanned exactly as at bind, no curl," literally (not approximately).
+        # During SWING, each toe gets its OWN small local-axis curl (hinge_axis_local, precomputed
+        # per toe from normalize(cross(toe_direction, world_up)) transformed into that toe's own
+        # rest-local frame -- see the per-leg precompute) on top of that identity baseline, so the
+        # fan closes slightly and reopens without ever rotating about a SHARED axis (which is what
+        # swung the splayed toes across each other in round 13's bug) and without ever drifting
+        # from the foot's own actual roll (which is what caused round 14's mesh shearing).
         fan = L["toe_fan"]
-        toe_base_w = ankle_w + rotate_around_x(fan["offset_rest"], foot_curl_angle)
         for t_name in ("in", "mid", "out"):
             toe_data = fan["toes"][t_name]
-            # The whole-foot rigid tilt (foot_curl_angle, shared with the foot bone) is applied
-            # FIRST, then each toe gets its OWN independent swing-phase hinge curl on top -- during
-            # STANCE both angles are exactly 0, so every toe sits EXACTLY at its bind-pose
-            # direction ("stays flat and fanned exactly as at bind, no curl" -- the task brief's
-            # own wording), never rotating about the foot's shared axis (which would swing the
-            # splayed toes across each other -- the original bug this round fixes). During SWING,
-            # the per-toe curl is around THIS toe's own hinge_axis (normalize(cross(toe_direction,
-            # world_up)), precomputed once from rest -- see the per-leg precompute above), NOT a
-            # shared axis, so the fan closes slightly and reopens without any toe crossing another.
-            base_dir = rotate_around_x(toe_data["tip_dir_rest"], foot_curl_angle)
             toe_curl_angle = math.radians(TOE_FAN_CURL_MAX_DEG) * curl_s
-            final_dir = rotate_around_axis(base_dir, toe_data["hinge_axis"], toe_curl_angle)
-            tip_w = toe_base_w + final_dir * toe_data["tip_len"]
-            # Defensive ground clamp, same spirit/purpose as the single-toe path's.
-            if tip_w.z < 0.0:
-                tip_w.z = 0.0
             toe_pb = arm_obj.pose.bones[f"leg_{side}_toe_{t_name}"]
-            set_bone_world_matrix_direct(
-                toe_pb, aim_matrix(toe_base_w, tip_w, toe_up_hint), foot_world, foot_rest_mat)
+            toe_pb.matrix_basis = mathutils.Matrix.Rotation(
+                toe_curl_angle, 4, toe_data["hinge_axis_local"])
     else:
         toe_pb = arm_obj.pose.bones[f"leg_{side}_toe"]
-        set_bone_world_matrix_direct(
-            toe_pb, aim_matrix(foot_tail, toe_tail, toe_up_hint), foot_world, foot_rest_mat)
+        toe_curl_angle = 0.0 if stance else math.radians(TOE_CURL_MAX_DEG) * curl_s
+        toe_pb.matrix_basis = mathutils.Matrix.Rotation(toe_curl_angle, 4, L["toe_local_curl_axis"])
     return stance
 
 

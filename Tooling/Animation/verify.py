@@ -684,17 +684,151 @@ if MOVE_BLEND:
     if toe_fan_result is not None:
         report["toe_fan"] = toe_fan_result
 
+# ---------------------------------------------------------------------------
+# Round 14 (lead review of round 13's own FRONT_FEET_SHEET.png: "the report says clean, but it
+# isn't -- contact, passing, lift and mid-swing columns show the front feet crumpled -- jagged
+# folded geometry at the foot/toe base in the side row, and mangled, overlapping toes in the bottom
+# row. The toe_fan gate passes because it only measures toe-to-toe angles and talon height, not
+# mesh deformation.") This gate closes exactly that blind spot: it measures the MESH itself (edge
+# stretch + triangle normal flips), restricted to the region actually at risk (vertices weighted
+# >=0.2 to any foreleg foot/toe bone -- the junction where round 14's fix (anim/gait.py's
+# bind-rotation-preserving foot + foot-local toe matrix_basis) matters), across EVERY frame of
+# Move/Idle/Attack (not just a handful of sampled poses the way the existing per-leg gates do).
+TOE_DEFORM_MAX_STRETCH = 1.35
+
+
+def check_toe_deformation(blend_path, action_names):
+    arm_obj = load(blend_path)
+    mesh_obj = next(o for o in bpy.data.objects if o.type == "MESH")
+    me = mesh_obj.data
+
+    target_bone_names = set()
+    for side in ("FL", "FR"):
+        if f"leg_{side}_toe_in" in arm_obj.data.bones:
+            target_bone_names |= {f"leg_{side}_foot", f"leg_{side}_toe_in",
+                                   f"leg_{side}_toe_mid", f"leg_{side}_toe_out"}
+        elif f"leg_{side}_toe" in arm_obj.data.bones:
+            target_bone_names |= {f"leg_{side}_foot", f"leg_{side}_toe"}
+    if not target_bone_names:
+        return None  # no foreleg foot/toe bones on this rig -- nothing to check
+    group_ids = {g.index for g in mesh_obj.vertex_groups if g.name in target_bone_names}
+    restricted_verts = set()
+    for v in me.vertices:
+        w = sum(g.weight for g in v.groups if g.group in group_ids)
+        if w >= 0.2:
+            restricted_verts.add(v.index)
+    if not restricted_verts:
+        return None
+
+    edges = [(e.vertices[0], e.vertices[1]) for e in me.edges
+             if e.vertices[0] in restricted_verts or e.vertices[1] in restricted_verts]
+    bind_pos = [v.co.copy() for v in me.vertices]
+    bind_len = [(bind_pos[a] - bind_pos[b]).length for a, b in edges]
+    polys = [p.index for p in me.polygons if any(vi in restricted_verts for vi in p.vertices)]
+    bind_normals = {pi: me.polygons[pi].normal.copy() for pi in polys}
+
+    result = {"restricted_vertex_count": len(restricted_verts), "restricted_edge_count": len(edges),
+              "restricted_triangle_count": len(polys),
+              "worst_stretch": 0.0, "worst_stretch_edge": None, "worst_stretch_frame": None,
+              "worst_stretch_action": None,
+              "flip_count": 0, "worst_flip_triangle": None, "worst_flip_frame": None,
+              "worst_flip_action": None, "worst_flip_dot": 1.0}
+
+    for action_name in action_names:
+        action = bpy.data.actions.get(action_name)
+        if action is None:
+            continue
+        if arm_obj.animation_data is None:
+            arm_obj.animation_data_create()
+        arm_obj.animation_data.action = action
+        scene = bpy.context.scene
+        f0, f1 = action.frame_range
+        for f in range(int(f0), int(f1) + 1):
+            scene.frame_set(f)
+            depsgraph = bpy.context.evaluated_depsgraph_get()
+            eval_obj = mesh_obj.evaluated_get(depsgraph)
+            eval_mesh = eval_obj.to_mesh()
+            posed = [v.co.copy() for v in eval_mesh.vertices]
+            for i, (a, b) in enumerate(edges):
+                bl = bind_len[i]
+                if bl < 1e-5:
+                    continue
+                ratio = (posed[a] - posed[b]).length / bl
+                if ratio > result["worst_stretch"]:
+                    result["worst_stretch"] = ratio
+                    result["worst_stretch_edge"] = (a, b)
+                    result["worst_stretch_frame"] = f
+                    result["worst_stretch_action"] = action_name
+            for pi in polys:
+                d = bind_normals[pi].dot(eval_mesh.polygons[pi].normal)
+                if d < result["worst_flip_dot"]:
+                    result["worst_flip_dot"] = d
+                if d < 0:
+                    result["flip_count"] += 1
+                    if result["worst_flip_triangle"] is None:
+                        result["worst_flip_triangle"] = pi
+                        result["worst_flip_frame"] = f
+                        result["worst_flip_action"] = action_name
+            eval_obj.to_mesh_clear()
+
+    stretch_ok = result["worst_stretch"] <= TOE_DEFORM_MAX_STRETCH
+    flip_ok = result["flip_count"] == 0
+    result["stretch_pass"] = stretch_ok
+    result["flip_pass"] = flip_ok
+    result["pass"] = stretch_ok and flip_ok
+
+    if result["worst_stretch_edge"] is not None:
+        a, b = result["worst_stretch_edge"]
+        for vi, label in ((a, "stretch_vertex_a"), (b, "stretch_vertex_b")):
+            v = me.vertices[vi]
+            groups = sorted(((mesh_obj.vertex_groups[g.group].name, round(g.weight, 3))
+                              for g in v.groups), key=lambda x: -x[1])
+            result[label] = {"index": vi, "bone_weights": groups}
+    if result["worst_flip_triangle"] is not None:
+        pi = result["worst_flip_triangle"]
+        result["worst_flip_triangle_vertices"] = list(me.polygons[pi].vertices)
+
+    print(f"  toe_deformation ({len(restricted_verts)} restricted verts, {len(edges)} edges, "
+          f"{len(polys)} triangles): worst edge-stretch {result['worst_stretch']:.3f}x "
+          f"(<= {TOE_DEFORM_MAX_STRETCH}? {stretch_ok}) at frame {result['worst_stretch_frame']} "
+          f"({result['worst_stretch_action']}); {result['flip_count']} normal-flipped triangles "
+          f"(worst dot {result['worst_flip_dot']:.3f}, {'none' if flip_ok else 'frame ' + str(result['worst_flip_frame']) + ' ' + str(result['worst_flip_action'])}) "
+          f"-> {'PASS' if result['pass'] else 'FAIL'}")
+    if result["worst_stretch_edge"] is not None:
+        print(f"    worst stretch edge {result['worst_stretch_edge']}: "
+              f"{result['stretch_vertex_a']['bone_weights']} / {result['stretch_vertex_b']['bone_weights']}")
+    if result["worst_flip_triangle"] is not None:
+        print(f"    worst flip triangle #{result['worst_flip_triangle']}: "
+              f"vertices {result['worst_flip_triangle_vertices']}")
+    return result
+
+
+toe_deform_results = {}
+if MOVE_BLEND:
+    r = check_toe_deformation(MOVE_BLEND, ["Move"])
+    if r is not None:
+        toe_deform_results["move"] = r
+if KEYED_BLEND:
+    r = check_toe_deformation(KEYED_BLEND, ["Idle", "Attack"])
+    if r is not None:
+        toe_deform_results["idle_attack"] = r
+if toe_deform_results:
+    report["toe_deformation"] = {
+        "pass": all(r["pass"] for r in toe_deform_results.values()),
+        **toe_deform_results,
+    }
+
 with open(os.path.join(OUT, "verify_report.json"), "w") as f:
     json.dump(report, f, indent=2)
 print("VERIFY DONE")
 
-# "Fail loudly": walk_direction, foot_orientation, and toe_fan are correctness gates, not
-# quality-polish ones -- a backwards-walking or mangled-footed Griffin is categorically broken, not
-# just imperfect, so (unlike the other gates in this file, which report pass/fail in the JSON for a
-# human to read) these also abort the pipeline with a non-zero exit code so a failure can't be
-# silently skipped past in a batch/CI context.
+# "Fail loudly": walk_direction, foot_orientation, toe_fan, and toe_deformation are correctness
+# gates, not quality-polish ones -- a backwards-walking, mangled-footed, or mesh-shearing Griffin is
+# categorically broken, not just imperfect, so (unlike the other gates in this file, which report
+# pass/fail in the JSON for a human to read) these also abort the pipeline with a non-zero exit code
+# so a failure can't be silently skipped past in a batch/CI context.
 hard_fail = False
-for gate_name in ("walk_direction", "foot_orientation", "toe_fan"):
+for gate_name in ("walk_direction", "foot_orientation", "toe_fan", "toe_deformation"):
     if gate_name in report and not report[gate_name].get("pass", False):
         print("=" * 70)
         print(f"FATAL: {gate_name} gate FAILED -- see verify_report.json['{gate_name}'].")

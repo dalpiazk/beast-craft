@@ -434,6 +434,113 @@ frame-5 wing blotch from v10-v12 (untouched, unrelated).
 
 Mesh/export: 8000 tris, **41 bones** (up from 37), GLB 0.859 MiB.
 
+## v14: fix mesh deformation at the foot/toe junction (round 13's rig fix had a real roll bug) +
+## add a toe_deformation verify.py gate (lead review round 14)
+
+Lead review of round 13's own `FRONT_FEET_SHEET.png`: the report said clean, but it wasn't --
+contact/passing/lift/mid-swing columns showed the front feet crumpled (jagged folded geometry at
+the foot/toe base, side row; mangled, overlapping toes, bottom row). Round 13's `toe_fan` gate
+passed because it only measured toe-to-toe angles and talon height, never mesh deformation -- a
+real, fair criticism: the gate didn't check the thing that was actually broken.
+
+**Root cause #1 (the dramatic crumpling), confirmed via a numeric diagnostic comparing posed-vs-
+rest matrices directly, exactly matching the lead's own hypothesis:** round 12/13 built the foot
+and toe bones' orientation via `aim_matrix` + a hand-picked world-space `up_hint` -- a DIFFERENT
+up_hint for the foot (world X) than for the toes (world -Z). That construction has no reason to
+reproduce either bone's actual REST roll (Blender's own default roll-0 convention, unrelated to
+any up_hint choice). Measured directly: even during STANCE, with the foot bone's Y-axis exactly
+matching its bind direction, its full pose-vs-rest matrix differed by 90 degrees (a 44-degree
+`matrix_basis` rotation around a non-anatomical compound axis `(0.69, 0.19, -0.70)` -- not a clean
+single-axis "wrist bends forward," just a roll-convention artefact), and the toe's rotation
+RELATIVE TO THE FOOT (what the blended mesh at the junction actually feels) drifted **160+
+degrees** from its bind-relative transform.
+
+**Fix #1:** stopped reconstructing orientation from a world-space `up_hint` for foot/toe bones
+entirely. The FOOT keeps round 12's real goal -- world orientation stays at BIND during stance,
+"with the shin/wrist taking up the difference" -- now implemented by literally copying the bind
+rest rotation (`foot_rest_rot4`) instead of re-deriving a roll via `aim_matrix`, so there's no
+possible mismatch at zero curl. The TOE bones (both the fan and the single-toe hind-leg path) are
+now driven with a DIRECT LOCAL `matrix_basis` (identity at stance -- exactly bind-relative to the
+foot, zero rotation -- a small local-axis rotation during swing), so they rigidly inherit whatever
+the foot's actual pose is via normal FK composition. By construction this has ZERO relative-to-foot
+mismatch regardless of the foot's own world orientation. Confirmed numerically after the fix:
+toe-relative-to-foot drift dropped from 160+ degrees to **0.00 degrees**; foot world-axes
+pose-vs-rest dropped from 90 to **0.14 degrees**.
+
+**A second bug found while fixing the first:** holding the foot at exact bind rotation (fix #1)
+made the foot+toe assembly a rigid body whose ground-contact height is `ankle_w.z + a fixed rest
+offset` -- nothing compensates any more for CROUCH placing the ankle at a different height than
+rest, which round 12/13's old "aim toward a ground-level target" approach had absorbed as a side
+effect of its (buggy-roll) re-aiming. Caught by `verify.py`'s own ground-interpenetration/`toe_fan`
+gates: toe tips sank 0.02-0.06H below ground after fix #1 alone -- the old near-zero ground
+readings were never really earned by the geometry, they were papered over by an explicit
+`if tip.z < 0: tip.z = 0` clamp on the toe's world position that fix #1's FK-driven toe
+construction has no equivalent for.
+
+**Fix #2:** the IK target's Z is now adjusted so the foot+toe rigid body's predicted contact height
+exactly matches the intended ground/lift height. An early version shifted `knee_w`/`ankle_w`
+directly post-hoc, which collapsed FL/FR's knee angle toward its floor (confirmed via the
+knee-angle gate: down to 0.2-8 deg, far below the 15 deg threshold) by perturbing the knee's true
+hip-relative solve without honouring `min_reach`. The final version applies the SAME `min_reach*
+1.15` safety margin this file already uses for the swing-lift cap, via a binary-search on how much
+of the desired correction a leg's own geometry can safely absorb each frame -- both the knee-angle
+gate (16.9-139.4 deg, all four legs) and the ground-clearance gates (-0.0002, both front feet) pass
+simultaneously.
+
+**New `verify.py` gate, `toe_deformation` (per the lead's own spec):** per-region edge-stretch and
+triangle-normal-flip check, restricted to vertices weighted >=0.2 to any foreleg foot/toe bone,
+every Move/Idle/Attack frame (not sampled); fails if max edge stretch > 1.35x or any triangle
+normal flips relative to bind; reports the worst triangle. This gate exposed something fix #1/#2
+didn't address: a vertex blended across `{leg_FR_shin, leg_FR_foot, leg_FR_toe_in, leg_FR_thigh}`
+showing 2.2-2.9x stretch against its neighbour. Investigated directly (not assumed): a focused
+diagnostic proved this is NOT caused by the toe fan's own per-toe curl (the stretch barely changed
+between `TOE_FAN_CURL_MAX_DEG` values of 20, 15, 5, and 0 degrees) -- it's a pre-existing
+WEIGHT-PAINTING issue at the knee/ankle boundary, the same general class `fix_hip_weight_gradient`
+(round 9) and `fix_wing_root_bleed` (round 10) target for other joints, now visible through this
+gate's stricter, more targeted lens. Added a narrow fix, `fix_toe_fan_weights`'s new toe-vs-thigh
+pass: a toe bone carrying substantial THIGH weight (two segments up the leg) is not a legitimate
+smooth blend the way foot<->shin is -- round 9 already proved directly that forcing a hard boundary
+at an adjacent-segment blend (like foot<->shin) makes stretch WORSE, not better, so this fix
+deliberately leaves that legitimate blend alone and strips ONLY the anatomically-nonsensical
+toe-vs-thigh case. This genuinely helped (the specific worst vertex/edge changed, and the overall
+weighting improved) but did not fully resolve the gate: **honestly, `toe_deformation` still FAILS**
+at 2.7x worst-case stretch (vs the 1.35x target) and ~810 triangle-normal-flip events (the same
+handful of triangles recurring across many frames, not hundreds of distinct broken triangles).
+`TOE_FAN_CURL_MAX_DEG` settled at 8 (a real, visible "small curl" per the task brief's own wording,
+not the full 20 deg budget) since larger values made the (separate, curl-sensitive) toe-pair edge
+stretch worse without reducing this specific weight-driven floor.
+
+This is honestly the SAME CLASS of issue as the pre-existing, already-documented `Move`/`Attack`
+edge-stretch gate failures (round 9, still 9.56x/3.31x, completely unchanged by this round) --
+multiple rounds of dedicated effort (9, 10, now 14) have consistently found that hard-ownership
+weight fixes at limb-segment boundaries relocate the worst edge rather than reliably eliminate it,
+and this round is no exception for the NEW, stricter 1.35x bar the lead asked for specifically at
+this junction. The dramatic, clearly-visible crumpling/mangling the lead's review reported is
+fixed (confirmed both numerically -- 160+ -> 0.00 degrees relative drift -- and visually, see
+below); the residual gate failure is a narrower, lower-magnitude, harder-to-see mesh-quality issue
+in the same unresolved family as this pipeline's other known edge-stretch gates.
+
+**Required re-render and inspection.** A labelled front-feet close-up sheet (bottom + side views;
+bind, contact, passing, lift, mid-swing, idle, attack-rake strike) -- looked at critically, not
+assumed clean:
+- **bind/contact/passing/lift/mid-swing:** every cell shows a smooth leg and a well-formed 3-toe
+  fan, matching the bind cell's shape just rotated/curled -- no jagged folding at the foot/toe
+  base, no mangled or overlapping toes, in either the side or bottom view. 2x-zoomed crops of
+  "passing" and "lift" specifically (the worst cells in round 13's report) confirm this at close
+  range.
+- **idle/attack-strike:** unchanged from round 13 (both were already correct -- Idle/Attack drive
+  the leg via simple FK, which was never susceptible to this bug).
+
+Also re-inspected every frame of the standard `contact_sheet_idle/move/move_side/attack.png`
+sheets: all clean, front-leg talons read naturally throughout; Attack unchanged except the same
+pre-existing frame-5 wing blotch from v10-v13 (untouched, unrelated).
+
+**MP4s regenerated** with the same `--pilot-sequence`/ffmpeg parameters as v11-v13 into
+`scratchpad/anim-pilot/video_v14/`: `griffin_reel.mp4`, `griffin_idle.mp4`, `griffin_walk.mp4`,
+`griffin_walk_side.mp4`, `griffin_attack.mp4` -- all 720x1280 h264/yuv420p. Not committed.
+
+Mesh/export: 8000 tris, 41 bones (unchanged), GLB 0.859 MiB.
+
 ## v9: max-edge-stretch gate + weight/render fixes -- partial progress, honestly not fully resolved
 ## (lead-review round 9)
 

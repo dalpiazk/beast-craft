@@ -1170,6 +1170,36 @@ def fix_toe_fan_weights(obj, bone_roles):
                             if g.group == gi:
                                 obj.vertex_groups[gi].remove([vi])
                     fixed += 1
+
+    # Round 14: a narrower, different-class fix found via verify.py's new toe_deformation gate --
+    # a vertex weighted across {leg_<side>_shin, leg_<side>_foot, leg_<side>_toe_in,
+    # leg_<side>_thigh} simultaneously (i.e. a TOE bone carrying substantial THIGH weight) showed
+    # 2.2x+ edge-stretch against its neighbour. Unlike the foot<->shin blend (an anatomically
+    # legitimate, adjacent transition zone this file deliberately leaves alone -- round 9 confirmed
+    # directly that forcing a hard boundary at THAT kind of adjacent-segment blend makes stretch
+    # WORSE, not better), a toe bone carrying weight from the THIGH (two segments further up the
+    # leg) is not a legitimate smooth blend at all -- it's long-range bleed from automatic heat
+    # weighting with no anatomical justification, exactly the kind of out-of-chain contamination
+    # restrict_leg_weights already targets for OTHER limbs/legs but can't see within a single leg's
+    # own bone set. Strips ONLY toe-vs-thigh (never toe-vs-shin, never foot-vs-anything), the
+    # narrowest fix that addresses the confirmed-nonsensical case without touching the legitimate
+    # adjacent blends round 9 already proved must be left alone.
+    for side in ("FL", "FR", "BL", "BR"):
+        toe_ids_all = {group_index[n] for n in
+                       (f"leg_{side}_toe", f"leg_{side}_toe_in", f"leg_{side}_toe_mid", f"leg_{side}_toe_out")
+                       if n in group_index}
+        thigh_ids = {group_index[f"leg_{side}_thigh"]} if f"leg_{side}_thigh" in group_index else set()
+        if not toe_ids_all or not thigh_ids:
+            continue
+        for vi, v in enumerate(me.vertices):
+            toe_w = sum(g.weight for g in v.groups if g.group in toe_ids_all)
+            thigh_w = sum(g.weight for g in v.groups if g.group in thigh_ids)
+            if toe_w > 0.08 and thigh_w > 0.08:
+                for gi in toe_ids_all | thigh_ids:
+                    for g in list(v.groups):
+                        if g.group == gi:
+                            obj.vertex_groups[gi].remove([vi])
+                fixed += 1
     return fixed
 
 
