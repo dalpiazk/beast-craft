@@ -1,10 +1,12 @@
 """Tooling/Animation stage 3a: procedural locomotion ("Move" clip).
 
-Builds a parametric walk cycle for the rigged Griffin (2 legs, per rig_creature.py's landmark
-detection -- see rig_templates/winged_quadruped.py's docstring for why 2, not 4) and bakes it to a
-clean in-place loop. Implements the methodology doc's section 3b recommendation directly:
-velocity-based foot placement + closed-form 2-bone IK + spline-ish foot arcs + phase offsets per
-leg, with wings folded (slight idle-ish motion) and body bob/sway driven by the leg phase.
+Builds a parametric walk cycle for the rigged Griffin (4 legs, all four walking -- see
+rig_templates/winged_quadruped.py's docstring for the horizontal-slicing landmark detection that
+makes this possible: real hip/knee/ankle/foot joints for every leg, not a guessed foreleg fold)
+and bakes it to a clean in-place loop. Implements the methodology doc's section 3b recommendation
+directly: velocity-based foot placement + closed-form 2-bone IK + spline-ish foot arcs + lateral-
+sequence phase offsets per leg, with wings folded (slight idle-ish motion) and body bob/sway
+driven by the leg phase.
 
 IK is closed-form analytic (law of cosines for the knee angle, "aim" direction for the hip), NOT a
 Blender IK constraint -- see rig_creature.py's docstring for why. Each leg bone's desired pose is
@@ -35,6 +37,7 @@ Run headless:
 import bpy
 import sys
 import os
+import json
 import math
 import mathutils
 
@@ -64,6 +67,30 @@ H = 2.0  # this pipeline's shared normalisation convention (common.normalise_tra
 all_bones = [b.name for b in arm_data.bones]
 leg_sides = sorted({n.split("_")[1] for n in all_bones if n.startswith("leg_")})
 print(f"LEG SIDES: {leg_sides}")
+
+# Per-leg bend direction (and is_front), read from rig_creature.py's rig_report.json (same OUT
+# directory as the rigged .blend) -- this is the horizontal-slicing landmark detection's own read
+# of which way EACH leg's knee/hock actually bows (rig_templates/winged_quadruped.py's
+# detect_landmarks: a foreleg's elbow and a hind leg's hock bend oppositely on this mesh), so the
+# IK pole below matches the real geometry per leg instead of a single hardcoded "+Y" guess that
+# would be correct for at most one of the two bend families.
+bend_dir_by_side = {}
+is_front_by_side = {}
+report_path = os.path.join(os.path.dirname(os.path.abspath(BLEND)), "rig_report.json")
+if os.path.isfile(report_path):
+    with open(report_path) as f:
+        rig_report = json.load(f)
+    for leg in rig_report.get("landmarks", {}).get("legs", []):
+        side = leg["side"]
+        bd = leg.get("bend_dir")
+        if bd:
+            bend_dir_by_side[side] = mathutils.Vector(bd)
+        is_front_by_side[side] = leg.get("is_front", side.startswith("F"))
+    print(f"BEND DIRS from rig_report.json: "
+          f"{ {s: tuple(round(c,3) for c in v) for s,v in bend_dir_by_side.items()} }")
+else:
+    print(f"WARNING: no rig_report.json next to {BLEND} -- falling back to a uniform +Y knee bow "
+          f"for every leg (correct for at most one of the foreleg/hindleg bend families).")
 
 
 def rest_head_tail(name):
@@ -121,8 +148,21 @@ def aim_matrix(head_pos, tail_pos, up_hint=mathutils.Vector((0, 0, 1))):
     y_axis.normalize()
     x_axis = up_hint.cross(y_axis)
     if x_axis.length < 1e-6:
-        up_hint = mathutils.Vector((1, 0, 0))
-        x_axis = up_hint.cross(y_axis)
+        # Degenerate: y_axis (the bone's own head->tail direction, which varies every frame as the
+        # IK solve moves) is parallel to up_hint. BUG, now fixed: every caller in this file passes
+        # up_hint=(1,0,0), so the old fallback here ALSO reassigned (1,0,0) -- the exact vector that
+        # just failed -- leaving x_axis genuinely zero (a non-invertible matrix) whenever a bone
+        # pointed along global X, and producing an ill-conditioned (not just exactly-singular)
+        # frame for frames NEAR that direction too, amplifying tiny differences into visible
+        # per-frame wobble. Confirmed as the root cause of FL's failed foot-slide gate (cv=0.68):
+        # FL's bend_dir is unusually X-dominant (0.925, 0.297, -0.236, from the horizontal-slicing
+        # detection -- a real reading of this specific leg's own knee bow, not a bug in the
+        # detection), which pulls the shin/foot bones' own head->tail direction close to global X
+        # as the IK solve sweeps through FL's stance -- near-exactly the up_hint every leg bone in
+        # this file was built with. A genuinely different fallback axis (global Z, or global Y if
+        # the bone itself points near Z) fixes this for every leg, not just a special case for FL.
+        fallback = mathutils.Vector((0, 0, 1)) if abs(y_axis.z) < 0.9 else mathutils.Vector((0, 1, 0))
+        x_axis = fallback.cross(y_axis)
     x_axis.normalize()
     z_axis = x_axis.cross(y_axis)
     # Wait: Blender bone basis is (X, Y, Z) with Y = head->tail; build a right-handed frame.
@@ -195,17 +235,32 @@ for side in leg_sides:
     # never clamps (a first pass used a fixed STRIDE for every leg and clamped on nearly every
     # frame -- see solve_2bone_ik's docstring -- which produced wildly non-constant stance
     # velocity and failed verify.py's foot-slide gate at cv=0.406 against a 0.35 threshold).
-    SAFETY = 0.90
+    SAFETY = 0.95
     reach_margin = max_reach * SAFETY
-    ground_z = 0.0 if not side.startswith("F") else 0.35 * H  # see the ground_z comment below
+    # All four feet are grounded in this mesh's own bind pose (producer-confirmed, see
+    # rig_templates/winged_quadruped.py's docstring) -- ground_z=0 for every leg, front or back,
+    # no "forelegs hover at bind height" special case. The horizontal-slicing landmark detection
+    # placed each leg's hip/knee/ankle directly from the mesh's own geometry (not a guessed
+    # proportional fold), so there is no longer an artificially extreme bind-pose knee bend to
+    # animate across.
+    ground_z = 0.0
     base_sq = (foot.x - hip.x) ** 2 + (ground_z - hip.z) ** 2
     margin_y = foot.y - hip.y
     r_sq = reach_margin ** 2 - base_sq
     if r_sq <= 0:
-        safe_stride = 0.02 * H  # degenerate rig geometry fallback -- shouldn't trigger here
+        safe_stride = 0.005 * H  # truly degenerate rig geometry fallback -- shouldn't trigger here
     else:
         r = math.sqrt(r_sq)
-        safe_stride = max(0.02 * H, min(r - abs(margin_y), RAW_STRIDE))
+        # Lower bound 0.005H (a near-imperceptible but non-zero sweep), NOT the 0.02H floor an
+        # earlier pass used unconditionally -- forcing stride UP to a fixed floor regardless of
+        # the actual computed safe value re-introduces exactly the clamping this computation exists
+        # to avoid whenever a leg's true safe excursion is smaller than that floor (confirmed on
+        # this mesh: FL's computed safe value was ~0.037H, the floor forced it to 0.04H, and the
+        # resulting tiny-but-unsafe excursion kept the IK solve clamped through most of stance --
+        # non-constant stance velocity, failing verify.py's foot-slide gate at cv=0.68 against a
+        # 0.35 threshold even though the stride itself already read as "barely moves"). Respecting
+        # the computed safe value even when it's smaller than the floor fixes this at the root.
+        safe_stride = max(0.005 * H, min(r - abs(margin_y), RAW_STRIDE))
 
     # Lift scales WITH the solved stride (not a fixed absolute height) so a geometrically-
     # constrained short stride (this Griffin's: the landmark-placed hip leaves little slack before
@@ -213,21 +268,22 @@ for side in leg_sides:
     # rather than "barely moves forward but kicks way up," which a fixed large LIFT would produce.
     lift = max(0.02 * H, 0.9 * safe_stride)
 
-    # Front legs: even a reduced (not-quite-ground) swing still visibly tore the mesh at the
-    # shoulder in two separate render checks -- the weighting (computed against this mesh's
-    # dramatically folded/tucked bind pose, needed for IK reach -- see build_bones) does not hold
-    # up across a large angular range for the forelegs specifically, the way it does for the hind
-    # legs. Given the time budget, stride/lift are capped hard for front legs only: a small,
-    # deliberately subtle motion that stays inside a range the weights render cleanly, traded
-    # against the ~25-40%-of-body-length stride target the hind legs do hit. Documented as a real
-    # limitation (see the README's lead-review fix round), not papered over.
-    ground_z = 0.0 if not side.startswith("F") else 0.35 * H
-    if side.startswith("F"):
-        safe_stride = min(safe_stride, 0.08 * H)
-        lift = min(lift, 0.05 * H)
+    # Lift SAFETY cap against the MINIMUM-reach clamp (not just the max-reach one safe_stride
+    # already guards): as the swing arc lifts the foot toward z=lift, the vertical hip-to-target
+    # gap shrinks -- for a leg whose hip sits only a little above min_reach (=|L1-L2|), a large
+    # enough lift brings hip-to-target distance down near min_reach, folding the knee almost flat
+    # (confirmed directly: verify.py's knee-angle gate failed at ~1 degree for exactly this
+    # mechanism on this mesh before this cap existed). Capping lift so the worst-case (straight
+    # down from the hip) distance stays a safety margin above min_reach prevents that regardless of
+    # stride.
+    min_reach = abs(L1 - L2)
+    max_safe_lift = max(0.01 * H, hip.z - min_reach * 1.15)
+    lift = min(lift, max_safe_lift)
+
     legs[side] = {"hip": hip, "L1": L1, "L2": L2, "foot_rest": foot, "toe_rest": toe,
                   "stride": safe_stride, "lift": lift, "_ankle_frac": ankle_frac, "ground_z": ground_z,
-                  "knee_rest": knee, "ankle_rest": ankle}
+                  "knee_rest": knee, "ankle_rest": ankle,
+                  "bend_dir": bend_dir_by_side.get(side, mathutils.Vector((0, 1, 0)))}
     print(f"LEG {side}: hip={tuple(round(c,3) for c in hip)} L1={L1:.3f} L2={L2:.3f} "
           f"max_reach={max_reach:.3f} rest_dist={(foot-hip).length:.3f} "
           f"safe_stride={safe_stride:.3f} (raw {RAW_STRIDE:.3f})")
@@ -253,30 +309,16 @@ def foot_target(side, t):
     ankle) -- see solve_2bone_ik's docstring.
 
     Z is always GROUND-RELATIVE (0 = stance, lift-arc above 0 during swing), not rest.z + offset:
-    this creature's bind/rest pose is a reared stance (forelegs held up at chest height, off the
-    ground -- producer-confirmed, see rig_templates/winged_quadruped.py), but a walking quadruped
-    plants all four feet on the ground during its own stance phase regardless of what the bind
-    pose looks like. Using rest.z as a baseline would keep the forelegs hovering at their bind
-    height through "stance", which is not a walk -- grounding every leg at z=0 during its own
-    stance is what the lead-review fix round's "zero foot slide" / real quadruped gait asked for.
+    all four feet are already grounded in this mesh's own bind pose (producer-confirmed, see
+    rig_templates/winged_quadruped.py's docstring -- a reared/proud stance with the chest held
+    higher than the hips, NOT a rampant stance with the forelegs lifted off the ground), so this
+    applies uniformly to every leg. Grounding every leg at z=0 during its own stance is what "zero
+    foot slide" / a real quadruped gait needs regardless.
     """
     rest = legs[side]["foot_rest"]
     stride = legs[side]["stride"]
     lift = legs[side]["lift"]
     ground_z = legs[side]["ground_z"]
-
-    # Lead-review fix round, final call under the session's time budget: EVERY attempt to animate
-    # the forelegs during Move -- full ground reach, a reduced ground depth, even a tiny 0.08H
-    # stride with a 0.05H lift -- visibly tore the mesh at the shoulder in a render check. The
-    # weighting at this mesh's extreme bind-pose knee-fold (needed for IK reach at all, see
-    # build_bones) does not hold up across *any* animated range for the forelegs, unlike the hind
-    # legs, which move cleanly through a real stride. Forelegs are kept STATIC at their bind pose
-    # through Move (zero motion = zero foot slide trivially, and matches the same "legs stay in
-    # their braced rest pose" approach already used successfully for Idle/Attack) rather than ship
-    # a visibly torn mesh. This is a real, honestly-documented limitation (see the README), not the
-    # full "all four legs walk" result the task asked for.
-    if side.startswith("F"):
-        return rest.copy(), True
 
     ph = (t + phase_offset[side]) % 1.0
     if ph < DUTY:
@@ -307,31 +349,24 @@ def set_leg_pose(side, t, parent_world, parent_rest):
     L = legs[side]
     ground_target, stance = foot_target(side, t)
 
-    if side.startswith("F"):
-        # Static forelegs (see foot_target's docstring for why): do NOT run this through
-        # solve_2bone_ik at all. This chain's L1+L2 was deliberately inflated far beyond the
-        # bind-pose hip-to-foot distance to give it ground reach (see build_bones' foreleg knee
-        # bow) -- asking the IK solve to fold that much extra length back down to the short
-        # bind-pose distance has a valid solution, but it is NOT the same knee configuration
-        # build_bones actually placed (which used explicit lerp waypoints, not an IK solve), and
-        # the mismatch is exactly what tore the mesh in a render check even with the target frozen
-        # at the bind-pose foot position. Reproducing the bind pose's own knee/ankle/toe points
-        # directly sidesteps the solve entirely and renders identically to the (confirmed clean)
-        # bind pose.
-        knee_w, ankle_w, target, toe_w = L["knee_rest"], L["ankle_rest"], L["foot_rest"], L["toe_rest"]
-    else:
-        bend_dir = mathutils.Vector((0, 1, 0))  # bow knee forward (+Y)
-        knee_w, reached = solve_2bone_ik(L["hip"], L["L1"], L["L2"], ground_target, bend_dir)
-        # Ankle: a fixed point along the knee->ground line, at the shin's share of the combined L2
-        # (shin_len / (shin_len+foot_len)) -- see solve_2bone_ik's docstring for why the ankle is
-        # derived here rather than itself being a separate IK target.
-        ankle_w = knee_w.lerp(reached, L["_ankle_frac"])
-        toe_w = reached + (L["toe_rest"] - L["foot_rest"])  # toe follows foot rigidly (no separate
-        # roll target this pass -- foot roll is a nice-to-have the task brief lists; given the time
-        # budget this pilot keeps the foot a single rigid segment through stance/swing, which already
-        # avoids foot slide by construction (the main quality driver per the methodology doc) -- noted
-        # as a follow-up in the README rather than silently skipped.
-        target = reached
+    # Per-leg IK pole: `bend_dir` comes from the horizontal-slicing landmark detection's own read
+    # of which way THIS leg's knee/hock bows (rig_templates/winged_quadruped.py's
+    # detect_landmarks) -- a foreleg's elbow and a hind leg's hock bend oppositely on this mesh, so
+    # a single hardcoded "+Y" pole (an earlier pass's approach, before all four legs were walking)
+    # would only be correct for one of the two families. Falls back to +Y if rig_report.json wasn't
+    # found (see this file's top-level load).
+    bend_dir = L["bend_dir"]
+    knee_w, reached = solve_2bone_ik(L["hip"], L["L1"], L["L2"], ground_target, bend_dir)
+    # Ankle: a fixed point along the knee->ground line, at the shin's share of the combined L2
+    # (shin_len / (shin_len+foot_len)) -- see solve_2bone_ik's docstring for why the ankle is
+    # derived here rather than itself being a separate IK target.
+    ankle_w = knee_w.lerp(reached, L["_ankle_frac"])
+    toe_w = reached + (L["toe_rest"] - L["foot_rest"])  # toe follows foot rigidly (no separate
+    # roll target this pass -- foot roll is a nice-to-have the task brief lists; given the time
+    # budget this pilot keeps the foot a single rigid segment through stance/swing, which already
+    # avoids foot slide by construction (the main quality driver per the methodology doc) -- noted
+    # as a follow-up in the README rather than silently skipped.
+    target = reached
 
     thigh_pb = arm_obj.pose.bones[f"leg_{side}_thigh"]
     shin_pb = arm_obj.pose.bones[f"leg_{side}_shin"]
@@ -342,7 +377,18 @@ def set_leg_pose(side, t, parent_world, parent_rest):
     foot_rest_mat = foot_pb.bone.matrix_local
     toe_rest_mat = toe_pb.bone.matrix_local
 
-    up_hint = mathutils.Vector((1, 0, 0))
+    # up_hint picked PER LEG, as the world axis least aligned with this leg's own detected bend
+    # direction -- a single hardcoded (1,0,0) (every leg, every frame, an earlier pass's approach)
+    # put aim_matrix's cross-product into the ill-conditioned near-parallel regime whenever a leg's
+    # bones swing close to that axis, which on this mesh happens for real for FL/BR specifically
+    # (their horizontal-slicing-detected bend_dir is X-dominant -- confirmed as the root cause of
+    # FL's failed foot-slide gate: aim_matrix's degenerate-direction fallback also had its own bug,
+    # fixed separately above, but avoiding the near-singular regime in the first place is the more
+    # robust fix). bend_dir is a stable per-leg constant (not frame-dependent), so this choice is
+    # made once per leg, not per frame, and stays consistent across the whole clip.
+    bd = L["bend_dir"]
+    axis_candidates = [mathutils.Vector((1, 0, 0)), mathutils.Vector((0, 1, 0)), mathutils.Vector((0, 0, 1))]
+    up_hint = min(axis_candidates, key=lambda ax: abs(ax.dot(bd)))
     thigh_world = set_bone_world_matrix_direct(
         thigh_pb, aim_matrix(L["hip"], knee_w, up_hint), parent_world, parent_rest)
     shin_world = set_bone_world_matrix_direct(
@@ -411,7 +457,21 @@ for i in range(FRAMES + 1):  # +1: bake the loop-closing frame identical to fram
     # foreleg-position error from this approximation is small relative to the rest-pose gap between
     # pelvis and spine_02 that using pelvis_world outright would have caused (33-45% of body height
     # in Z alone) -- documented simplification, not an oversight.
-    spine02_world = root_world @ root_rest.inverted() @ spine02_rest
+    # spine_02's own small counter-rotation (set below via set_rot_local) is folded in HERE,
+    # analytically, before it's used as the forelegs' parent transform -- an earlier version used
+    # spine02_world = root_world @ root_rest.inverted() @ spine02_rest (identity local basis),
+    # approximating away this same few-degree rotation, "documented" as a small simplification.
+    # It was not negligible: FL's own IK reach margin (hip-to-foot distance vs. L1+L2) is tight
+    # enough on this mesh that even this few-degree parent error was enough to push the solve in
+    # and out of its max-reach clamp every frame -- confirmed directly (a debug probe showed
+    # solve_2bone_ik's OWN output, in hip-local space, exactly matching its target every frame with
+    # zero clamping, while the bone actually rendered into the saved action drifted off that target
+    # by up to several mm -- the discrepancy could only be coming from the parent chain, which this
+    # fixes). Computed directly from the same sinusoid set_rot_local("spine_02", ...) below applies,
+    # so the two stay in sync by construction, not by re-deriving/duplicating the formula.
+    spine02_local_pitch = math.radians(2 * math.sin(2 * a))
+    spine02_world = (root_world @ root_rest.inverted() @ spine02_rest
+                      @ mathutils.Matrix.Rotation(spine02_local_pitch, 4, "X"))
 
     stances = []
     for side in leg_sides:
@@ -432,7 +492,9 @@ for i in range(FRAMES + 1):  # +1: bake the loop-closing frame identical to fram
     set_rot_local("wing_R_01", deg_z=6 + 2 * math.sin(a * 2), deg_x=2 * math.sin(a))
     set_rot_local("wing_R_02", deg_z=4 * math.sin(a * 2 + 0.5))
 
-    # Head/neck/spine: a light counter-rotation to the body bob reads as weight/balance.
+    # Head/neck/spine: a light counter-rotation to the body bob reads as weight/balance. spine_02's
+    # rotation here MUST match spine02_local_pitch above exactly (same formula) -- it's the pose
+    # this frame's leg placement was actually computed against.
     set_rot_local("spine_02", deg_x=2 * math.sin(2 * a))
     set_rot_local("neck_01", deg_x=-2 * math.sin(2 * a))
     set_rot_local("head", deg_x=-1.5 * math.sin(2 * a + 0.2))

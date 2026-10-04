@@ -70,7 +70,9 @@ lm = template.detect_landmarks(obj, H)
 report["landmarks"] = {
     "forward_sign": lm["forward_sign"],
     "leg_count": len(lm["legs"]),
-    "legs": [{"side": l["side"], "foot": list(l["foot"])} for l in lm["legs"]],
+    "legs": [{"side": l["side"], "is_front": l["is_front"], "foot": list(l["foot"]),
+              "ankle": list(l["ankle"]), "knee": list(l["knee"]), "hip": list(l["hip"]),
+              "bend_dir": list(l["bend_dir"])} for l in lm["legs"]],
     "pelvis": list(lm["pelvis"]),
     "chest": list(lm["chest"]),
     "head_base": list(lm["head_base"]),
@@ -93,6 +95,15 @@ report["bone_names"] = bone_names
 report["bone_roles"] = bone_roles
 print(f"SKELETON: {len(bone_names)} deform bones")
 
+# --- Leg masks (from the slicing-derived joint chains) -----------------------
+# Built BEFORE weighting so the restriction pass below has something to restrict to. See
+# rig_templates/winged_quadruped.py's build_leg_masks docstring: a vertex is assigned to the
+# nearest leg's hip-knee-ankle-foot polyline if within `radius` of it, else left unassigned
+# (body/tail/wing/neck -- normal weighting applies there, unrestricted).
+leg_masks = template.build_leg_masks(obj, H, lm["legs"])
+report["leg_masks"] = {side: len(vids) for side, vids in leg_masks.items()}
+print("LEG MASKS:", json.dumps(report["leg_masks"]))
+
 # --- Weighting ---------------------------------------------------------------
 method_used, weight_log = common.auto_weight_with_fallbacks(obj, arm_obj, bone_names, H)
 report["weighting"] = {"method": method_used, "log": weight_log}
@@ -101,6 +112,16 @@ for line in weight_log:
 if method_used is None:
     raise SystemExit("rig_creature.py: auto-weighting failed on all three methods -- refusing to "
                       "proceed with an unrigged mesh.")
+
+# Per-leg weight restriction: a vertex inside one leg's mask may only carry weight for that leg's
+# own 4 bones or its parent (spine_02 for forelegs, pelvis for hind legs) -- so a foreleg vertex
+# literally cannot carry hind-leg or tail weight regardless of what automatic/voxel weighting
+# produced, closing off the specific failure mode (cross-limb weight bleed at the point two limbs
+# pass close to each other) that contributed to the previous pass's tearing. Runs BEFORE
+# cleanup_weights' limit/normalise/smooth pass, which re-normalises whatever this leaves behind.
+removed = common.restrict_leg_weights(obj, leg_masks, bone_roles)
+report["weighting"]["leg_restriction_groups_removed"] = removed
+print(f"LEG WEIGHT RESTRICTION: removed {removed} out-of-chain group memberships")
 
 common.cleanup_weights(obj, limit=4)
 worst, avg = common.max_influences_per_vertex(obj)
@@ -191,24 +212,37 @@ def render_ortho(scene, out_path, loc, rot, ortho_scale=2.6):
     bpy.data.objects.remove(cam_obj, do_unlink=True)
 
 
+# All 12 role colors chosen to be mutually distinguishable by eye -- an earlier pass reused the
+# same blue for wing_L and leg_FL (and a near-identical cyan for neck and leg_FL), which made an
+# overlay render look like a leg's chain ran up the wing/neck when it was actually just a
+# different bone drawn in a too-similar color (confirmed by checking the raw landmark numbers
+# against the render, not by eye alone). leg_FL/FR/BL/BR vs wing_L/wing_R are the pair most likely
+# to be confused (both can run tall near the shoulder/chest) so those six got the most separated
+# hues; tail/neck/head/spine/pelvis/root are short or spatially unambiguous (head is always the
+# terminus ball at the very top) so some hue reuse there is fine.
 ROLE_COLOR = {
     "root": (1, 1, 1, 1), "pelvis": (1, 0.5, 0, 1), "spine": (1, 0.9, 0, 1),
-    "neck": (0, 1, 0.4, 1), "head": (1, 0, 0, 1), "tail": (0.6, 0.2, 1, 1),
+    "neck": (0, 1, 0.2, 1), "head": (1, 0, 0, 1), "tail": (0.6, 0.2, 1, 1),
+    "wing_L": (0.05, 0.05, 0.85, 1), "wing_R": (0.85, 0.3, 0.75, 1),
 }
 
-scene = setup_render(600)
+scene = setup_render(700)
+# Semi-transparent mesh for the overlay renders (task brief: "textured mesh semi-transparent") so
+# bones that sit INSIDE the leg are still visible through the surface, not hidden behind it --
+# X-ray mode on top of the existing TEXTURE/MATERIAL shading, not a separate material swap.
+scene.display.shading.show_xray = True
+scene.display.shading.xray_alpha = 0.45
 
 overlay_objs = []
 markers = build_overlay_markers()
+LEG_SIDE_COLOR = {
+    "FL": (0.0, 0.9, 0.9, 1), "FR": (1.0, 0.0, 1.0, 1),
+    "BL": (0.55, 0.35, 0.1, 1), "BR": (1.0, 0.85, 0.0, 1),
+}
 for name, head_ws, tail_ws in markers:
     role = bone_roles.get(name, "")
-    base_role = role.split("_")[0] if role.startswith(("wing", "leg")) else role
-    if role.startswith("wing_L") or role == "leg_L":
-        color = (0.1, 0.5, 1, 1)
-    elif role.startswith("wing_R") or role == "leg_R":
-        color = (1, 0.1, 0.6, 1)
-    elif role.startswith("leg_"):
-        color = (0.1, 0.8, 0.8, 1)
+    if role.startswith("leg_"):
+        color = LEG_SIDE_COLOR.get(role.split("_", 1)[1], (0.1, 0.8, 0.8, 1))
     else:
         color = ROLE_COLOR.get(role, (0.8, 0.8, 0.8, 1))
     s = add_sphere(head_ws, 0.018 * H, color, f"mk_{name}_h")
@@ -221,7 +255,12 @@ render_ortho(scene, os.path.join(OUT, "rig_overlay_front.png"), (0, -4, 1.0),
              (math.radians(90), 0, 0))
 render_ortho(scene, os.path.join(OUT, "rig_overlay_side.png"), (4, 0, 1.0),
              (math.radians(90), 0, math.radians(90)))
-print("RIG OVERLAY RENDERED")
+render_ortho(scene, os.path.join(OUT, "rig_overlay_bottom.png"), (0, -0.3, -4),
+             (math.radians(180), 0, 0), ortho_scale=2.2)
+render_ortho(scene, os.path.join(OUT, "rig_overlay_34.png"), (2.6, -3.0, 1.6),
+             (math.radians(65), 0, math.radians(40)), ortho_scale=2.8)
+print("RIG OVERLAY RENDERED (front/side/bottom/3-4)")
+scene.display.shading.show_xray = False
 
 for o in overlay_objs:
     bpy.data.objects.remove(o, do_unlink=True)
@@ -266,6 +305,20 @@ bpy.ops.object.mode_set(mode="OBJECT")
 render_ortho(scene, os.path.join(OUT, "weightcheck_legs_bent.png"), (3, -3, 1.0),
              (math.radians(75), 0, math.radians(40)), ortho_scale=2.8)
 bpy.ops.object.mode_set(mode="POSE")
+
+# Per-leg lifted-and-extended: each leg on its own, swung well past its rest bend while the other
+# three stay planted at rest -- isolates shoulder/hip tearing that a combined all-legs-bent pose
+# (above) can hide (one leg's crease can be masked by another leg's silhouette from a single
+# camera angle). Task brief's explicit ask: "each leg lifted and extended."
+for side in leg_sides:
+    reset_pose()
+    set_pose_euler(f"leg_{side}_thigh", deg_x=-38, deg_z=(10 if side.endswith("L") else -10))
+    set_pose_euler(f"leg_{side}_shin", deg_x=46)
+    bpy.context.view_layer.update()
+    bpy.ops.object.mode_set(mode="OBJECT")
+    render_ortho(scene, os.path.join(OUT, f"weightcheck_leg_{side}_extended.png"), (3, -3, 1.0),
+                 (math.radians(75), 0, math.radians(40)), ortho_scale=2.8)
+    bpy.ops.object.mode_set(mode="POSE")
 
 reset_pose()
 set_pose_euler("wing_L_01", deg_z=-60)

@@ -394,6 +394,35 @@ def auto_weight_with_fallbacks(obj, arm_obj, bone_names, target_height):
     return method_used, log
 
 
+def restrict_leg_weights(obj, leg_masks, bone_roles):
+    """Zeros any vertex-group weight that doesn't belong to a vertex's own leg's chain (or that
+    leg's parent bone -- spine_02 for a foreleg, pelvis for a hind leg) for every vertex in
+    `leg_masks` (leg_side -> set of vertex indices, from rig_templates.winged_quadruped's
+    build_leg_masks). A vertex inside one leg's mask literally cannot carry hind-leg/foreleg/tail
+    weight after this runs, regardless of what automatic/voxel weighting produced -- closes off
+    cross-limb weight bleed at the points two limbs pass close to each other on this mesh. Must run
+    BEFORE cleanup_weights' limit/normalise/smooth pass, which re-normalises whatever's left.
+    Returns the number of out-of-chain group memberships removed."""
+    me = obj.data
+    group_index = {g.name: g.index for g in obj.vertex_groups}
+    allowed_by_leg = {}
+    for leg_side in leg_masks:
+        allowed = {n for n, role in bone_roles.items() if role == f"leg_{leg_side}"}
+        allowed.add("spine_02")
+        allowed.add("pelvis")
+        allowed_by_leg[leg_side] = {group_index[n] for n in allowed if n in group_index}
+    removed = 0
+    for leg_side, vids in leg_masks.items():
+        allowed_idx = allowed_by_leg[leg_side]
+        for vi in vids:
+            v = me.vertices[vi]
+            for g in list(v.groups):
+                if g.group not in allowed_idx:
+                    obj.vertex_groups[g.group].remove([vi])
+                    removed += 1
+    return removed
+
+
 def cleanup_weights(obj, limit=3):
     """Scripted weight-paint cleanup, per the methodology doc section 2: limit influences,
     normalise, clean near-zero, smooth. All plain bpy.ops, fully headless.
@@ -413,7 +442,15 @@ def cleanup_weights(obj, limit=3):
     bpy.ops.object.vertex_group_limit_total(limit=limit)
     bpy.ops.object.vertex_group_normalize_all(lock_active=False)
     bpy.ops.object.vertex_group_clean(group_select_mode="ALL", limit=0.01)
-    bpy.ops.object.vertex_group_smooth(group_select_mode="ALL", factor=0.5, repeat=2)
+    # factor/repeat bumped (0.5/2 -> 0.6/3) for the 4-leg pilot: with all four legs now animated
+    # (not two), the toon-shader outline pass shows a small faceted/dark patch near the hip/thigh
+    # in extreme-ish poses -- the same class of "cosmetic outline-shader artefact" already noted as
+    # a known issue in this pipeline's precedent runs (see README), confirmed present even in the
+    # prior 2-leg pilot's own Move clip, just relocated now that more legs move. A stronger smooth
+    # pass softens the hard weight-paint boundary at each leg's mask edge (common.
+    # restrict_leg_weights) a bit further; it does not fully eliminate the artefact (same class,
+    # not chased further within this pass's budget -- see README's known-limitations entry).
+    bpy.ops.object.vertex_group_smooth(group_select_mode="ALL", factor=0.6, repeat=3)
     bpy.ops.object.vertex_group_limit_total(limit=limit)  # re-cap: smooth can reintroduce influences
     bpy.ops.object.vertex_group_clean(group_select_mode="ALL", limit=0.01)
     bpy.ops.object.vertex_group_normalize_all(lock_active=False)

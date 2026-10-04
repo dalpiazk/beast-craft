@@ -29,7 +29,115 @@ passes, weight-paint cleanup, Blender-5.x layered-Action F-curve walking, interp
 normalisation) live in `common.py` so every stage script imports them rather than re-deriving the
 same Blender-API gotchas five times.
 
-## Running the full pipeline on a new creature
+## v4 redo: all four legs from horizontal-slicing landmarks
+
+A later pass redid the rig fitting and the walk from scratch after the producer supplied an
+independent multi-angle orthographic turnaround of the exact input mesh
+(`scratchpad/anim-pilot/views_quad.png`): **all four feet stand on the ground** in this creature's
+bind pose (two eagle forelegs under the chest, two lion hind legs under the haunch, chest held
+higher than the hips -- a reared/proud stance, not a rampant one). The prior pass (left below,
+struck through in spirit but not deleted -- the mistake and why it happened are worth keeping on
+record) had read the mesh backwards: it concluded the forelegs were tucked up off the ground and
+placed them with a guessed forward-offset formula. Without real ground contact to anchor it, that
+guess landed on a bind-pose knee fold so extreme that every attempt to animate it tore the mesh.
+
+**Method: horizontal-slicing landmark detection**, replacing the old proportional guess entirely
+(`rig_templates/winged_quadruped.py`):
+
+1. **Feet, by per-side ground-band clustering.** Ground-band vertices (z < 0.10H) are split by body
+   side (X<0 / X>=0) and each side is clustered independently with `_cluster_xy`'s adaptive
+   single-link threshold search (same technique the prior pass's hind-leg detection already used
+   successfully), taking the largest threshold that still yields exactly 2 big clusters per side.
+   **Per-side, not one global clustering pass** -- a global version could not satisfy both sides at
+   once: this mesh's right foreleg's toes need a much larger merge threshold (~0.18-0.24H) to fuse
+   into one paw than the left side needs (~0.015-0.04H) for its own two, already well-separated
+   paws, so a single global threshold either left the right paw's toes looking like 2-3 "feet" or
+   risked over-merging the left side's genuinely separate paws.
+2. **Ankle/knee/hip, by tracking each foot's cross-section upward.** From each real foot, the mesh
+   is bisected with a horizontal plane (`bmesh.ops.bisect_plane`) at many Z levels; connected
+   cut-edge islands are tracked frame-to-frame (nearest-centroid matching) from the foot upward.
+   Below `settle_frac*H` the splayed claws are still mid-fusion (confirmed by calibration), so the
+   tracker follows unconditionally; above it, a merge event (two tracks claiming the same island),
+   an oversized jump, a ballooning cross-section, or straying closer to a *different* leg's own
+   track than to its own all end that leg's track -- the point just before that is the hip/shoulder.
+   The two sharpest curvature points along the kept path are the ankle/wrist and knee/elbow.
+3. **Left/right hip-height symmetry safeguard.** A real quadruped's left and right shoulders (and
+   separately hips) sit at the same height even on this mesh's otherwise-asymmetric bind pose; if a
+   pair disagrees by more than 0.12H, the taller (over-tracked) one's knee/hip are corrected toward
+   its sibling's height, keeping the ankle and the chain's own lateral lean.
+4. **Per-leg weight masks + restriction** (`build_leg_masks` / `common.restrict_leg_weights`): a
+   vertex within `radius` of one leg's own hip-knee-ankle-foot polyline may only carry weight for
+   that leg's 4 bones plus its parent (spine_02 for forelegs, pelvis for hind legs) -- built from
+   the same detected chain the bones use, so a foreleg vertex cannot carry hind-leg or tail weight
+   regardless of what automatic/voxel weighting produced.
+
+**Three real bugs found and fixed along the way, each confirmed by rendering the result and looking
+at it, not by numbers alone** (see `winged_quadruped.py`'s `_track_legs`/`detect_landmarks`
+docstrings and `anim/gait.py`'s `aim_matrix`/frame-loop comments for the full forensic detail):
+- **Forward-axis detection was backwards.** The old "which Y half holds more upper-body mass"
+  heuristic picked up this mesh's raised wings (which sweep toward the tail side in this pose), not
+  the head -- confirmed by rendering the detected head/front-leg landmarks against the producer's
+  turnaround and finding them on the wrong end. Fixed with a simpler, more direct signal: of the
+  two global Y-extreme vertices, the one at the higher Z (a real tail or rear-torso extremity, not
+  an outstretched ground-level claw) points backward.
+- **`aim_matrix`'s degenerate-direction fallback reused the exact up_hint that had just failed**
+  (every caller passed a single hardcoded `(1,0,0)`), leaving an ill-conditioned or literally
+  non-invertible frame whenever a leg bone swung close to that axis -- which happens for real on
+  this mesh (FL's detected bend direction is X-dominant). Fixed with a genuinely different fallback
+  axis, and `up_hint` is now chosen per leg as whichever world axis is least aligned with that
+  leg's own detected bend direction.
+- **The forelegs' parent transform (`spine02_world`) ignored its own small same-frame
+  counter-rotation**, approximating it as identity. Small, but enough to push FL's unusually tight
+  IK reach margin in and out of its clamp every frame -- confirmed directly (the IK solve's own
+  output matched its target exactly, in isolation, with zero clamping; only the rendered bone
+  drifted). Fixed by folding the rotation in analytically before using it as a parent matrix.
+
+**Result:** all four legs walk with a real lateral-sequence gait (BL->FL->BR->FR, each a
+quarter-cycle apart), all verify.py gates pass (numbers below), 33 deform bones, 0/6,740 vertices
+unweighted, max 4 / avg 3.22 influences/vertex.
+
+| Gate | BL | BR | FL | FR |
+| --- | --- | --- | --- | --- |
+| Foot-slide (stance CV<0.35, or abs stddev<2mm if near-static) | 0.114 (2.98mm) | near-static, 0.35mm | near-static, 0.08mm | 0.151 (2.99mm) |
+| Knee angle range (15-179.5 deg) | 38-131 | 90-144 | 104-142 | 44-133 |
+| Ground interpenetration (toe min z > -0.01) | ~0 | ~0 | ~0 | ~0 |
+| Move loop seam | 0.000 deg | | | |
+| Idle loop seam / jitter | 0.000 deg / 0.00057 max | | | |
+| Attack jitter / cumulative head pitch | 0.0357 max / 64.0 deg | | | |
+
+**Stride is honestly asymmetric, and the reason is now fully legible from the landmarks
+themselves** (not a mystery the way the old pilot's L/R asymmetry partly was): BL (peak-to-peak
+0.49 = 24.5%H) and FR (0.38 = 19.1%H) have real IK slack and stride accordingly; BR (0.16 = 8.2%H)
+and FL (0.07 = 3.6%H) sit much closer to their own hip-to-foot max reach at rest (FL's rest
+hip-to-foot distance is already ~91% of its own max reach, L1=0.147/L2=0.184) and so get a small,
+geometrically-honest stride rather than a forced
+one that would have reintroduced clamping (an earlier attempt forced a fixed-floor minimum stride
+and it measurably did: FL's foot-slide CV was 0.68 until the floor was removed in favour of
+whatever `anim/gait.py`'s own reach computation says is actually safe). This is a direct, legible
+consequence of this specific mesh's proportions (FL and BR's own detected hip-knee-ankle-foot
+chains leave little slack), not a detection error -- the landmark overlay renders (below) show
+each chain sitting correctly inside its own leg.
+
+**Landmark overlay renders** (`rig_creature.py`'s 4-view output, semi-transparent textured mesh,
+one colour per leg): `rig_overlay_front.png`, `rig_overlay_side.png`, `rig_overlay_bottom.png`,
+`rig_overlay_34.png` in the stage-2 output directory. Per-leg isolation renders used during
+calibration (one leg's chain alone, bright red, side + 3/4 views) are a scratchpad-only tool, not
+part of the gated pipeline.
+
+**Known limitation carried into this pass, honestly reported:** a small, faceted dark patch appears
+on the hip/belly during parts of the Move clip specifically (when multiple legs are mid-stride at
+once) in the Live3D toon-shader runtime render -- not visible in the Idle or Attack renders, and not
+reproducible by posing the rig in Blender directly (a Blender MatCap render of the same exported
+asset at the same pose is clean). This is the same *class* of issue as the precedent spike's
+documented "outline-shell specks" / "cosmetic outline-shader artefact" entries (confirmed present,
+in a different spot, in this pipeline's own prior review output too -- see `review_v3/contact_move`
+in session scratchpad) -- i.e. a recurring, pre-existing characteristic of this toon/outline shader
+under multi-limb articulation, not a new defect this pass introduced, though having all four legs
+move instead of two likely makes it more visible than before. A stronger weight-smooth pass
+(`common.cleanup_weights`, factor 0.5->0.6 / repeat 2->3) visibly fixed it for Idle; Move's version
+was not fully chased further within this pass's budget.
+
+## Pilot results (Griffin) -- original 2-leg finding, superseded above
 
 ```
 BLENDER="C:\bctmp\blender-5.2.1-windows-x64\blender.exe"   # or wherever your Blender 5.x portable lives
@@ -143,6 +251,8 @@ New, additive pieces:
   vs. the fourth pass's 11; still comfortably inside GLSL ES 2.0's guaranteed 128 vec4 vertex-uniform
   minimum (25 bones = 100 vec4). Every existing model (griffin_live.glb, crest_alt.glb,
   swarmling_live.glb) still works unchanged -- unused palette slots are inert identity padding.
+  (Bumped again to **34** in the lead-review 4-leg fix round, covering this rig's 33 bones; the v4
+  redo above keeps the same 33-bone count, so no further runtime change was needed.)
 - **`--pilot-sequence <dir> [--pilot-clip reel|idle|move|attack] [--frames N] [--pilot-fps N]`**: a
   new headless capture mode (mirrors `--screenshot`'s structure) that loads `griffin_anim.glb`
   instead of `griffin_live.glb`, frames it with the existing single-instance camera fit (same
@@ -164,7 +274,8 @@ git diff main --stat -- src .github BeastCraft.slnx      # empty
 ## Producer review gate outputs
 
 Per the task brief, these are **not committed** -- they live in the session scratchpad
-(`scratchpad/anim-pilot/review/final/`, see the handback report for absolute paths): a contact sheet
+(`scratchpad/anim-pilot/review/final/` for the original pilot, `scratchpad/anim-pilot/review_v4/final/`
+for the v4 all-four-legs redo above -- see the handback report for absolute paths): a contact sheet
 per clip (10 frames at the battle camera angle, toon-shaded), an onion-skin overlay of the Attack
 clip's key poses, and a GIF reel cycling Idle -> Move -> Attack -> Idle with real crossfades,
 rendered **from the Live3D runtime itself** (not a Blender fallback -- `--pilot-sequence` captures
@@ -249,6 +360,13 @@ was re-investigated and the original finding stands, with the evidence recorded 
    handback report for a frame-by-frame description.
 
 ## Known limitations / honest self-critique
+
+**Superseded by the v4 redo above:** the two entries below that this pilot originally reported --
+"Move's L/R stride is asymmetric" and "Forelegs don't walk" -- are both out of date. All four legs
+now walk (horizontal-slicing landmark detection, see above); the stride asymmetry is still real but
+is now 4-way (BL/FR have real slack, BR/FL are reach-constrained) and traced to each leg's own
+detected hip-to-foot geometry rather than a single hardcoded formula. Left below for the historical
+record of what the 2-leg pilot actually found, not because it's still true.
 
 - **Foot roll is not implemented.** The foot segment (ankle-to-ground) is treated as rigid through
   stance and swing; only the thigh/shin solve via IK. This is consistent with the "no foot slide by
