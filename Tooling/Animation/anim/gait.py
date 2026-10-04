@@ -235,8 +235,20 @@ for side in leg_sides:
     # never clamps (a first pass used a fixed STRIDE for every leg and clamped on nearly every
     # frame -- see solve_2bone_ik's docstring -- which produced wildly non-constant stance
     # velocity and failed verify.py's foot-slide gate at cv=0.406 against a 0.35 threshold).
+    #
+    # Lead-review round 4 (hand-placed, long legs): a flat 0.95 safety factor broke down on this
+    # rig -- these legs are long enough that the rest pose itself already sits within ~0.1-0.3% of
+    # max_reach (hip height alone very nearly uses up the whole L1+L2 chain; confirmed directly:
+    # FR's rest_dist/max_reach = 0.597/0.598), so reach_margin = max_reach*0.95 landed BELOW the
+    # rest distance itself, before any stride was even attempted -- every leg's r_sq went negative
+    # or near-zero and every leg (bar one) fell straight to the degenerate floor stride. The margin
+    # is now the LARGER of the flat 95% budget and "a little past the rest pose's own distance" --
+    # never beyond max_reach itself (triangle inequality already guarantees rest_dist <= max_reach
+    # for any geometrically valid hand-placed chain, so this can't ask for the impossible) -- so a
+    # leg whose bind pose is itself nearly fully extended still gets a small but real usable margin
+    # instead of an immediate floor.
     SAFETY = 0.95
-    reach_margin = max_reach * SAFETY
+    reach_margin = min(max_reach, max(max_reach * SAFETY, (foot - hip).length + 0.02 * H))
     # All four feet are grounded in this mesh's own bind pose (producer-confirmed, see
     # rig_templates/winged_quadruped.py's docstring) -- ground_z=0 for every leg, front or back,
     # no "forelegs hover at bind height" special case. The horizontal-slicing landmark detection
@@ -361,7 +373,17 @@ def set_leg_pose(side, t, parent_world, parent_rest):
     # (shin_len / (shin_len+foot_len)) -- see solve_2bone_ik's docstring for why the ankle is
     # derived here rather than itself being a separate IK target.
     ankle_w = knee_w.lerp(reached, L["_ankle_frac"])
-    toe_w = reached + (L["toe_rest"] - L["foot_rest"])  # toe follows foot rigidly (no separate
+    toe_offset = L["toe_rest"] - L["foot_rest"]
+    # Hind legs' hand-placed toe sits a little BELOW their own foot/paw-pad point (an anatomically
+    # reasonable digitigrade detail -- the claws dig in slightly below the pad) -- fine at the bind
+    # pose, but reproducing that offset rigidly during a full-ground-contact stance (reached.z=0)
+    # pushes the toe measurably below z=0, failing verify.py's ground-interpenetration gate (BR:
+    # -0.021 against a -0.01 threshold). Clamping the offset's Z component to >=0 keeps the toe's
+    # forward (XY) reach exactly as given while stopping it from digging into the ground during the
+    # baked walk specifically -- the bind pose itself (Idle/Attack, which don't route through this
+    # gait-only code path) still shows the toe's true, lower, as-given position.
+    toe_offset.z = max(0.0, toe_offset.z)
+    toe_w = reached + toe_offset  # toe follows foot rigidly (no separate
     # roll target this pass -- foot roll is a nice-to-have the task brief lists; given the time
     # budget this pilot keeps the foot a single rigid segment through stance/swing, which already
     # avoids foot slide by construction (the main quality driver per the methodology doc) -- noted

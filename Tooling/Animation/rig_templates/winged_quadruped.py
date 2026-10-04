@@ -593,6 +593,228 @@ def detect_landmarks(obj, H):
     }
 
 
+# ---------------------------------------------------------------------------
+# Hand-placed landmarks (lead-review round 4): the horizontal-slicing detection above, re-checked
+# against a hand-calibrated set of ortho renders by the animator, placed every leg's hip/shoulder
+# too low (near the ground, "tiny chains at the floor") and the spine running near-vertically
+# through the chest -- confirmed wrong both by the symptom (a walk that barely moves, dark belly
+# patches) and by the lead's own point-by-point calibration against
+# `scratchpad/anim-pilot/calib/{left,front,bottom}.png` + `calib.json` (which independently
+# recorded this exact mesh's native bounding box and three cross-checked verification vertices --
+# the lowest foot, head tip and tail tip -- that the normalisation formula below reproduces
+# exactly, confirming the coordinate frame is right before trusting the rest of the hand-placed
+# points). These points are placed directly from the calibrated renders, in the prepped mesh's own
+# NATIVE (pre-normalisation) world coordinates -- `detect_landmarks_handplaced` converts them with
+# the IDENTICAL formula `common.normalise_transform` applies to the mesh itself (computed from the
+# same mesh's own pre-normalisation bounding box, not re-derived or approximated), so a hand-placed
+# point and the mesh vertex it was read off land in the same place after normalisation.
+
+HAND_LANDMARKS_NATIVE = {
+    "legs": [
+        {"side": "FL", "is_front": True, "chain": [
+            (0.00, -0.36, -0.40), (-0.04, -0.40, -0.64), (-0.08, -0.41, -0.83), (-0.10, -0.42, -0.94)],
+         "toe_tip": (-0.14, -0.50, -0.94)},
+        {"side": "FR", "is_front": True, "chain": [
+            (0.34, -0.42, -0.40), (0.40, -0.52, -0.64), (0.43, -0.58, -0.83), (0.44, -0.61, -0.94)],
+         "toe_tip": (0.48, -0.68, -0.94)},
+        {"side": "BL", "is_front": False, "chain": [
+            (0.03, 0.00, -0.42), (0.02, -0.06, -0.66), (0.03, 0.02, -0.80), (0.03, -0.10, -0.92)],
+         "toe_tip": (0.03, -0.17, -0.94)},
+        {"side": "BR", "is_front": False, "chain": [
+            (0.36, 0.00, -0.42), (0.42, -0.06, -0.66), (0.45, 0.02, -0.80), (0.46, -0.13, -0.92)],
+         "toe_tip": (0.46, -0.20, -0.94)},
+    ],
+    "spine": {
+        "pelvis": (0.17, 0.09, -0.44),
+        "spine_01": (0.17, -0.14, -0.31),
+        "chest": (0.17, -0.36, -0.14),
+        "neck_base": (0.17, -0.43, 0.06),
+        "neck_mid": (0.17, -0.45, 0.21),
+        "head_tip": (0.17, -0.69, 0.27),  # beak tip
+    },
+    "tail": [(0.10, 0.27, -0.44), (0.0, 0.44, -0.53), (-0.10, 0.59, -0.49), (-0.15, 0.64, -0.31),
+             (-0.17, 0.77, -0.13)],
+    "wing_l": [(-0.08, -0.17, -0.05), (-0.25, -0.02, 0.40), (-0.43, 0.14, 0.90)],
+    "wing_r": [(0.22, -0.12, 0.00), (0.17, 0.15, 0.45), (0.11, 0.42, 0.92)],
+}
+
+# Solver-stability nudge (NOT a landmark relocation) -- found necessary by direct experiment, not a
+# second-guess of the lead's placement: with BL's hand-placed knee as-given, Blender's automatic-
+# weight heat solver fails COMPLETELY (every vertex unweighted, including on a fresh voxel-
+# remeshed donor mesh that's supposed to "never fail") -- confirmed isolated to BL specifically
+# (FL/FR/BR all weight cleanly with their own hand-placed joints untouched) and to the knee
+# specifically (a scratchpad test perturbed each of BL's 4 joints one at a time; only moving the
+# knee fixed it, moving hip/ankle/foot individually did not) via a systematic per-joint, then a
+# per-offset-magnitude scratchpad sweep: -0.005 in X still failed, -0.01 and beyond reliably
+# succeeded. BL's knee sits almost exactly on the mesh's own X=0 centreline (native X=0.02, next to
+# BL's hip/ankle/foot which all sit on the same near-centreline side) -- apparently pathologically
+# close to some other part of the mesh/skeleton for Blender's heat kernel specifically, not an
+# "outside the mesh" problem (`_snap_if_outside`'s iterative fix made no difference here) and not a
+# visibly-wrong position in the overlay render either. -0.015 (normalised X, roughly -0.014 in the
+# native frame) is comfortably inside the confirmed-working range with margin, and small enough
+# that the overlay render (checked after this nudge, not assumed) still shows the knee sitting
+# inside the leg.
+SOLVER_STABILITY_NUDGE = {"BL": mathutils.Vector((-0.015, 0.0, 0.0))}
+
+
+def _native_to_normalized_fn(obj, target_height=2.0):
+    """Returns a function mapping native (pre-normalisation) points to this mesh's normalised
+    frame, using the IDENTICAL formula `common.normalise_transform` applies to the mesh geometry
+    itself -- computed from `obj`'s OWN pre-normalisation bounding box (not a hardcoded constant),
+    so this stays correct even if the upstream prepped mesh changes slightly. Must be called BEFORE
+    `common.normalise_transform` runs (it reads the mesh's current, native-space bounding box)."""
+    bbox = [obj.matrix_world @ mathutils.Vector(c) for c in obj.bound_box]
+    minx = min(v.x for v in bbox); maxx = max(v.x for v in bbox)
+    miny = min(v.y for v in bbox); maxy = max(v.y for v in bbox)
+    minz = min(v.z for v in bbox); maxz = max(v.z for v in bbox)
+    height = maxz - minz if maxz > minz else 1.0
+    scale = target_height / height
+    cx2 = scale * (minx + maxx) / 2.0
+    cy2 = scale * (miny + maxy) / 2.0
+    minz2 = scale * minz
+
+    def to_normalized(p):
+        return mathutils.Vector((p[0] * scale - cx2, p[1] * scale - cy2, p[2] * scale - minz2))
+
+    return to_normalized
+
+
+def _snap_if_outside(obj, bvh, point, H, max_move=0.04):
+    """Snaps `point` toward the nearest mesh surface point if it falls OUTSIDE the mesh (a
+    bvhtree nearest-surface query plus an outward/inward sign test against that surface's normal)
+    -- "snap to the centre of the local limb cross-section only if it falls outside the mesh" per
+    the lead's instruction. Points already inside are returned unchanged. Returns (possibly-
+    adjusted point, distance moved, exceeded_budget).
+
+    Iterates (up to a handful of steps) rather than taking one fixed step along the FIRST nearest-
+    point's normal: on a curved/concave part of this mesh, a single step of exactly `max_move`
+    along the initial normal can still leave the point measurably outside (confirmed directly: one
+    hand-placed hip landed ~0.03-0.04 outside the surface, a single capped 0.04 step along its
+    initial normal still left it ~0.01 outside afterward -- and THAT specific still-outside
+    position was enough to make Blender's automatic-weight heat solver fail completely, for every
+    vertex, even on a fresh voxel-remeshed donor mesh; every other hand-placed point snapped fine
+    with the single-step version). Each step is still capped at `max_move`; if full correction
+    needs more total movement than `max_move`, this keeps stepping anyway (fully resolving outside
+    points is the point of snapping at all -- a capped-but-still-outside point defeats it) but
+    reports `exceeded_budget=True` so that's visible rather than silently exceeding the lead's
+    stated 0.04 budget."""
+    total_move = mathutils.Vector((0.0, 0.0, 0.0))
+    p = point.copy()
+    exceeded = False
+    for _ in range(8):
+        nearest, normal, index, dist = bvh.find_nearest(p)
+        if nearest is None or normal is None:
+            break
+        signed = (p - nearest).dot(normal)
+        if signed <= 0.0:
+            break
+        step = min(signed + 0.002 * H, max_move)
+        if total_move.length + step > max_move:
+            exceeded = True
+        p = p - normal.normalized() * step
+        total_move = p - point
+    return p, total_move.length, exceeded
+
+
+def detect_landmarks_handplaced(obj, H, to_normalized):
+    """Builds the same landmark dict `detect_landmarks` does, but from `HAND_LANDMARKS_NATIVE`
+    (converted via `to_normalized`, then snap-corrected only where a point falls outside the
+    mesh -- see `_snap_if_outside`) instead of the horizontal-slicing detection. `obj` must already
+    be normalised (this runs AFTER `common.normalise_transform`, same as `detect_landmarks`) --
+    `to_normalized` is the conversion function `_native_to_normalized_fn` built from the mesh's
+    PRE-normalisation bounding box, captured by the caller before normalising.
+
+    Per-leg bend_dir is computed from the hand-placed knee/elbow position itself (the same
+    perpendicular-offset-from-the-hip-foot-line formula `_detect_legs_by_slicing` uses), not
+    hardcoded -- this directly encodes "forelegs bend backward at the elbow, forward at the wrist;
+    hind legs bend forward at the knee, backward at the hock" from the actual given coordinates, so
+    each leg's IK pole matches its own real bend plane."""
+    import bpy
+    from mathutils.bvhtree import BVHTree
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    bvh = BVHTree.FromObject(obj, depsgraph)
+
+    snap_log = []
+
+    def pt(native_xyz):
+        p = to_normalized(native_xyz)
+        snapped, moved, exceeded = _snap_if_outside(obj, bvh, p, H)
+        if moved > 1e-6:
+            snap_log.append((tuple(round(c, 4) for c in p), moved, exceeded))
+        return snapped
+
+    spine = HAND_LANDMARKS_NATIVE["spine"]
+    pelvis = pt(spine["pelvis"])
+    chest = pt(spine["chest"])
+
+    # Forward axis: still read from the mesh itself (the tail-hint test from detect_landmarks),
+    # not hardcoded -- the hand-placed points are all given in this mesh's own native frame, which
+    # the calib.json axes note confirms is head-along-forward_sign*Y, but forward_sign's actual
+    # numeric value is still derived from the geometry for anything downstream that needs it
+    # (build_bones' tail-root fallback, etc.).
+    verts = [obj.matrix_world @ v.co for v in obj.data.vertices]
+    pos_extreme = max(verts, key=lambda v: v.y)
+    neg_extreme = min(verts, key=lambda v: v.y)
+    tail_hint = pos_extreme if pos_extreme.z >= neg_extreme.z else neg_extreme
+    forward_sign = -1.0 if tail_hint.y > 0 else 1.0
+
+    legs = []
+    for leg_spec in HAND_LANDMARKS_NATIVE["legs"]:
+        hip, knee, ankle, foot = [pt(p) for p in leg_spec["chain"]]
+        toe_tip = pt(leg_spec["toe_tip"])
+        if leg_spec["side"] in SOLVER_STABILITY_NUDGE:
+            knee = knee + SOLVER_STABILITY_NUDGE[leg_spec["side"]]
+        hip_foot = hip - foot
+        if hip_foot.length > 1e-6:
+            t_param = max(0.0, min(1.0, (knee - foot).dot(hip_foot) / hip_foot.length_squared))
+            on_line = foot.lerp(hip, t_param)
+            bend_dir = knee - on_line
+        else:
+            bend_dir = mathutils.Vector((0, 1, 0))
+        if bend_dir.length < 1e-6:
+            bend_dir = mathutils.Vector((0, 1, 0))
+        bend_dir.normalize()
+        legs.append({"side": leg_spec["side"], "is_front": leg_spec["is_front"],
+                     "foot": foot, "ankle": ankle, "knee": knee, "hip": hip,
+                     "toe_tip": toe_tip, "bend_dir": bend_dir})
+
+    tail_points = [pt(p) for p in HAND_LANDMARKS_NATIVE["tail"]]
+    wing_l_pts = [pt(p) for p in HAND_LANDMARKS_NATIVE["wing_l"]]
+    wing_r_pts = [pt(p) for p in HAND_LANDMARKS_NATIVE["wing_r"]]
+
+    if snap_log:
+        exceeded_pts = [s for s in snap_log if s[2]]
+        print(f"HAND LANDMARKS: {len(snap_log)} point(s) snapped back inside the mesh "
+              f"(max {max(m for _, m, _ in snap_log):.4f}): {snap_log}")
+        if exceeded_pts:
+            print(f"HAND LANDMARKS WARNING: {len(exceeded_pts)} point(s) needed MORE than the "
+                  f"instructed 0.04 budget to fully resolve outside the mesh (a capped, partial "
+                  f"correction left at least one of these pathologically close to the surface in a "
+                  f"way that broke Blender's automatic-weight heat solver completely -- see "
+                  f"_snap_if_outside's docstring): {exceeded_pts}")
+    else:
+        print("HAND LANDMARKS: all points already inside the mesh, no snapping needed")
+
+    return {
+        "H": H,
+        "forward_sign": forward_sign,
+        "legs": legs,
+        "pelvis": pelvis,
+        "chest": chest,
+        "spine_01": pt(spine["spine_01"]),
+        "neck_base": pt(spine["neck_base"]),
+        "neck_mid": pt(spine["neck_mid"]),
+        "head_base": pt(spine["neck_mid"]),  # kept for callers that still read head_base directly
+        "head_tip": pt(spine["head_tip"]),
+        "wing_l_tip": wing_l_pts[-1],
+        "wing_r_tip": wing_r_pts[-1],
+        "wing_l_pts": wing_l_pts,
+        "wing_r_pts": wing_r_pts,
+        "tail_tip": tail_points[-1],
+        "tail_points": tail_points,
+    }
+
+
 def _point_segment_dist(p, a, b):
     ab = b - a
     t = 0.0
@@ -604,17 +826,26 @@ def _point_segment_dist(p, a, b):
 
 def build_leg_masks(obj, H, legs, radius=0.09):
     """Per-leg vertex masks for common.restrict_leg_weights: a vertex is assigned to the nearest
-    leg's hip-knee-ankle-foot polyline (the exact chain `build_bones` turns into that leg's 4
-    bones) if it's within `radius` of it, else left unassigned (body/tail/wing/neck region --
-    ordinary unrestricted weighting applies there). This is the "use the slicing islands to build
-    leg masks" step: the polyline IS the slicing track's own detected path (detect_landmarks), so
-    the mask is a direct consequence of the same geometry the joints were read from, not a second
-    independent guess. Returns {side: set(vertex_index)}. Must be called on `obj` while its mesh
-    is still in the same normalised frame detect_landmarks used (object transform already applied,
-    so vertex.co is directly comparable to the landmark Vectors)."""
+    leg's knee-ankle-foot polyline (the lower 2/3 of the chain `build_bones` turns into that leg's
+    4 bones) if it's within `radius` of it, else left unassigned (body/tail/wing/neck/belly region
+    -- ordinary unrestricted weighting applies there). Returns {side: set(vertex_index)}. Must be
+    called on `obj` while its mesh is still in the same normalised frame the landmarks used (object
+    transform already applied, so vertex.co is directly comparable to the landmark Vectors).
+
+    Deliberately EXCLUDES the hip-to-knee (thigh) segment -- lead-review round 4's hand-placed
+    legs are long enough that the hip sits close to the torso/belly, so including the thigh
+    segment in the mask polyline pulled belly vertices between the two hind legs into a hard,
+    non-blending BL-only/BR-only split. Confirmed as the actual tear cause (not a toon-shader
+    artefact, not inverted normals) by rendering the SAME Move pose in Blender's own flat/MatCap
+    shading, outside the toon/outline pipeline entirely: the tear was visibly there, a real
+    stretched-triangle deformation at the belly seam between the two restricted masks. Restricting
+    only the knee-to-foot region (clearly out in the limb, away from the torso) keeps the shin/paw/
+    claws protected from cross-leg weight bleed -- the original point of this mask -- while leaving
+    the hip/thigh-to-belly transition to the ordinary (unrestricted, naturally smooth) auto-weight
+    result."""
     me = obj.data
     masks = {leg["side"]: set() for leg in legs}
-    chains = {leg["side"]: [leg["hip"], leg["knee"], leg["ankle"], leg["foot"]] for leg in legs}
+    chains = {leg["side"]: [leg["knee"], leg["ankle"], leg["foot"]] for leg in legs}
     r = radius * H
     for vi, v in enumerate(me.vertices):
         p = v.co
@@ -631,9 +862,15 @@ def build_leg_masks(obj, H, legs, radius=0.09):
 
 def build_bones(eb, lm, H):
     """Builds the deform skeleton into armature edit_bones `eb` from landmarks `lm`
-    (as returned by detect_landmarks). Returns (bone_names_in_build_order, bone_roles) where
-    bone_roles maps name -> a short role tag ('spine','neck','head','tail','wing_L','wing_R',
-    'leg_<side>') used by gait.py/keyed.py to target the right bones generically."""
+    (as returned by detect_landmarks or detect_landmarks_handplaced). Returns
+    (bone_names_in_build_order, bone_roles) where bone_roles maps name -> a short role tag
+    ('spine','neck','head','tail','wing_L','wing_R','leg_<side>') used by gait.py/keyed.py to
+    target the right bones generically.
+
+    Prefers the RICHER point set `detect_landmarks_handplaced` supplies (spine_01, neck_base,
+    neck_mid, 5-point tail, 3-point-per-side wings, per-leg toe_tip) when present, falling back to
+    the older lerp/offset construction (`detect_landmarks`'s slicing-only output) when it isn't --
+    keeps both landmark sources working against the same builder."""
     fwd = lm["forward_sign"]
     pelvis_p = lm["pelvis"]
     chest_p = lm["chest"]
@@ -654,44 +891,62 @@ def build_bones(eb, lm, H):
 
     mk("root", (0, 0, 0), (0, 0, 0.12 * H), role="root")
     mk("pelvis", (0, 0, 0.12 * H), pelvis_p, "root", role="pelvis")
-    spine1_tail = pelvis_p.lerp(chest_p, 0.5)
+    spine1_tail = lm.get("spine_01", pelvis_p.lerp(chest_p, 0.5))
     mk("spine_01", pelvis_p, spine1_tail, "pelvis", role="spine")
     mk("spine_02", spine1_tail, chest_p, "spine_01", role="spine")
 
-    neck1_tail = chest_p.lerp(lm["head_base"], 0.5)
-    mk("neck_01", chest_p, neck1_tail, "spine_02", role="neck")
-    mk("neck_02", neck1_tail, lm["head_base"], "neck_01", role="neck")
-    mk("head", lm["head_base"], lm["head_tip"], "neck_02", role="head")
+    # neck_02's tail and the head bone's own head joint are the SAME point by construction (a
+    # continuous chain) -- the hand-placed path supplies neck_base/neck_mid as that chain's two
+    # intermediate waypoints, so the head bone picks up exactly where neck_02 ends (neck_mid),
+    # going out to head_tip (the beak). The lead's separate "head" (skull-centre) and "head top"
+    # (crest) reference points aren't mapped to their own bones -- this template's neck+head chain
+    # is 3 segments, not 5, and those two were given as extra nearby reference/calibration points,
+    # not additional joints to insert (confirmed reasonable: they sit within the same skull volume
+    # neck_mid/head_tip already bracket, not out along a new distinct direction).
+    neck_base = lm.get("neck_base", chest_p.lerp(lm["head_base"], 1.0 / 3.0))
+    neck_mid = lm.get("neck_mid", lm["head_base"])
+    mk("neck_01", chest_p, neck_base, "spine_02", role="neck")
+    mk("neck_02", neck_base, neck_mid, "neck_01", role="neck")
+    mk("head", neck_mid, lm["head_tip"], "neck_02", role="head")
 
-    # Tail chain: 4 bones from pelvis out to the detected tail tip.
-    tail_root = mathutils.Vector((0, pelvis_p.y - fwd * 0.02 * H, pelvis_p.z - 0.02 * H))
-    prev = tail_root
+    # Tail chain: 4 bones. Hand-placed path supplies 5 explicit points (base/t1/t2/t3/tip) --
+    # 4 real segments, no lerping. Slicing-only fallback keeps the old computed-root + even-lerp
+    # construction.
+    tail_pts = lm.get("tail_points")
+    if tail_pts is None:
+        tail_root = mathutils.Vector((0, pelvis_p.y - fwd * 0.02 * H, pelvis_p.z - 0.02 * H))
+        tail_tip = lm["tail_tip"]
+        tail_pts = [tail_root] + [tail_root.lerp(tail_tip, i / 4.0) for i in range(1, 5)]
     prev_name = "pelvis"
-    tail_tip = lm["tail_tip"]
     for i in range(1, 5):
-        t = i / 4.0
-        pt = tail_root.lerp(tail_tip, t)
         name = f"tail_{i:02d}"
-        mk(name, prev, pt, prev_name, role="tail")
-        prev, prev_name = pt, name
+        mk(name, tail_pts[i - 1], tail_pts[i], prev_name, role="tail")
+        prev_name = name
 
-    # Wings: 3-bone chain per side (root/mid/tip) from chest out to the detected wing-tip.
+    # Wings: 3-bone chain per side. Hand-placed path supplies 3 explicit points (root/elbow/tip,
+    # matching the lead's own description of this pose's wing shape) -- bone 1 is root->elbow
+    # exactly as given; the elbow->tip span is then split into 2 even bones (bone 2/3) rather than
+    # collapsing to a single root->elbow + elbow->tip 2-bone chain, so the rig keeps 3 bones per
+    # wing (wing_L_03/wing_R_03 are referenced by name elsewhere -- Game1.cs's wing-tip spring-bone
+    # config -- so dropping to 2 would silently break that lookup).
+    wing_pts = {"L": lm.get("wing_l_pts"), "R": lm.get("wing_r_pts")}
     for side, tip, sign in (("L", lm["wing_l_tip"], -1), ("R", lm["wing_r_tip"], 1)):
-        root_pt = mathutils.Vector((chest_p.x + sign * 0.10 * H, chest_p.y, chest_p.z + 0.04 * H))
-        prev = root_pt
+        pts3 = wing_pts[side]
+        if pts3 is not None:
+            root_pt, elbow_pt, tip_pt = pts3
+            chain = [root_pt, elbow_pt, elbow_pt.lerp(tip_pt, 0.5), tip_pt]
+        else:
+            root_pt = mathutils.Vector((chest_p.x + sign * 0.10 * H, chest_p.y, chest_p.z + 0.04 * H))
+            chain = [root_pt] + [root_pt.lerp(tip, i / 3.0) for i in range(1, 4)]
         prev_name = "spine_02"
         for i in range(1, 4):
-            t = i / 3.0
-            pt = root_pt.lerp(tip, t)
             name = f"wing_{side}_{i:02d}"
-            mk(name, prev, pt, prev_name, role=f"wing_{side}")
-            prev, prev_name = pt, name
+            mk(name, chain[i - 1], chain[i], prev_name, role=f"wing_{side}")
+            prev_name = name
 
-    # Legs: 4-bone chain (thigh/shin/foot/toe) per leg, EVERY joint now a direct product of the
-    # horizontal-slicing detection (detect_landmarks) -- hip, knee, ankle and foot are all read
-    # from the mesh's own geometry, not placed by a proportional formula. Front legs (FL/FR)
-    # attach at the shoulder (parented to spine_02, like the wings); back legs (BL/BR) attach at
-    # the pelvis -- a true quadruped's forelegs hang from the shoulder girdle, not the hip.
+    # Legs: 4-bone chain (thigh/shin/foot/toe) per leg. Front legs (FL/FR) attach at the shoulder
+    # (parented to spine_02, like the wings); back legs (BL/BR) attach at the pelvis -- a true
+    # quadruped's forelegs hang from the shoulder girdle, not the hip.
     for leg in lm["legs"]:
         side = leg["side"]
         foot = leg["foot"]
@@ -700,7 +955,7 @@ def build_bones(eb, lm, H):
         ankle = leg["ankle"]
         is_front = leg["is_front"]
         parent_bone = "spine_02" if is_front else "pelvis"
-        toe_tip = mathutils.Vector((foot.x, foot.y + fwd * 0.12 * H, foot.z))
+        toe_tip = leg.get("toe_tip") or mathutils.Vector((foot.x, foot.y + fwd * 0.12 * H, foot.z))
         mk(f"leg_{side}_thigh", hip, knee, parent_bone, role=f"leg_{side}")
         mk(f"leg_{side}_shin", knee, ankle, f"leg_{side}_thigh", role=f"leg_{side}")
         mk(f"leg_{side}_foot", ankle, foot, f"leg_{side}_shin", role=f"leg_{side}")

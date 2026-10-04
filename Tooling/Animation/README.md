@@ -29,6 +29,86 @@ passes, weight-paint cleanup, Blender-5.x layered-Action F-curve walking, interp
 normalisation) live in `common.py` so every stage script imports them rather than re-deriving the
 same Blender-API gotchas five times.
 
+## v5 redo: hand-placed landmarks (lead-review round 4)
+
+The v4 horizontal-slicing redo below was itself sent back: `rig_overlay_side.png` showed hips/
+shoulders placed almost at ground level (legs as tiny chains at the floor) and the spine running
+near-vertically through the chest -- the detected landmarks were wrong. The lead/animator then
+placed every joint BY HAND from the same calibrated ortho views the slicing pass used
+(`scratchpad/anim-pilot/calib/{left,front,bottom}.png` + `calib.json`, same `v4/griffin_prepped.glb`
+mesh, native pre-normalisation coordinates). `rig_templates/winged_quadruped.py`'s
+`HAND_LANDMARKS_NATIVE` now holds this full point set (every leg's hip/knee/ankle/foot/toe, the
+spine/neck/head chain, a 5-point tail, 3-point-per-side wings); `detect_landmarks_handplaced`
+converts them with the IDENTICAL formula `common.normalise_transform` applies to the mesh itself
+(computed from the mesh's own pre-normalisation bounding box, captured by `rig_creature.py` before
+normalising -- see `_native_to_normalized_fn`), then snaps a point back inside the mesh only if it
+falls outside (`_snap_if_outside`, iterative, not a single capped step -- see its docstring for why
+a single-step version wasn't enough). `detect_landmarks` (horizontal slicing) is kept for history/
+reuse on a future creature; this mesh now uses the hand-placed path exclusively, and the overlay
+render confirms it: hips/shoulders sit at the correct height, the spine runs through the torso at
+the body's own lean, all four legs' bones sit inside their own limb.
+
+**Two real engineering problems found and fixed along the way, neither a landmark-placement issue:**
+
+1. **Blender's automatic-weight heat solver failed completely** (every vertex unweighted, including
+   on a fresh voxel-remeshed donor mesh that's supposed to never fail) with the hand-placed rig.
+   Isolated by systematic testing (one leg at a time, then one joint at a time, then an offset-
+   magnitude sweep) to BL's knee specifically: at its exact given position the solver always failed;
+   nudging it by as little as 0.01 (normalised units) in -X fixed it completely, every time.
+   `_snap_if_outside`'s "outside the mesh" check made no difference here (BL's knee was already
+   inside) -- this is a Blender solver instability at that specific point, not a geometry problem,
+   and is applied as a small, separately-documented `SOLVER_STABILITY_NUDGE` (-0.015, comfortably
+   inside the confirmed-working range), not a change to the recorded hand-placed value.
+2. **The stride-safety margin broke down on these much longer legs.** The flat 0.95 safety factor
+   (`anim/gait.py`) assumed meaningful slack between the rest pose and max reach; on this rig the
+   rest pose itself already sits within ~0.1-0.3% of `max_reach` for the forelegs (confirmed: FR's
+   rest_dist/max_reach = 0.597/0.598), so `reach_margin = max_reach*0.95` landed BELOW the rest
+   distance itself and nearly every leg fell to the degenerate floor stride before any animation was
+   even attempted. Fixed by making the margin the larger of the flat 95% budget and "a little past
+   the rest pose's own distance" (capped at `max_reach`, which triangle inequality guarantees is
+   always >= rest_dist for a valid hand-placed chain).
+
+**Honest result: stride is still small for the forelegs specifically, and this is physical, not a
+parameter to tune away.** FL's hip-to-ground distance (full reach required to plant the foot, before
+any fore-aft stride) is ~91% of its own total leg length (L1+L2); FR is ~99.7%. At a hip height that
+tall relative to the leg's own segment lengths, there is essentially zero reachable distance left for
+ANY fore-aft foot excursion, regardless of safety-margin tuning -- verified directly: even
+`SAFETY=1.0` (no margin at all) leaves a reachable radius of a few percent of H. BL (24.5%
+peak-to-peak stride) and BR (8.2%) have real slack and get real motion; FL and FR get the floor
+value (~1-2%, effectively static) by physical necessity given the hand-placed hip/foot geometry, not
+by a bug. This is the same class of honest, geometry-driven asymmetry as the v4 pass's BL/FR vs BR/
+FL split -- just now applying to different legs, because the geometry itself is different.
+
+**A real mesh tear, found and diagnosed (not fully fixed) at the hind-leg hip/belly junction during
+Move specifically.** Per the task brief's instruction, diagnosed with a flat-shaded Blender render
+(not the toon runtime) at the exact same pose, to separate "real deformation" from "outline-shader
+artefact":
+- The pure bind pose (`griffin_rigged.blend`, no animation at all) renders completely clean --
+  confirms the mesh/weights themselves are fine, ruling out inverted normals/backfaces or an
+  outline-hull self-intersection as the cause (per the task brief's suggested checks).
+- ANY baked Move frame, even with stride manually damped to 30% of its computed value, shows the
+  same tear at the same severity -- ruling out stride AMPLITUDE as the driver.
+- Disabling body bob entirely made no difference either.
+- Resetting the Move-baked armature to full identity pose (no action) on the SAME file renders
+  clean -- confirms it's not file/weight corruption from the gait bake, purely pose-dependent.
+- Direct comparison of the hand-placed bind-pose knee position against the IK-solved knee at the
+  very first baked frame showed a real, substantial difference (BL: ~0.085 units, ~4.25% of H) even
+  though that frame's foot target is close to the rest foot position -- the knee's sensitivity to
+  small target changes is high for this leg geometry (bind pose already near its own reach limits,
+  per the stride finding above), and BL/BR are exactly opposite-phase in the lateral-sequence gait,
+  so their thigh bones rotate in diverging directions on every frame. The most likely mechanism:
+  ordinary linear-blend-skinning quality at a joint undergoing more rotation range than the
+  automatic weighting (tuned against the task brief's weight-check poses, not this specific gait)
+  handles smoothly, not a bug in the landmark placement, the mask, or the IK math specifically --
+  but this was not fully isolated down to a single confirmed fix within this pass's budget.
+  **Mitigation applied, not a full fix:** `build_leg_masks` now excludes the hip-to-knee (thigh)
+  segment from the per-leg restriction (it was pulling belly vertices between the two hind legs into
+  a hard BL-only/BR-only split, a real but distinct problem, confirmed separately) -- this did not
+  measurably change the tear's severity either way, so it was kept for its own (smaller, hip-to-
+  thigh-blend) benefit rather than reverted. The tear is visible in `review_v5/final/
+  contact_sheet_move.png` and `contact_sheet_move_side.png` at the hind legs' hip/belly junction;
+  Idle and Attack do not show it (legs stay braced in both).
+
 ## v4 redo: all four legs from horizontal-slicing landmarks
 
 A later pass redid the rig fitting and the walk from scratch after the producer supplied an

@@ -60,13 +60,26 @@ common.fresh_scene()
 obj, new_images = common.import_glb(GLB)
 obj.name = "Griffin"
 bpy.context.view_layer.objects.active = obj
+
+# Lead-review round 4: the hand-calibrated landmark path needs the native (pre-normalisation) ->
+# normalised conversion captured BEFORE common.normalise_transform runs (it reads the mesh's own
+# current bounding box; afterwards that box is already the normalised one). See
+# rig_templates.winged_quadruped._native_to_normalized_fn's docstring.
+to_normalized = template._native_to_normalized_fn(obj, TARGET_HEIGHT)
+
 H = common.normalise_transform(obj, TARGET_HEIGHT)
 print(f"NORMALISED to height {H}")
 
 report = {"input": GLB, "target_height": H}
 
 # --- Landmarks + skeleton ---------------------------------------------------
-lm = template.detect_landmarks(obj, H)
+# Lead-review round 4: hand-placed landmarks (calibrated against scratchpad/anim-pilot/calib/
+# {left,front,bottom}.png + calib.json by the animator) replace the horizontal-slicing detection
+# for this mesh -- the slicing-detected rig placed hips/shoulders near ground level with the spine
+# running near-vertically through the chest, producing a walk that barely moved and dark belly
+# patches. `detect_landmarks` (horizontal slicing) is kept in winged_quadruped.py for history/
+# reuse on a future creature; this mesh now uses `detect_landmarks_handplaced`.
+lm = template.detect_landmarks_handplaced(obj, H, to_normalized)
 report["landmarks"] = {
     "forward_sign": lm["forward_sign"],
     "leg_count": len(lm["legs"]),

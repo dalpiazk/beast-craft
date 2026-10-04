@@ -321,12 +321,32 @@ def auto_weight_with_fallbacks(obj, arm_obj, bone_names, target_height):
     method_used = "heat weights (raw mesh)" if unweighted <= total * 0.05 else None
 
     if method_used is None:
+        # Clean up attempt 1's own (failed) Armature modifier + all-zero-weight vertex groups
+        # before trying anything else -- otherwise a later attempt that duplicates `obj` (the voxel
+        # fallback, just below) inherits that stale, failed binding. See the voxel branch's own
+        # comment for why this matters (confirmed to cause a total, not partial, failure once).
+        for m in list(obj.modifiers):
+            if m.type == "ARMATURE":
+                obj.modifiers.remove(m)
+        obj.vertex_groups.clear()
         bpy.ops.object.select_all(action="DESELECT")
         obj.select_set(True)
         bpy.context.view_layer.objects.active = obj
         bpy.ops.object.duplicate()
         remesh_obj = bpy.context.view_layer.objects.active
         remesh_obj.name = obj.name + "_weight_donor_temp"
+        # Defensive cleanup: attempt 1 (just above) may have left obj with an Armature modifier and
+        # all-zero-weight vertex groups from its own failed parent_set(type='ARMATURE_AUTO') call --
+        # bpy.ops.object.duplicate() copies the whole modifier/vertex-group state, so remesh_obj
+        # would otherwise inherit that stale, failed armature binding before this attempt even
+        # starts. Confirmed to matter on a specific skeleton (lead-review round 4's hand-placed
+        # landmarks): parent_set(type='ARMATURE_AUTO') on an object that ALREADY has an Armature
+        # modifier targeting the same armature produced a total failure (every vertex unweighted),
+        # not the usual partial failure -- clearing any inherited modifiers/groups first gives this
+        # attempt a genuinely clean slate every time, regardless of how attempt 1 went.
+        for m in list(remesh_obj.modifiers):
+            remesh_obj.modifiers.remove(m)
+        remesh_obj.vertex_groups.clear()
         remesh_mod = remesh_obj.modifiers.new("VoxelRemesh", "REMESH")
         remesh_mod.mode = "VOXEL"
         remesh_mod.voxel_size = target_height * 0.003
