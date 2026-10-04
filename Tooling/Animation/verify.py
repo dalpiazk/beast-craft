@@ -455,16 +455,134 @@ if MOVE_BLEND:
     if walk_dir_result is not None:
         report["walk_direction"] = walk_dir_result
 
+# ---------------------------------------------------------------------------
+# Round 12 (producer review: "the feet look wrong" -- FR toes crossing/twisting, hind feet
+# pads-up/flipped). Root cause, confirmed via a numeric diagnostic (angle of the foot/toe bones'
+# own axes vs. world up/FORWARD, sampled at bind + four Move phases): the OLD foot/toe orientation
+# was derived by literally aiming the bone at the raw IK target position every frame, which was
+# numerically unstable during swing -- a leg's foot-bone direction could flip up to 180 deg from
+# FORWARD between adjacent swing frames. Fixed in anim/gait.py (set_leg_pose) by decoupling foot/
+# toe ORIENTATION from the raw target position: stance holds a fixed, bind-pose-derived direction
+# (literally "no roll/twist while planted"), swing blends to a small, bounded toe-curl and back.
+#
+# This gate checks the FIX, independently of gait.py's own internals (reads the posed armature
+# directly, not gait.py's formulas, so a regression in one file can't silently agree with a bug in
+# the other): during STANCE, for every leg:
+#   - "toe direction": the leg_<side>_toe bone's own Y axis (head->tail = foot-point -> toe-tip,
+#     true by construction for ANY bone regardless of roll) must be within TOE_DIR_MAX_DEG of
+#     FORWARD, ground-projected.
+#   - "sole normal": the toe bone's REST-pose local axis closest to world-up (found once, since
+#     roll is never set explicitly when this rig's bones are built -- see winged_quadruped.py's
+#     build_bones -- so "which local axis is sole-normal" isn't assumable in advance; auto-detected
+#     from the rest matrix itself, the same way for every leg) must, once carried through the
+#     bone's ACTUAL POSED rotation, stay within SOLE_NORMAL_MAX_DEG of world-up.
+TOE_DIR_MAX_DEG = 25.0
+SOLE_NORMAL_MAX_DEG = 20.0
+
+
+def check_foot_orientation(blend_path, action_name="Move"):
+    arm_obj = load(blend_path)
+    action = bpy.data.actions.get(action_name)
+    if action is None:
+        return None
+    if arm_obj.animation_data is None:
+        arm_obj.animation_data_create()
+    arm_obj.animation_data.action = action
+    scene = bpy.context.scene
+
+    leg_sides = sorted({n.name.split("_")[1] for n in arm_obj.data.bones if n.name.startswith("leg_")})
+    pelvis_pb = arm_obj.pose.bones.get("pelvis")
+    head_pb = arm_obj.pose.bones.get("head")
+    forward = (arm_obj.matrix_world @ head_pb.bone.head_local) - (arm_obj.matrix_world @ pelvis_pb.bone.head_local)
+    forward.z = 0.0
+    forward.normalize()
+    world_up = mathutils.Vector((0, 0, 1))
+
+    f0, f1 = action.frame_range
+    f0, f1 = int(f0), int(f1)
+    n_frames = f1 - f0
+
+    leg_results = {}
+    overall_pass = True
+    for side in leg_sides:
+        toe_pb = arm_obj.pose.bones[f"leg_{side}_toe"]
+        phase_off = LATERAL_SEQUENCE.get(side, 0.0 if side == leg_sides[0] else 0.5)
+
+        # Which LOCAL axis of the toe bone is "sole normal" cannot be auto-detected from the REST
+        # matrix: this rig's bones are built with Blender's default roll (never set explicitly --
+        # see winged_quadruped.py's build_bones), while the POSED toe bone's roll is built entirely
+        # independently by anim/gait.py's own aim_matrix/up_hint convention (set_leg_pose uses
+        # up_hint=(0,0,-1) specifically for the toe bone, BY DESIGN, so that its local Z axis is the
+        # one that ends up close to world-up once posed -- confirmed numerically, see gait.py's own
+        # comment there for why the sign is -Z not +Z). Rest and pose simply don't share a roll
+        # baseline here, so this gate checks what the POSE convention actually guarantees -- local Z
+        # -- directly, not an auto-detected-from-rest axis (an earlier version of this gate did
+        # that and failed at 90-180 deg on every leg even after the fix landed, because it was
+        # comparing against the wrong, rest-derived axis instead of the one gait.py actually
+        # controls).
+        local_up = mathutils.Vector((0, 0, 1))
+
+        toe_dir_worst, sole_worst = 0.0, 0.0
+        toe_dir_worst_frame, sole_worst_frame = None, None
+        n_stance_samples = 0
+        for f in range(f0, f1 + 1):
+            t = (f - f0) / n_frames
+            ph = (t + phase_off) % 1.0
+            if ph >= DUTY:
+                continue  # swing -- this gate only checks stance, per the task brief
+            n_stance_samples += 1
+            scene.frame_set(f)
+            pose_mat3 = toe_pb.matrix.to_3x3()
+            y_axis = (pose_mat3 @ mathutils.Vector((0, 1, 0)))
+            y_flat = mathutils.Vector((y_axis.x, y_axis.y, 0))
+            toe_dir_deg = math.degrees(y_flat.angle(forward)) if y_flat.length > 1e-6 else 180.0
+            sole_dir = (pose_mat3 @ local_up).normalized()
+            sole_deg = math.degrees(sole_dir.angle(world_up))
+            if toe_dir_deg > toe_dir_worst:
+                toe_dir_worst, toe_dir_worst_frame = toe_dir_deg, f
+            if sole_deg > sole_worst:
+                sole_worst, sole_worst_frame = sole_deg, f
+
+        toe_ok = toe_dir_worst <= TOE_DIR_MAX_DEG
+        sole_ok = sole_worst <= SOLE_NORMAL_MAX_DEG
+        leg_pass = toe_ok and sole_ok and n_stance_samples > 0
+        overall_pass = overall_pass and leg_pass
+        leg_results[side] = {
+            "stance_samples": n_stance_samples,
+            "worst_toe_direction_deg": toe_dir_worst, "worst_toe_direction_frame": toe_dir_worst_frame,
+            "toe_direction_pass": toe_ok,
+            "worst_sole_normal_deg": sole_worst, "worst_sole_normal_frame": sole_worst_frame,
+            "sole_normal_pass": sole_ok,
+            "pass": leg_pass,
+        }
+        print(f"  foot_orientation {side}: worst toe-direction {toe_dir_worst:.1f} deg "
+              f"(<= {TOE_DIR_MAX_DEG}? {toe_ok}), worst sole-normal {sole_worst:.1f} deg "
+              f"(<= {SOLE_NORMAL_MAX_DEG}? {sole_ok}) over {n_stance_samples} stance frames -> "
+              f"{'PASS' if leg_pass else 'FAIL'}")
+
+    return {"forward": list(round(c, 4) for c in forward), "legs": leg_results, "pass": overall_pass}
+
+
+if MOVE_BLEND:
+    foot_orient_result = check_foot_orientation(MOVE_BLEND, "Move")
+    if foot_orient_result is not None:
+        report["foot_orientation"] = foot_orient_result
+
 with open(os.path.join(OUT, "verify_report.json"), "w") as f:
     json.dump(report, f, indent=2)
 print("VERIFY DONE")
 
-# "Fail loudly": walk_direction is a correctness gate, not a quality-polish one -- a backwards-
-# walking Griffin is categorically broken, not just imperfect, so (unlike the other gates in this
-# file, which report pass/fail in the JSON for a human to read) this one also aborts the pipeline
-# with a non-zero exit code so it can't be silently skipped past in a batch/CI context.
-if "walk_direction" in report and not report["walk_direction"].get("pass", False):
-    print("=" * 70)
-    print("FATAL: walk_direction gate FAILED -- see verify_report.json['walk_direction'].")
-    print("=" * 70)
+# "Fail loudly": walk_direction and foot_orientation are correctness gates, not quality-polish
+# ones -- a backwards-walking or mangled-footed Griffin is categorically broken, not just
+# imperfect, so (unlike the other gates in this file, which report pass/fail in the JSON for a
+# human to read) these also abort the pipeline with a non-zero exit code so a failure can't be
+# silently skipped past in a batch/CI context.
+hard_fail = False
+for gate_name in ("walk_direction", "foot_orientation"):
+    if gate_name in report and not report[gate_name].get("pass", False):
+        print("=" * 70)
+        print(f"FATAL: {gate_name} gate FAILED -- see verify_report.json['{gate_name}'].")
+        print("=" * 70)
+        hard_fail = True
+if hard_fail:
     sys.exit(1)

@@ -247,6 +247,100 @@ frames, ~6.0s), `griffin_walk.mp4` (240 frames, ~4.0s), `griffin_walk_side.mp4` 
 ~4.0s), `griffin_attack.mp4` (180 frames, ~3.0s) -- all 720x1280 h264/yuv420p. Not committed
 (scratch deliverables, per every prior round's convention).
 
+## v12: fix foot orientation (crossed/twisted toes, flipped pads) + add a foot_orientation
+## verify.py gate (producer review round 12)
+
+Producer review of the v11 videos: FR's toes looked crossed/twisted and the hind feet looked
+pads-up/flipped.
+
+**Diagnosis first, per the task brief.** Built a dedicated diagnostic (`work/foot_diag.py` +
+`work/foot_angle_diag.py`, scratch-only) rendering close-ups of all four feet at the prepped
+(unrigged) mesh, bind pose, four Move phases (contact/passing/lift/mid-swing), and an Idle frame,
+and numerically printing each foot/toe bone's world-space direction (angle from world-down, angle
+from FORWARD) at each of those states. Bind and the unrigged mesh looked/measured clean -- this
+immediately ruled out a landmark/weighting problem (if the foot were wrong at bind, the mesh or the
+toe/foot landmark placement would be the cause; it wasn't) -- confirming the bug was specifically
+in `anim/gait.py`'s per-frame IK/foot-rotation logic, not the rig or weights.
+
+**Root cause #1 (the dramatic crossing/flipping): foot-bone orientation was numerically unstable
+during swing.** The old code built the foot bone's world matrix by literally aiming its Y axis at
+the raw IK target (`aim_matrix(ankle_w, reached, up_hint)`) every frame. Measured directly: BL's
+foot-bone direction, projected to the ground plane, stayed within 0.4 deg of FORWARD during every
+stance frame, but flipped to a full **180 deg** from FORWARD during the lift/mid-swing frames --
+a genuine orientation reversal (confirmed both numerically and in close-up renders showing a
+tangled/crossed leg silhouette), not a rendering artefact. The swing arc's lifted target and the
+ankle's own IK-derived position can end up on geometrically different sides of each other partway
+through the arc, and the bone's Y axis (its only orientation constraint) just followed wherever
+that raw geometry pointed, with no independent control over "does this look like a natural foot."
+
+**Fix #1:** decoupled foot/toe ORIENTATION from the raw IK target position entirely (positions --
+ankle_w, the overall leg's reach/stride/lift -- are completely unchanged, so stride %, knee-angle
+range, and foot-slide results are identical to v11). `set_leg_pose` now holds each leg's foot and
+toe bones at a FIXED, bind-pose-derived direction (`foot_stance_dir`/`toe_stance_dir`, precomputed
+once) for the entire STANCE window -- literally "stays planted, no roll/twist while planted," not
+just approximately so -- and during SWING smoothly rotates that same direction into a small,
+bounded toe-down curl (`FOOT_CURL_MAX_DEG=20`, `TOE_CURL_MAX_DEG=28`, around world X -- the stable
+sideways axis this file's up_hint convention already uses) that peaks at mid-swing and returns
+to the identical stance direction by the next touchdown, so there's no discontinuity at either
+phase boundary and no possibility of the old approach's wild direction reversal.
+
+**Root cause #2 (a subtler, always-present "sole normal" misalignment): the toe bone's rest roll
+and its posed roll used two unrelated conventions.** This rig's bones are built with Blender's
+default roll (never set explicitly -- see `winged_quadruped.py`'s `build_bones`), while the posed
+toe bone's roll is built entirely independently by `aim_matrix`'s `up_hint`-based construction. The
+toe bone's Y axis (toe-pointing direction) is roll-independent and was already correct throughout
+(confirmed: 0.4-8.5 deg from FORWARD at every phase, even before fix #1) -- but the perpendicular
+"which way is the sole" axis is roll-dependent, and the old shared `up_hint` (world X, chosen for
+the mostly-vertical thigh/shin/foot bones to avoid ill-conditioned cross products) has no
+up-alignment property for the toe bone at all. Confirmed via the new gate: 90-176 deg off, on every
+leg, even during stance, even after fix #1 alone.
+
+**Fix #2:** the toe bone specifically now gets its own `up_hint`, world -Z (not the shared
+per-leg one) -- its Y axis is close to horizontal for every leg on this rig, which makes world Z a
+well-conditioned choice (not near-parallel) and, by `aim_matrix`'s "look-at with an up vector"
+construction, directly aligns the toe bone's local Z axis with world-up. (The sign took one
+empirical check to get right -- world +Z actually produced a Z axis pointing mostly DOWN given this
+file's specific x_axis/z_axis cross-product ordering; -Z gives the intended up-pointing result,
+confirmed via the gate.)
+
+**New `verify.py` gate, `foot_orientation`:** during stance, checks each foot's toe-direction
+(the toe bone's own Y axis, ground-projected) stays within 25 deg of FORWARD, and its sole-normal
+(the toe bone's local Z axis, which fix #2 makes meaningful) stays within 20 deg of world-up.
+Like `walk_direction`, this is a correctness gate, not a polish one, so it also calls `sys.exit(1)`
+on failure. Initial version of this gate tried to auto-detect "which rest-local axis is up" by
+reading the REST matrix -- this seemed more general/robust but was actually wrong for this fix
+specifically, since rest and pose intentionally use unrelated roll conventions (see root cause #2);
+switched to checking the local Z axis directly, since that's the one `gait.py`'s fix #2 actually
+controls and guarantees.
+
+**Result, all four legs:** `foot_orientation` PASSES -- worst toe-direction 0.4-7.7 deg (well under
+the 25 deg budget), worst sole-normal 7.7-18.4 deg (under the 20 deg budget). `walk_direction`
+(round 11's gate) still passes unchanged. The pre-existing edge-stretch gate is untouched and still
+fails at the same values as v11 (Move 9.53x, Attack 3.31x) -- confirms this round's fix didn't
+move that unrelated weighting issue.
+
+**Visual confirmation, all four feet, as required:** a labelled sheet (`work/foot_diag_v12_all4/
+ALL_4_FEET_SHEET.png`, scratch-only) showing bind + the four Move phases + Idle for FL/FR/BL/BR,
+side view -- every foot looks natural and consistent across every state, no crossing, no flipped
+pads, no twisting. Separately cropped 4 consecutive frames from the actual 60-frame MP4 source
+sequence (`video_move_side`, frames 40-43) at the leg/foot region: both talons point forward-down
+with distinct, non-crossing claws across all 4 frames, confirming the fix holds at the real video
+frame rate, not just at the 10-frame contact-sheet sampling.
+
+**Per-sheet frame-by-frame inspection (required before reporting):** `contact_sheet_idle.png` --
+clean (Idle doesn't drive leg bones through gait.py, so it was never affected). `contact_sheet_
+move.png` and `contact_sheet_move_side.png` -- all 10 frames clean, feet read naturally throughout,
+confirmed via a dedicated feet-only zoomed crop of every frame. `contact_sheet_attack.png` -- clean
+except the same pre-existing frame-5 wing blotch from v10/v11 (untouched, unrelated to this fix,
+Attack doesn't use gait.py's leg logic either).
+
+**MP4s regenerated** exactly as specified (same `--pilot-sequence`/ffmpeg parameters as v11) into
+`scratchpad/anim-pilot/video_v12/`: `griffin_reel.mp4`, `griffin_idle.mp4`, `griffin_walk.mp4`,
+`griffin_walk_side.mp4`, `griffin_attack.mp4` -- all 720x1280 h264/yuv420p. Not committed (scratch
+deliverables).
+
+Mesh/export unchanged except the new Move action: 8000 tris, 37 bones, GLB 0.848 MiB.
+
 ## v9: max-edge-stretch gate + weight/render fixes -- partial progress, honestly not fully resolved
 ## (lead-review round 9)
 
