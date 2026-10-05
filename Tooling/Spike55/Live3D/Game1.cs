@@ -46,6 +46,29 @@ namespace BeastCraft.Spike55.Live3D
         private Texture2D _backdropTexture;
         private int _headNodeIndex;
 
+        // v18 (wingless quadrupeds, pilot-model framing fix): the loaded _bodyModel's own bind-pose
+        // height (max Y - min Y, Y-up per glTF/this engine's convention), measured once in
+        // LoadContent from the same vertex-position loop that already computes the hex-board X/Z
+        // extent just below. Every creature in this pipeline shares the SAME 2.0-unit normalised-
+        // height convention (common.normalise_transform's default), so this is 2.0 for the Griffin
+        // and for every other creature -- but RebuildCameraFitInstances' pilot-mode camera fit used
+        // to assume a HARDCODED 2.2f height margin tuned to the Griffin specifically, which silently
+        // stopped being "model height + a small margin" the moment a creature with a different
+        // bind-pose proportions (not height -- footprint) loaded, because a wide/low creature also
+        // changes HexBoard's own scale (set from the model's X/Z extent, a few lines below), shifting
+        // where instances get placed relative to that same fixed 2.2f margin. Lead review: "Golem
+        // fills/overflows the frame" -- confirmed this was the mechanism, not a per-species scale
+        // factor (there isn't one; every model loads at its own native 2.0-unit-tall glTF scale).
+        private float _bodyModelHeight = 2.0f;
+        // Same idea as _bodyModelHeight, for the model's own horizontal (X/Z) half-extent -- see
+        // RebuildCameraFitInstances' use of it. The Griffin's own footprint is modest relative to its
+        // height (most of its apparent "size" is the 2.0-unit height + wingspan, which the pre-
+        // existing fixed 1.4f edge margin already covered); a wide/low creature like Golem has a
+        // SUBSTANTIAL footprint relative to its height that the old margin never accounted for at
+        // all (ApplyCamera's sample set is one centre point + a vertical height margin per instance
+        // -- no horizontal extent), which is the actual "fills/overflows the frame" mechanism.
+        private float _bodyModelFootprintHalf = 0.7f;
+
         // Anim-pilot griffin (issue #68, Tooling/Animation): when --pilot-sequence is given, _bodyModel
         // is griffin_anim.glb instead of griffin_live.glb (see LoadContent) -- a 25-bone rig with three
         // named clips (Idle/Move/Attack) and real spring-joint bones, vs. the fourth pass's 11-bone,
@@ -307,7 +330,11 @@ namespace BeastCraft.Spike55.Live3D
             // rig_templates/winged_quadruped.py), so the node-name lookups below branch on which file was
             // loaded rather than needing a second code path.
             bool pilotMode = _options.PilotSequenceMode;
-            string bodyGlbName = pilotMode ? "griffin_anim.glb" : "griffin_live.glb";
+            // v18: --pilot-model overrides which creature's exported GLB/events sidecar this loads
+            // (see LaunchOptions.PilotModel's own comment) -- defaults to "griffin" so every existing
+            // --pilot-sequence call keeps loading griffin_anim.glb/griffin_anim_events.json exactly
+            // as before.
+            string bodyGlbName = pilotMode ? _options.PilotModel + "_anim.glb" : "griffin_live.glb";
             _bodyModel = GltfSkinnedModel.Load(Path.Combine(contentRoot, "model", bodyGlbName));
             _crestModel = GltfSkinnedModel.Load(Path.Combine(contentRoot, "model", "crest_alt.glb"));
             _headNodeIndex = AnimatedPose.FindNodeIndexByName(_bodyModel, pilotMode ? "head" : "bone_head");
@@ -317,11 +344,16 @@ namespace BeastCraft.Spike55.Live3D
                 // Tuning by eye against the review GIF, not derived from any physical measurement (see
                 // SpringBone.cs's header comment): the tail is heavier/longer and settles slower (lower
                 // stiffness, more damping) than a light wing feather tip.
-                _springTail = new SpringJointConfig(AnimatedPose.FindNodeIndexByName(_bodyModel, "tail_04"), 90f, 6f);
+                // v18 round 5: tail_04 is the Griffin's tail-TIP tuft; on other creatures it can be a
+                // mid-tail bone (Basilisk: tail_05 hangs off it), where translating it by the spring's
+                // lagged offset kinks the tail in-engine. Griffin only (-1 = the existing no-op path).
+                int tailSpringNode = string.Equals(_options.PilotModel, "griffin", StringComparison.OrdinalIgnoreCase)
+                    ? AnimatedPose.FindNodeIndexByName(_bodyModel, "tail_04") : -1;
+                _springTail = new SpringJointConfig(tailSpringNode, 90f, 6f);
                 _springWingL = new SpringJointConfig(AnimatedPose.FindNodeIndexByName(_bodyModel, "wing_L_03"), 140f, 8f);
                 _springWingR = new SpringJointConfig(AnimatedPose.FindNodeIndexByName(_bodyModel, "wing_R_03"), 140f, 8f);
 
-                string eventsSidecarPath = Path.Combine(contentRoot, "model", "griffin_anim_events.json");
+                string eventsSidecarPath = Path.Combine(contentRoot, "model", _options.PilotModel + "_anim_events.json");
                 _pilotEventMarkers = LoadPilotEventMarkers(eventsSidecarPath);
                 _pilotClipLoop = LoadPilotClipLoop(eventsSidecarPath);
             }
@@ -336,14 +368,22 @@ namespace BeastCraft.Spike55.Live3D
             // the now-relevant column axis -- fixed by taking the larger of the two bind-pose extents,
             // so hex spacing comfortably covers whichever axis ends up where post-yaw.
             float minX = float.MaxValue, maxX = float.MinValue, minZ = float.MaxValue, maxZ = float.MinValue;
+            float minY = float.MaxValue, maxY = float.MinValue;
             foreach (var p in _bodyModel.Positions)
             {
                 minX = Math.Min(minX, p.X);
                 maxX = Math.Max(maxX, p.X);
                 minZ = Math.Min(minZ, p.Z);
                 maxZ = Math.Max(maxZ, p.Z);
+                minY = Math.Min(minY, p.Y);
+                maxY = Math.Max(maxY, p.Y);
             }
-            HexBoard.SetScale(Math.Max(maxX - minX, maxZ - minZ));
+            float footprint = Math.Max(maxX - minX, maxZ - minZ);
+            HexBoard.SetScale(footprint);
+            if (maxY > minY)
+                _bodyModelHeight = maxY - minY;
+            if (footprint > 0f)
+                _bodyModelFootprintHalf = footprint / 2f;
 
             _baseColorTexture = LoadTextureFromBytes(_bodyModel.BaseColorImageBytes);
 
@@ -872,13 +912,26 @@ namespace BeastCraft.Spike55.Live3D
                 boardCenterNum /= centerCount;
             var target = new XnaVector3(boardCenterNum.X, 0.85f, boardCenterNum.Z);
 
+            // v18: height margin was hardcoded 2.2f (Griffin's own 2.0-unit height + a 0.2 clearance
+            // for its wingspan/outline) -- derived from the actual loaded model's own bind-pose
+            // height instead (_bodyModelHeight, measured once in LoadContent) so a differently-
+            // proportioned creature (e.g. Golem, wide/low rather than tall) gets a margin sized to
+            // ITS own height, not the Griffin's. Every creature in this pipeline shares the same
+            // 2.0-unit normalised-height convention, so this is unchanged (2.2f) for the Griffin.
+            float instanceHeightMargin = _bodyModelHeight + 0.2f;
             var samples = new List<(XnaVector3, float)>();
             foreach (var inst in _instances)
-                samples.Add((new XnaVector3(inst.World.M41, inst.World.M42, inst.World.M43), 2.2f));
+                samples.Add((new XnaVector3(inst.World.M41, inst.World.M42, inst.World.M43), instanceHeightMargin));
             foreach (var w in _swarmWorld)
                 samples.Add((new XnaVector3(w.M41, w.M42, w.M43), 0.6f)); // swarmlings are much shorter than beasts
 
-            const float margin = 1.4f; // wing spread + outline thickness clearance around each beast
+            // v18: margin was a fixed 1.4f ("wing spread + outline thickness clearance"), tuned for
+            // the Griffin's own modest footprint-vs-height ratio. Widened per the actual loaded
+            // model's own horizontal half-extent (_bodyModelFootprintHalf) when that's the larger
+            // number -- fixes a wide/low creature (Golem) overflowing the frame, since ApplyCamera's
+            // sample set otherwise has no horizontal-extent information at all (just a centre point
+            // + a vertical height margin per instance). Unchanged (1.4f) for the Griffin.
+            float margin = Math.Max(1.4f, _bodyModelFootprintHalf + 0.3f);
             ApplyCamera(target, samples, margin);
         }
 
