@@ -49,6 +49,92 @@ BLEND = args["blend"]
 OUT = args["out"]
 FPS = int(args.get("fps", 24))
 CYCLE_SECONDS = float(args.get("cycle-seconds", 1.0))
+CREATURE = args.get("creature", "griffin")
+
+# Per-creature gait "character" (v18, wingless quadrupeds): every number here was already a named
+# tunable constant (round 5-13's own tuning knobs) EXCEPT the tail/neck/head/spine_02 sinusoid
+# amplitudes a few hundred lines down, which were bare literals -- those are now scaled by
+# tail_amp/head_amp instead of rewritten per-creature, to keep this a small, auditable diff rather
+# than a second copy of the per-frame loop. "griffin" reproduces every one of v17's hardcoded
+# values EXACTLY (verified byte-identical: re-ran gait.py before/after this change against the same
+# rigged .blend and hashed the baked Move action's fcurve keyframes -- see the handback report).
+# cycle-seconds (speed) is NOT in here -- that was already a CLI arg (--cycle-seconds), used as-is
+# per creature (Golem slow/heavy -> a larger value; Kirin light/elegant -> a smaller one).
+GAIT_PARAMS = {
+    "griffin":  dict(duty=0.6,  body_bob=0.025, foot_curl=20.0, toe_curl=28.0, toe_fan_curl=8.0,
+                      raw_stride=0.23, crouch_min=0.06, crouch_max=0.14, scapula_swing=12.0,
+                      pelvis_roll=4.0, pelvis_yaw=3.0, tail_amp=1.0, head_amp=1.0),
+    # Golem: slow, heavy, deliberate -- short stride, minimal head bob, more side-to-side body sway
+    # (pelvis roll) than fore-aft, barely any tail motion (it's a short stub anyway).
+    "golem":    dict(duty=0.70, body_bob=0.012, foot_curl=3.0, toe_curl=3.0, toe_fan_curl=8.0,
+                      raw_stride=0.14, crouch_min=0.03, crouch_max=0.07, scapula_swing=6.0,
+                      pelvis_roll=7.0, pelvis_yaw=2.0, tail_amp=0.3, head_amp=0.25),
+    # Kirin: elegant and light -- longer stride, a visible head bob on the long neck, a flicking
+    # tail, less side-to-side sway (a light-footed gait, not a lumbering one).
+    "kirin":    dict(duty=0.52, body_bob=0.032, foot_curl=22.0, toe_curl=30.0, toe_fan_curl=8.0,
+                      raw_stride=0.30, crouch_min=0.05, crouch_max=0.10, scapula_swing=14.0,
+                      pelvis_roll=3.0, pelvis_yaw=3.0, tail_amp=2.2, head_amp=2.5),
+    # Tarasque: short-legged waddle -- short stride, shell rocks side to side (big pelvis roll/yaw),
+    # grumpy head-low (small head amplitude, no proud bob), short stub tail barely moves.
+    "tarasque": dict(duty=0.68, body_bob=0.016, foot_curl=12.0, toe_curl=14.0, toe_fan_curl=8.0,
+                      raw_stride=0.15, crouch_min=0.03, crouch_max=0.06, scapula_swing=7.0,
+                      pelvis_roll=8.0, pelvis_yaw=5.0, tail_amp=0.3, head_amp=0.35),
+    # Basilisk: low sprawling lizard -- lateral-sequence gait (DUTY close to Griffin's), continuous
+    # exaggerated tail sway (its own long tail is the character's signature motion) and a yaw-heavy
+    # body S-curve (pelvis_yaw >> pelvis_roll -- a lizard's sprawl sways side to side in the ground
+    # plane, not up/down).
+    "basilisk": dict(duty=0.58, body_bob=0.018, foot_curl=18.0, toe_curl=22.0, toe_fan_curl=8.0,
+                      raw_stride=0.22, crouch_min=0.08, crouch_max=0.15, scapula_swing=10.0,
+                      pelvis_roll=4.0, pelvis_yaw=9.0, tail_amp=3.5, head_amp=1.2),
+}
+# v18 round 4 (lead review of contact_sheet_final: Golem/Tarasque Move tore the chest/forelegs,
+# Kirin's Move lurched, Basilisk's tail swung below ground). Root causes, measured directly (a
+# per-bone world-space swing/twist decomposition of every baked Move frame, scratchpad
+# work5/diag_wtwist.py), not guessed:
+#   1. aim_matrix(..., up_hint) rebuilds scapula/thigh/shin orientation from a world up_hint, which
+#      ignores the bone's REST ROLL. The Griffin's rest roll happens to sit a constant -90 deg from
+#      that construction on every frame (a rigid offset its 17 tuning rounds were built on); the
+#      quadruped template's explicit align_roll_leg roll does not, so these rigs' scapula/thigh/
+#      shin were twisted by a frame-varying 40-180 deg about their own axes -- a candy-wrapper twist
+#      of the leg/shoulder mesh = the torn chest. Fix: `fk_anchored` creatures aim those bones with
+#      MINIMUM TWIST from their FK-neutral orientation (aim_min_twist below).
+#   2. The IK hip anchors were fixed points (rest hip minus a per-leg crouch) independent of the
+#      body's own bob/roll/yaw, and the scapula head stayed at its REST position while spine_02 (its
+#      parent) dropped by the crouch -- so shoulder/hip skin sheared every frame. Fix: anchors are
+#      read from the actually-posed pelvis/spine_02 frame (FK-consistent).
+#   3. Per-leg crouch was linearly mapped across the four legs' rest-reach ratios; for near-straight
+#      stumpy legs (ratios 0.996-1.000) that maps NOISE onto the full [min,max] band (Golem FL 0.06 vs
+#      BL 0.14) and the stride was an absolute 0.14-0.22*H regardless of leg length (Golem: a 0.28
+#      half-stride on 0.70 legs). Fix: uniform crouch = crouch_frac * mean leg length, half-stride =
+#      stride_frac * each leg's own length.
+#   4. Near-straight legs' landmark-derived knee pole is noise (knee 0.5-2% of leg length off the
+#      hip-foot line: Golem FR bowed sideways). Fix: legs straighter than `straight_leg_thresh` bow
+#      backward (-FORWARD), the Griffin/Kirin convention.
+#   5. Tail sway was pitch (local X) for every tail bone; on the quadruped template's Z-up roll that
+#      swings the tail up/down (Basilisk's tail went below ground). Fix: tail_yaw/tail_pitch params.
+#   6. Pelvis roll/yaw were local Euler on a bone that runs from root (near the ground) UP to the
+#      pelvis landmark, so "roll" (local Y) was really yaw about a near-vertical axis. Fix: world-axis
+#      roll about FORWARD and yaw about world Z, conjugated into the pelvis's local frame.
+# Griffin has no `fk_anchored` key, so every Griffin code path below is untouched (byte-identical
+# baked Move action re-verified).
+_FK_COMMON = dict(fk_anchored=True, straight_leg_thresh=0.06, foot_curl=6.0, toe_curl=10.0)
+GAIT_PARAMS["golem"].update(_FK_COMMON, cycle_seconds=1.3, crouch_frac=0.075, stride_frac=0.12,
+                            lift_frac=0.10, scapula_swing=3.0, pelvis_roll=3.0, pelvis_yaw=2.0,
+                            body_bob=0.006, tail_yaw=3.0, tail_pitch=0.0, head_amp=0.3)
+GAIT_PARAMS["tarasque"].update(_FK_COMMON, cycle_seconds=1.2, crouch_frac=0.075, stride_frac=0.13,
+                               lift_frac=0.10, scapula_swing=3.0, pelvis_roll=3.5, pelvis_yaw=3.0,
+                               body_bob=0.006, tail_yaw=4.0, tail_pitch=0.0, head_amp=0.35)
+GAIT_PARAMS["kirin"].update(_FK_COMMON, cycle_seconds=1.0, crouch_frac=0.05, stride_frac=0.17,
+                            lift_frac=0.16, scapula_swing=6.0, pelvis_roll=2.0, pelvis_yaw=2.0,
+                            body_bob=0.008, tail_yaw=6.0, tail_pitch=2.0, head_amp=1.2,
+                            duty=0.6)
+GAIT_PARAMS["basilisk"].update(_FK_COMMON, cycle_seconds=1.1, crouch_frac=0.04, stride_frac=0.16,
+                               lift_frac=0.10, scapula_swing=5.0, pelvis_roll=1.5, pelvis_yaw=5.0,
+                               body_bob=0.004, tail_yaw=7.0, tail_pitch=0.0, head_amp=0.8)
+GP = GAIT_PARAMS.get(CREATURE, GAIT_PARAMS["griffin"])
+FK_ANCHORED = GP.get("fk_anchored", False)
+if "cycle_seconds" in GP and "cycle-seconds" not in args:
+    CYCLE_SECONDS = GP["cycle_seconds"]
 os.makedirs(OUT, exist_ok=True)
 
 bpy.ops.wm.open_mainfile(filepath=BLEND)
@@ -200,6 +286,24 @@ def aim_matrix(head_pos, tail_pos, up_hint=mathutils.Vector((0, 0, 1))):
     return mat
 
 
+def aim_min_twist(pb, head_pos, tail_pos, parent_world, parent_rest):
+    """Round-4 fix 1 (fk_anchored creatures only): world matrix with translation=head_pos and +Y
+    aimed head->tail, reached by the MINIMUM rotation from the bone's FK-neutral orientation (its
+    rest orientation carried by the parent's actual pose, i.e. identity matrix_basis) -- so the
+    bone never twists about its own axis relative to its parent, whatever its rest roll is. Unlike
+    aim_matrix(+up_hint), which rebuilds the roll from a world axis and so twisted these rigs'
+    scapula/thigh/shin by 40-180 deg per frame."""
+    neutral = (parent_world @ parent_rest.inverted() @ pb.bone.matrix_local).to_3x3().normalized()
+    y_now = neutral.col[1].normalized()
+    y_want = tail_pos - head_pos
+    if y_want.length < 1e-7:
+        y_want = y_now
+    swing = y_now.rotation_difference(y_want.normalized()).to_matrix()
+    mat = (swing @ neutral).to_4x4()
+    mat.translation = head_pos
+    return mat
+
+
 def set_bone_world_matrix_direct(pb, desired_world, parent_world, parent_rest):
     """Sets pb's pose directly to `desired_world` (an armature-space 4x4 matrix) by computing
     matrix_basis analytically from Blender's own pose-chain formula:
@@ -233,21 +337,21 @@ def set_bone_world_matrix_direct(pb, desired_world, parent_world, parent_rest):
 # COMBINED shin+foot length (ankle-to-ground), not just the shin -- see solve_2bone_ik's docstring
 # for why: the IK target is the ground-contact point, so the second "effective bone" for the 2-bone
 # solve must span all the way from the knee to the ground, not stop at the ankle.
-DUTY = 0.6              # fraction of the cycle each foot spends in stance
-BODY_BOB = 0.025 * H    # vertical bob amplitude, two bob cycles per stride (both feet contribute)
+DUTY = GP["duty"]              # fraction of the cycle each foot spends in stance
+BODY_BOB = GP["body_bob"] * H    # vertical bob amplitude, two bob cycles per stride (both feet contribute)
 # Round 12 (producer review -- foot orientation fix): small toe-down curl amplitude during swing,
 # peaking at mid-swing and easing back to the flat stance direction by touchdown. "Small" per the
 # task brief's own wording -- see set_leg_pose's docstring for why this replaces the old
 # "aim the foot/toe bone literally at the raw IK target" approach.
-FOOT_CURL_MAX_DEG = 20.0
-TOE_CURL_MAX_DEG = 28.0  # toes curl a bit more than the pastern/foot segment, same peak timing
+FOOT_CURL_MAX_DEG = GP["foot_curl"]
+TOE_CURL_MAX_DEG = GP["toe_curl"]  # toes curl a bit more than the pastern/foot segment, same peak timing
 # Round 13 (producer review -- toe-fan fix): a foreleg's three splayed toes (toe_in/mid/out) stay
 # EXACTLY at their bind-pose fan during stance (per the task brief: "no curl" while planted -- a
 # stricter requirement than the single-toe TOE_CURL_MAX_DEG above, which DID allow some stance-
 # adjacent easing via the shared foot curl) and each curls up to this amount, around its OWN hinge
 # axis, during swing only.
-TOE_FAN_CURL_MAX_DEG = 8.0
-RAW_STRIDE = 0.23 * H   # desired fore-aft HALF-stride excursion (foot sweeps +RAW_STRIDE to
+TOE_FAN_CURL_MAX_DEG = GP["toe_fan_curl"]
+RAW_STRIDE = GP["raw_stride"] * H   # desired fore-aft HALF-stride excursion (foot sweeps +RAW_STRIDE to
 # -RAW_STRIDE), before the per-leg reach clamp. Full peak-to-peak foot travel is 2x this -- the
 # lead-review fix round's "readable stride, ~25-40% of body length" target is interpreted as that
 # peak-to-peak distance, so this aims for ~30% of H unclamped, clamped down per-leg by actual IK
@@ -273,8 +377,8 @@ RAW_STRIDE = 0.23 * H   # desired fore-aft HALF-stride excursion (foot sweeps +R
 # natural slack (lowest ratio) gets the least. This widens the original "6-10% of H" band a little
 # at the top end specifically to buy FR enough IK slack to clear 20%; legs that already met the
 # target keep a crouch close to the original flat 8%.
-CROUCH_MIN = 0.06 * H
-CROUCH_MAX = 0.14 * H
+CROUCH_MIN = GP["crouch_min"] * H
+CROUCH_MAX = GP["crouch_max"] * H
 _rest_reach_ratio = {}
 for _side in leg_sides:
     _hip_rest0, _knee0 = rest_head_tail(f"leg_{_side}_thigh")
@@ -293,6 +397,36 @@ for _side in leg_sides:
     CROUCH_BY_SIDE[_side] = CROUCH_MIN + _frac * (CROUCH_MAX - CROUCH_MIN)
 print(f"PER-LEG CROUCH: ratios={ {s: round(r,3) for s,r in _rest_reach_ratio.items()} } "
       f"crouch={ {s: round(c,4) for s,c in CROUCH_BY_SIDE.items()} }")
+if FK_ANCHORED:
+    # Round-4 fix 3 (see GAIT_PARAMS' note): one UNIFORM crouch, scaled to this creature's own mean
+    # leg length -- the body is a single rigid parent, so in FK-anchored mode a per-leg crouch would
+    # just mean the IK anchors disagree with where the body actually is.
+    _leg_lengths = {}
+    for _side in leg_sides:
+        _h0, _k0 = rest_head_tail(f"leg_{_side}_thigh")
+        _, _a0 = rest_head_tail(f"leg_{_side}_shin")
+        _, _f0 = rest_head_tail(f"leg_{_side}_foot")
+        _leg_lengths[_side] = (_k0 - _h0).length + (_a0 - _k0).length + (_f0 - _a0).length
+    _uniform_crouch = GP["crouch_frac"] * sum(_leg_lengths.values()) / len(_leg_lengths)
+    # ...but never less than what each leg needs to actually reach its own stride at the bob peak
+    # with this side's pelvis-roll lift (splayed/near-straight legs -- Tarasque -- need more).
+    for _side in leg_sides:
+        # The IK chain in this mode is hip->knee->ANKLE (thigh+shin); the foot keeps its rest
+        # orientation, so the ankle target is the foot target minus the rest foot vector.
+        _h0, _k0 = rest_head_tail(f"leg_{_side}_thigh")
+        _, _a0 = rest_head_tail(f"leg_{_side}_shin")
+        _l_ik = (_k0 - _h0).length + (_a0 - _k0).length
+        _d = _a0 - _h0
+        _fwd = abs(_d.dot(FORWARD))
+        _lat_sq = (_d - _d.dot(FORWARD) * FORWARD).xy.length_squared
+        _want = (0.98 * _l_ik) ** 2 - _lat_sq - (_fwd + GP["stride_frac"] * _leg_lengths[_side]) ** 2
+        if _want > 0:
+            _need = ((_h0.z - _a0.z) - math.sqrt(_want) + BODY_BOB
+                     + abs(_h0.x) * math.sin(math.radians(GP["pelvis_roll"])))
+            _uniform_crouch = max(_uniform_crouch, _need)
+    CROUCH_BY_SIDE = {s: _uniform_crouch for s in leg_sides}
+    print(f"FK-ANCHORED: leg_lengths={ {s: round(v,3) for s,v in _leg_lengths.items()} } "
+          f"uniform crouch={_uniform_crouch:.4f}")
 CROUCH = sum(CROUCH_BY_SIDE.values()) / len(CROUCH_BY_SIDE)  # cosmetic root/body bob only (a single
 # rigid global transform can't differ per leg) -- the mean of the per-leg values, not a separate
 # tuned constant, so the visual torso drop stays representative of what the legs are actually doing.
@@ -302,11 +436,15 @@ CROUCH = sum(CROUCH_BY_SIDE.values()) / len(CROUCH_BY_SIDE)  # cosmetic root/bod
 # foreleg's effective hip position, in phase with that leg's own swing, giving MORE apparent
 # stride than knee articulation alone would (see the per-frame loop for how this composes with
 # CROUCH's reach-margin gain).
-SCAPULA_SWING_DEG = 12.0  # middle of the requested 10-15 degree band
+SCAPULA_SWING_DEG = GP["scapula_swing"]  # Griffin: middle of the requested 10-15 degree band
 # Pelvis roll/yaw (round 5): a small weight-shift motion in phase with the hind legs' own stride
 # frequency (not the 2x-per-cycle body bob) -- subtle secondary motion, not a reach mechanism.
-PELVIS_ROLL_DEG = 4.0
-PELVIS_YAW_DEG = 3.0
+PELVIS_ROLL_DEG = GP["pelvis_roll"]
+PELVIS_YAW_DEG = GP["pelvis_yaw"]
+TAIL_AMP = GP["tail_amp"]    # scales the tail sinusoid amplitudes a few hundred lines down
+HEAD_AMP = GP["head_amp"]    # scales spine_02/neck_01/head's sinusoid amplitudes (both the early
+# spine02_local_pitch computation the leg IK is solved against AND the later keyframed value below
+# MUST use the identical formula -- see both call sites' own comments)
 
 legs = {}
 scapula_rest = {}  # side -> (head, tail, rest_matrix) for front legs only
@@ -366,6 +504,15 @@ for side in leg_sides:
     # instead of an immediate floor.
     SAFETY = 0.95
     reach_margin = min(max_reach, max(max_reach * SAFETY, (foot - hip).length + 0.02 * H))
+    leg_raw_stride = RAW_STRIDE
+    if FK_ANCHORED:
+        # The hip rides the body in this mode, so size the reach check for the HIGHEST the hip gets
+        # (bob peak + pelvis-roll lift on this side), and keep a real 2% knee-bend margin -- a
+        # straight stump has no slack otherwise. Stride scales with this leg's own length.
+        _roll_lift = abs(hip_rest.x) * math.sin(math.radians(GP["pelvis_roll"]))
+        hip = hip_rest - mathutils.Vector((0, 0, CROUCH_BY_SIDE[side] - BODY_BOB - _roll_lift))
+        reach_margin = (L1 + shin_len) * 0.98  # IK chain = thigh+shin to the ankle (see below)
+        leg_raw_stride = GP["stride_frac"] * max_reach
     # All four feet are grounded in this mesh's own bind pose (producer-confirmed, see
     # rig_templates/winged_quadruped.py's docstring) -- ground_z=0 for every leg, front or back,
     # no "forelegs hover at bind height" special case. The horizontal-slicing landmark detection
@@ -373,6 +520,11 @@ for side in leg_sides:
     # proportional fold), so there is no longer an artificially extreme bind-pose knee bend to
     # animate across.
     ground_z = 0.0
+    if FK_ANCHORED:
+        # The foot is held at its bind rotation through stance, so the foot JOINT sits at its own
+        # rest height when the toe is grounded -- target that, not z=0 (which a fully-extended
+        # stump can't reach, clamping the solve every frame).
+        ground_z = foot.z
     # Decompose (foot_rest - hip) relative to FORWARD instead of assuming the fore-aft sweep axis
     # is literally world Y: `fwd_offset` is the signed component already along FORWARD (what the
     # stride sweep moves along), `base_sq` is everything perpendicular to it (sideways ground
@@ -381,6 +533,8 @@ for side in leg_sides:
     # x^2+z^2 / foot.y-hip.y formulas exactly; for any other ground-plane heading it generalizes
     # correctly instead of silently assuming an axis.
     diff = mathutils.Vector((foot.x - hip.x, foot.y - hip.y, ground_z - hip.z))
+    if FK_ANCHORED:
+        diff = ankle - hip  # the ankle is the IK target in this mode (foot vector held at rest)
     fwd_offset = diff.dot(FORWARD)
     perp = diff - fwd_offset * FORWARD
     base_sq = perp.length_squared
@@ -398,13 +552,17 @@ for side in leg_sides:
         # non-constant stance velocity, failing verify.py's foot-slide gate at cv=0.68 against a
         # 0.35 threshold even though the stride itself already read as "barely moves"). Respecting
         # the computed safe value even when it's smaller than the floor fixes this at the root.
-        safe_stride = max(0.005 * H, min(r - abs(fwd_offset), RAW_STRIDE))
+        safe_stride = max(0.005 * H, min(r - abs(fwd_offset), leg_raw_stride))
+    if FK_ANCHORED:
+        hip = hip_rest - mathutils.Vector((0, 0, CROUCH_BY_SIDE[side]))  # nominal (per-frame FK overrides)
 
     # Lift scales WITH the solved stride (not a fixed absolute height) so a geometrically-
     # constrained short stride (this Griffin's: the landmark-placed hip leaves little slack before
     # hitting max reach -- see safe_stride above) still reads as a proportionate short, quick step
     # rather than "barely moves forward but kicks way up," which a fixed large LIFT would produce.
     lift = max(0.02 * H, 0.9 * safe_stride)
+    if FK_ANCHORED:
+        lift = GP["lift_frac"] * max_reach
 
     # Lift SAFETY cap against the MINIMUM-reach clamp (not just the max-reach one safe_stride
     # already guards): as the swing arc lifts the foot toward z=lift, the vertical hip-to-target
@@ -523,7 +681,17 @@ for side in leg_sides:
         toe_local_curl_axis = toe_local_curl_axis.normalized() if toe_local_curl_axis.length > 1e-6 \
             else mathutils.Vector((1, 0, 0))
 
-    legs[side] = {"hip": hip, "L1": L1, "L2": L2, "foot_rest": foot, "toe_rest": toe,
+    leg_bend_dir = bend_dir_by_side.get(side, mathutils.Vector((0, 1, 0)))
+    if FK_ANCHORED:
+        # Round-4 fix 4: a near-straight leg's landmark-derived pole is noise -- bow it backward.
+        _hf = foot - hip_rest
+        _t = max(0.0, min(1.0, (knee - hip_rest).dot(_hf) / max(_hf.length_squared, 1e-9)))
+        _knee_off = (knee - (hip_rest + _hf * _t)).length / max(max_reach, 1e-6)
+        if _knee_off < GP["straight_leg_thresh"]:
+            leg_bend_dir = -FORWARD.copy()
+            print(f"LEG {side}: near-straight (knee offset {_knee_off:.3f} of leg length) -> "
+                  f"knee pole overridden to -FORWARD")
+    legs[side] = {"hip": hip, "hip_rest": hip_rest, "L1": L1, "L2": L2, "shin_len": shin_len, "foot_rest": foot, "toe_rest": toe,
                   "stride": safe_stride, "lift": lift, "_ankle_frac": ankle_frac, "ground_z": ground_z,
                   "knee_rest": knee, "ankle_rest": ankle,
                   "foot_len": foot_len, "toe_len": toe_len, "min_reach": min_reach,
@@ -531,7 +699,7 @@ for side in leg_sides:
                   "contact_offset_rest": contact_offset_rest,
                   "toe_local_curl_axis": toe_local_curl_axis,
                   "has_toe_fan": has_toe_fan, "toe_fan": toe_fan_data,
-                  "bend_dir": bend_dir_by_side.get(side, mathutils.Vector((0, 1, 0)))}
+                  "bend_dir": leg_bend_dir}
     print(f"LEG {side}: hip={tuple(round(c,3) for c in hip)} L1={L1:.3f} L2={L2:.3f} "
           f"max_reach={max_reach:.3f} rest_dist={(foot-hip).length:.3f} "
           f"safe_stride={safe_stride:.3f} (raw {RAW_STRIDE:.3f})")
@@ -647,6 +815,18 @@ def set_leg_pose(side, t, parent_world, parent_rest):
     # knee's true hip-relative solve. A handful of iterations converges quickly since the
     # relationship is smooth for the small corrections this mesh needs (a fixed point, not a
     # literal Newton solve, but well-behaved here).
+    if FK_ANCHORED:
+        # Round-4: the foot is held at its rest orientation (plus swing curl), so its vector is
+        # known exactly -- solve thigh+shin to the ANKLE = foot-joint target minus that vector.
+        # (The inherited solve below folds the foot into L2 and puts the ankle on the knee->ground
+        # line, then only corrects Z; with a long foot -- Kirin's hind cannon is 0.46 tall -- that
+        # left the stance sweep visibly non-linear: foot-slide cv 0.39.)
+        _foot_rot = (L["foot_rest_rot4"].to_3x3()
+                     @ mathutils.Matrix.Rotation(foot_curl_angle, 3, L["foot_local_curl_axis"]))
+        _ankle_target = ground_target - _foot_rot @ mathutils.Vector((0, L["foot_len"], 0))
+        knee_w, ankle_w = solve_2bone_ik(L["hip"], L["L1"], L["shin_len"], _ankle_target, bend_dir)
+        return _place_leg_bones(side, L, knee_w, ankle_w, stance, curl_s, foot_curl_angle,
+                                parent_world, parent_rest)
     contact_offset_now = mathutils.Matrix.Rotation(foot_curl_angle, 3, "X") @ L["contact_offset_rest"]
     knee_w, reached = solve_2bone_ik(L["hip"], L["L1"], L["L2"], ground_target, bend_dir)
     ankle_w = knee_w.lerp(reached, L["_ankle_frac"])
@@ -718,6 +898,15 @@ def set_leg_pose(side, t, parent_world, parent_rest):
     # blended mesh at the junction -- a toe anatomically just needs to follow its own forefoot
     # rigidly, not independently chase a world direction. Blender's own FK composition places the
     # toe correctly as a rigid extension of the (now correctly bind-preserving) foot.
+    return _place_leg_bones(side, L, knee_w, ankle_w, stance, curl_s, foot_curl_angle,
+                            parent_world, parent_rest)
+
+
+def _place_leg_bones(side, L, knee_w, ankle_w, stance, curl_s, foot_curl_angle, parent_world,
+                     parent_rest):
+    """Shared by both set_leg_pose paths: places thigh/shin/foot/toe(s) from the solved knee and
+    ankle (unchanged code, moved here verbatim from set_leg_pose so the fk_anchored path reuses
+    it)."""
     thigh_pb = arm_obj.pose.bones[f"leg_{side}_thigh"]
     shin_pb = arm_obj.pose.bones[f"leg_{side}_shin"]
     foot_pb = arm_obj.pose.bones[f"leg_{side}_foot"]
@@ -733,10 +922,18 @@ def set_leg_pose(side, t, parent_world, parent_rest):
     bd = L["bend_dir"]
     axis_candidates = [mathutils.Vector((1, 0, 0)), mathutils.Vector((0, 1, 0)), mathutils.Vector((0, 0, 1))]
     up_hint = min(axis_candidates, key=lambda ax: abs(ax.dot(bd)))
-    thigh_world = set_bone_world_matrix_direct(
-        thigh_pb, aim_matrix(L["hip"], knee_w, up_hint), parent_world, parent_rest)
-    shin_world = set_bone_world_matrix_direct(
-        shin_pb, aim_matrix(knee_w, ankle_w, up_hint), thigh_world, thigh_rest)
+    if FK_ANCHORED:
+        thigh_world = set_bone_world_matrix_direct(
+            thigh_pb, aim_min_twist(thigh_pb, L["hip"], knee_w, parent_world, parent_rest),
+            parent_world, parent_rest)
+        shin_world = set_bone_world_matrix_direct(
+            shin_pb, aim_min_twist(shin_pb, knee_w, ankle_w, thigh_world, thigh_rest),
+            thigh_world, thigh_rest)
+    else:
+        thigh_world = set_bone_world_matrix_direct(
+            thigh_pb, aim_matrix(L["hip"], knee_w, up_hint), parent_world, parent_rest)
+        shin_world = set_bone_world_matrix_direct(
+            shin_pb, aim_matrix(knee_w, ankle_w, up_hint), thigh_world, thigh_rest)
 
     foot_desired_world = (mathutils.Matrix.Translation(ankle_w) @ L["foot_rest_rot4"]
                            @ mathutils.Matrix.Rotation(foot_curl_angle, 4, L["foot_local_curl_axis"]))
@@ -775,6 +972,12 @@ def set_scapula_pose(side, hip_dynamic, parent_world, parent_rest):
     head/tail/length were captured once in `scapula_rest` during the per-leg precompute above."""
     head, tail, rest_mat, _length = scapula_rest[side]
     pb = arm_obj.pose.bones[f"scapula_{side}"]
+    if FK_ANCHORED:
+        # Round-4 fix 2: the scapula head rides spine_02's ACTUAL pose (not its rest position).
+        fk_head = (parent_world @ parent_rest.inverted() @ pb.bone.matrix_local).translation
+        return set_bone_world_matrix_direct(
+            pb, aim_min_twist(pb, fk_head, hip_dynamic, parent_world, parent_rest),
+            parent_world, parent_rest)
     bd = legs[side]["bend_dir"]
     axis_candidates = [mathutils.Vector((1, 0, 0)), mathutils.Vector((0, 1, 0)), mathutils.Vector((0, 0, 1))]
     up_hint = min(axis_candidates, key=lambda ax: abs(ax.dot(bd)))
@@ -804,6 +1007,12 @@ for side in leg_sides:
     if side in scapula_rest:
         arm_obj.pose.bones[f"scapula_{side}"].rotation_mode = "QUATERNION"
 
+if FK_ANCHORED:
+    # v18 round 5: rig_creature.py's smoke-test "TestPose" leaves neck/head/legs posed in the saved
+    # rigged .blend; any bone this clip never keys (neck_02) kept that pose in Blender (a 14 deg neck
+    # turn in every Move preview/contact sheet) while the GLB/runtime shows rest. Clear it first.
+    for _pb in arm_obj.pose.bones:
+        _pb.matrix_basis = mathutils.Matrix.Identity(4)
 FRAMES = int(round(CYCLE_SECONDS * FPS))
 move_action = bpy.data.actions.new("Move")
 move_action.use_fake_user = True  # survives a save even if .action gets reassigned later
@@ -839,6 +1048,9 @@ for i in range(FRAMES + 1):  # +1: bake the loop-closing frame identical to fram
     if root_pb:
         root_pb.location = (0, 0, bob)
         root_pb.keyframe_insert(data_path="location", frame=i + 1)
+        if FK_ANCHORED:
+            # keyed (identity) so a clip played after a root-rotating KO can't inherit its roll
+            root_pb.keyframe_insert(data_path="rotation_euler", frame=i + 1)
     # Pelvis roll/yaw (round 5): a small weight-shift motion in phase with the hind legs' own
     # stride frequency (sin(a), one full cycle per full gait cycle -- not sin(2a) like the 2x-per-
     # cycle body bob). Folded in analytically here for the same reason spine_02's pitch is below:
@@ -849,6 +1061,15 @@ for i in range(FRAMES + 1):  # +1: bake the loop-closing frame identical to fram
     pelvis_world = (root_world @ root_rest.inverted() @ pelvis_rest
                      @ mathutils.Matrix.Rotation(pelvis_local_roll, 4, "Y")
                      @ mathutils.Matrix.Rotation(pelvis_local_yaw, 4, "Z"))
+    pelvis_fk_basis = None
+    if FK_ANCHORED:
+        # Round-4 fix 6: roll about the walk axis, yaw about world up, conjugated into the pelvis
+        # bone's own rest frame (its local axes are not body axes -- it runs root -> pelvis landmark).
+        _rp = pelvis_rest.to_3x3()
+        _rw = (mathutils.Matrix.Rotation(pelvis_local_yaw, 3, "Z")
+               @ mathutils.Matrix.Rotation(pelvis_local_roll, 3, FORWARD))
+        pelvis_fk_basis = _rp.inverted() @ _rw @ _rp
+        pelvis_world = root_world @ root_rest.inverted() @ pelvis_rest @ pelvis_fk_basis.to_4x4()
     # spine_02 (the forelegs' real parent -- see set_leg_pose's docstring) DOES get a small
     # animated counter-rotation later this same frame (set_rot_local("spine_02", ...) below), but
     # that happens after legs are placed; approximating spine_02_world as if it were identity-basis
@@ -886,7 +1107,7 @@ for i in range(FRAMES + 1):  # +1: bake the loop-closing frame identical to fram
     # correctly found had no effect). Fixed by routing through pelvis_world (which DOES already
     # include the round-3 roll/yaw) instead of root_world directly; spine_01 is still skipped since
     # it genuinely has no pose rotation of its own (only pelvis's new rotation needed restoring).
-    spine02_local_pitch = math.radians(2 * math.sin(2 * a))
+    spine02_local_pitch = math.radians(HEAD_AMP * 2 * math.sin(2 * a))
     spine02_world = (pelvis_world @ pelvis_rest.inverted() @ spine02_rest
                       @ mathutils.Matrix.Rotation(spine02_local_pitch, 4, "X"))
 
@@ -908,6 +1129,10 @@ for i in range(FRAMES + 1):  # +1: bake the loop-closing frame identical to fram
             # shoulder socket's fore-aft excursion must swing toward the head/tail exactly like the
             # foot's own stride does, for the same reason.
             hip_dynamic = legs[side]["hip"] + FORWARD * scapula_fwd
+            if FK_ANCHORED:
+                # Round-4 fix 2: shoulder socket carried by spine_02's actual pose this frame.
+                hip_dynamic = (spine02_world @ spine02_rest.inverted() @ legs[side]["hip_rest"]
+                               + FORWARD * scapula_fwd)
             scapula_world = set_scapula_pose(side, hip_dynamic, spine02_world, spine02_rest)
             scapula_pb = arm_obj.pose.bones[f"scapula_{side}"]
             scapula_pb.keyframe_insert(data_path="rotation_quaternion", frame=i + 1)
@@ -921,14 +1146,28 @@ for i in range(FRAMES + 1):  # +1: bake the loop-closing frame identical to fram
             legs[side]["hip"] = hip_dynamic
             stances.append(set_leg_pose(side, t, scapula_world, scapula_rest[side][2]))
             legs[side]["hip"] = hip_static
+        elif FK_ANCHORED:
+            # Round-4 fix 2: hip socket carried by the pelvis's actual pose this frame.
+            hip_static = legs[side]["hip"]
+            legs[side]["hip"] = pelvis_world @ pelvis_rest.inverted() @ legs[side]["hip_rest"]
+            stances.append(set_leg_pose(side, t, pelvis_world, pelvis_rest))
+            legs[side]["hip"] = hip_static
         else:
             stances.append(set_leg_pose(side, t, pelvis_world, pelvis_rest))
 
     # Tail: counter-sways opposite the leg phase for a touch of weight-shift readability.
-    set_rot_local("tail_01", deg_x=6 * math.sin(a), deg_z=4 * math.sin(a + 0.3))
-    set_rot_local("tail_02", deg_x=8 * math.sin(a + 0.4), deg_z=5 * math.sin(a + 0.6))
-    set_rot_local("tail_03", deg_x=6 * math.sin(a + 0.8))
-    set_rot_local("tail_04", deg_x=4 * math.sin(a + 1.1))
+    if FK_ANCHORED:
+        # Round-4 fix 5: on the quadruped template's Z-up roll, local Z is yaw -- sway sideways at
+        # constant height (a small optional pitch), each bone lagging the one before it.
+        for _ti, _tb in enumerate(sorted(n for n in all_bones if n.startswith("tail_"))):
+            set_rot_local(_tb, deg_x=GP["tail_pitch"] * math.sin(2 * a + 0.4 * _ti),
+                          deg_z=GP["tail_yaw"] * (1.0 + 0.25 * _ti) * math.sin(a + 0.35 * (_ti + 1)))
+    else:
+        set_rot_local("tail_01", deg_x=TAIL_AMP * 6 * math.sin(a), deg_z=TAIL_AMP * 4 * math.sin(a + 0.3))
+        set_rot_local("tail_02", deg_x=TAIL_AMP * 8 * math.sin(a + 0.4), deg_z=TAIL_AMP * 5 * math.sin(a + 0.6))
+        set_rot_local("tail_03", deg_x=TAIL_AMP * 6 * math.sin(a + 0.8))
+        set_rot_local("tail_04", deg_x=TAIL_AMP * 4 * math.sin(a + 1.1))
+        set_rot_local("tail_05", deg_x=TAIL_AMP * 3 * math.sin(a + 1.4))  # Basilisk's 5-bone tail
 
     # Wings: folded, slight settle motion (not flapping -- this is a ground-locomotion clip).
     set_rot_local("wing_L_01", deg_z=-6 - 2 * math.sin(a * 2), deg_x=2 * math.sin(a))
@@ -941,10 +1180,14 @@ for i in range(FRAMES + 1):  # +1: bake the loop-closing frame identical to fram
     # this frame's leg placement was actually computed against. Same for pelvis's roll/yaw below
     # (must match pelvis_local_roll/pelvis_local_yaw exactly -- that's the pose BL/BR's own IK
     # solve was computed against this frame).
-    set_rot_local("pelvis", deg_x=0, deg_y=PELVIS_ROLL_DEG * math.sin(a), deg_z=PELVIS_YAW_DEG * math.sin(a + 0.5))
-    set_rot_local("spine_02", deg_x=2 * math.sin(2 * a))
-    set_rot_local("neck_01", deg_x=-2 * math.sin(2 * a))
-    set_rot_local("head", deg_x=-1.5 * math.sin(2 * a + 0.2))
+    if pelvis_fk_basis is not None:
+        pelvis_pb.rotation_mode = "XYZ"
+        pelvis_pb.rotation_euler = pelvis_fk_basis.to_euler("XYZ")
+    else:
+        set_rot_local("pelvis", deg_x=0, deg_y=PELVIS_ROLL_DEG * math.sin(a), deg_z=PELVIS_YAW_DEG * math.sin(a + 0.5))
+    set_rot_local("spine_02", deg_x=HEAD_AMP * 2 * math.sin(2 * a))
+    set_rot_local("neck_01", deg_x=HEAD_AMP * -2 * math.sin(2 * a))
+    set_rot_local("head", deg_x=HEAD_AMP * -1.5 * math.sin(2 * a + 0.2))
 
     for side in leg_sides:
         toe_suffixes = ("toe_in", "toe_mid", "toe_out") if legs[side]["has_toe_fan"] else ("toe",)
@@ -952,7 +1195,7 @@ for i in range(FRAMES + 1):  # +1: bake the loop-closing frame identical to fram
             pb = arm_obj.pose.bones[f"leg_{side}_{suffix}"]
             pb.keyframe_insert(data_path="rotation_quaternion", frame=i + 1)
             pb.keyframe_insert(data_path="location", frame=i + 1)
-    for name in ("tail_01", "tail_02", "tail_03", "tail_04", "wing_L_01", "wing_L_02",
+    for name in ("tail_01", "tail_02", "tail_03", "tail_04", "tail_05", "wing_L_01", "wing_L_02",
                  "wing_R_01", "wing_R_02", "spine_02", "neck_01", "head", "pelvis"):
         pb = arm_obj.pose.bones.get(name)
         if pb:
@@ -974,7 +1217,7 @@ stride_summary = ", ".join(f"{s}={legs[s]['stride']:.3f}" for s in leg_sides)
 print(f"MOVE ACTION: {FRAMES + 1} frames @ {FPS}fps, {n_curves} fcurves, duty={DUTY}, "
       f"stride=[{stride_summary}]")
 
-blend_out = os.path.join(OUT, "griffin_move.blend")
+blend_out = os.path.join(OUT, f"{CREATURE}_move.blend")
 bpy.ops.wm.save_as_mainfile(filepath=blend_out)
 print(f"SAVED {blend_out}")
 print("GAIT DONE")

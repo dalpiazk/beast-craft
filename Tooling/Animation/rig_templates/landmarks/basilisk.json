@@ -1,0 +1,210 @@
+{
+ "_note": "Lead hand-placed landmarks, NATIVE prepped-mesh coords (head=-Y, up=+Z, feet Z=0, L=-X, R=+X), read off <beast>_calib/{left,bottom,front}.png via calib.json. Leg chain = hip, knee, ankle, foot; toe_tip forward of foot. Tail may be a short stub inside the body for tail-less beasts. 'snout_tip' plays the Griffin's 'beak_tip' role.",
+ "_source": "lead hand-placed landmarks, scratchpad/anim-quads/landmarks_lead.json (2026-10-04)",
+ "legs": [
+  {
+   "side": "FL",
+   "is_front": true,
+   "chain": [
+    [
+     -0.1,
+     -0.51,
+     0.28
+    ],
+    [
+     -0.15,
+     -0.47,
+     0.14
+    ],
+    [
+     -0.17,
+     -0.46,
+     0.035
+    ],
+    [
+     -0.18,
+     -0.47,
+     0.01
+    ]
+   ],
+   "toe_tip": [
+    -0.2,
+    -0.6,
+    0.01
+   ]
+  },
+  {
+   "side": "FR",
+   "is_front": true,
+   "chain": [
+    [
+     0.08,
+     -0.53,
+     0.28
+    ],
+    [
+     0.1,
+     -0.54,
+     0.14
+    ],
+    [
+     0.11,
+     -0.55,
+     0.035
+    ],
+    [
+     0.12,
+     -0.56,
+     0.01
+    ]
+   ],
+   "toe_tip": [
+    0.12,
+    -0.66,
+    0.01
+   ]
+  },
+  {
+   "side": "BL",
+   "is_front": false,
+   "chain": [
+    [
+     -0.12,
+     -0.12,
+     0.22
+    ],
+    [
+     -0.14,
+     -0.25,
+     0.12
+    ],
+    [
+     -0.13,
+     -0.1,
+     0.045
+    ],
+    [
+     -0.13,
+     -0.15,
+     0.01
+    ]
+   ],
+   "toe_tip": [
+    -0.13,
+    -0.23,
+    0.01
+   ]
+  },
+  {
+   "side": "BR",
+   "is_front": false,
+   "chain": [
+    [
+     0.16,
+     -0.12,
+     0.22
+    ],
+    [
+     0.18,
+     -0.25,
+     0.12
+    ],
+    [
+     0.17,
+     -0.1,
+     0.045
+    ],
+    [
+     0.17,
+     -0.15,
+     0.01
+    ]
+   ],
+   "toe_tip": [
+    0.17,
+    -0.23,
+    0.01
+   ]
+  }
+ ],
+ "spine": {
+  "pelvis": [
+   0,
+   -0.09,
+   0.28
+  ],
+  "spine_01": [
+   0,
+   -0.22,
+   0.34
+  ],
+  "chest": [
+   0,
+   -0.39,
+   0.32
+  ],
+  "neck_base": [
+   0,
+   -0.46,
+   0.41
+  ],
+  "neck_mid": [
+   0,
+   -0.59,
+   0.47
+  ],
+  "head": [
+   0,
+   -0.72,
+   0.56
+  ],
+  "head_top": [
+   0,
+   -0.7,
+   0.71
+  ],
+  "snout_tip": [
+   0,
+   -0.95,
+   0.54
+  ],
+  "jaw_tip": [
+   0,
+   -0.9,
+   0.49
+  ]
+ },
+ "tail": [
+  [
+   0,
+   0.04,
+   0.24
+  ],
+  [
+   0,
+   0.22,
+   0.17
+  ],
+  [
+   0,
+   0.39,
+   0.12
+  ],
+  [
+   0,
+   0.57,
+   0.12
+  ],
+  [
+   0,
+   0.77,
+   0.17
+  ],
+  [
+   0,
+   0.94,
+   0.21
+  ]
+ ],
+ "notes": "Crouched lizard: hind legs fold (thigh runs forward-down from hip to knee at the haunch front, shin back-down to ankle, foot points forward) and sit only ~0.35 behind the forelegs; body low. Hind X is slightly asymmetric in the source (L -0.13, R +0.17). Tail is ~half the total length: needs 5+ tail bones (6 points given). Crest spikes on head/neck are rigid to head/neck bones. Glowing eyes on the head bone."
+}
