@@ -83,6 +83,7 @@ import bpy
 import sys
 import os
 import json
+import math
 import mathutils
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -95,6 +96,20 @@ GLB = args["glb"]
 OUT = args["out"]
 TARGET_TRIS = int(args.get("target-tris", 8000))
 TEXTURE_SIZE = int(args.get("texture-size", 1024))
+# Round "anim-quads" batch: --creature selects between the Griffin's own path (default, byte-for-
+# byte unchanged -- every creature-specific name/branch below is still gated on CREATURE=="griffin")
+# and a GENERIC path for any other creature name. The generic path is deliberately simpler than the
+# Griffin's: no segmentation (that machinery is built on winged_quadruped's wing/tail landmark
+# roles, meaningless for a wingless quadruped), no leg/body decimation protect zone (built on the
+# Griffin's own HAND_LANDMARKS_NATIVE, wrong data for a different mesh), a shape-based ground-plate/
+# debris classifier instead of a flat min-vertex-count cutoff (see common.classify_and_remove_debris
+# -- a Meshy ground disc can hold far more verts than a stray reconstruction speck), and an explicit
+# feet-to-Z=0 bake (the Griffin's own prepped output deliberately leaves that for rig_creature.py's
+# normalise_transform; the generic path's calibrated-view consumers want it baked in already).
+CREATURE = args.get("creature", "griffin")
+GENERIC = CREATURE != "griffin"
+ROTATE_Z_DEG = float(args.get("rotate-z-deg", 0.0))
+OBJ_NAME = "Griffin" if not GENERIC else CREATURE[:1].upper() + CREATURE[1:]
 os.makedirs(OUT, exist_ok=True)
 
 # Per-piece triangle budgets -- sum comfortably under TARGET_TRIS. Body gets the lion's share (it's
@@ -107,10 +122,25 @@ TAIL_BUDGET = 700
 
 common.fresh_scene()
 obj, new_images = common.import_glb(GLB)
-obj.name = "Griffin"
+obj.name = OBJ_NAME
 bpy.context.view_layer.objects.active = obj
 
-report = {"input": GLB}
+report = {"input": GLB, "creature": CREATURE}
+
+if ROTATE_Z_DEG:
+    # Optional manual facing-axis correction for a creature whose native Meshy export doesn't
+    # already match the Griffin's head=-Y/up=+Z/lateral=X convention -- determined per-creature by
+    # the agent rendering a quick +X/-X/+Y/-Y/top orientation probe (scratch-only) and comparing
+    # against the reference turnaround sheet BEFORE running this script, not guessed inline here.
+    # None of the round-10 "anim-quads" batch (Golem/Kirin/Tarasque/Basilisk) needed this -- all
+    # four already faced -Y natively -- so it defaults to a no-op or (0.0, logged either way).
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    obj.rotation_euler.z = math.radians(ROTATE_Z_DEG)
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
+    report["rotate_z_deg_applied"] = ROTATE_Z_DEG
+    print(f"ROTATED {ROTATE_Z_DEG} deg around Z to match the Griffin's facing convention")
 
 before_stats = common.topology_stats(obj)
 report["before"] = before_stats
@@ -140,6 +170,18 @@ print("AFTER WELD:", json.dumps(welded_stats))
 # taken (see the visual check below, before export).
 NEEDS_SEGMENTATION = not (welded_stats["components"] <= 5
                            and welded_stats["largest_component"] / max(welded_stats["verts"], 1) >= 0.98)
+if GENERIC and NEEDS_SEGMENTATION:
+    # The segmentation path below is built entirely on winged_quadruped's wing_L/wing_R/tail bone
+    # ROLES (a throwaway skeleton + heat weights classify each vertex by dominant bone) -- meaningless
+    # for a wingless quadruped and not something this round built a replacement for. Rather than
+    # mis-segment a different creature's mesh with the Griffin's own template, fall back to the simple
+    # path anyway and report the mismatch loudly so a future round knows this creature's welded mesh
+    # didn't actually meet the simple path's own precondition cleanly.
+    report["needs_segmentation_forced_off"] = True
+    print(f"WARNING: welded mesh wanted segmentation (components={welded_stats['components']}, "
+          f"largest_frac={welded_stats['largest_component'] / max(welded_stats['verts'], 1):.3f}) but "
+          f"no generic segmentation path exists yet -- forcing the simple path, reporting honestly")
+    NEEDS_SEGMENTATION = False
 report["needs_segmentation"] = NEEDS_SEGMENTATION
 print(f"NEEDS SEGMENTATION: {NEEDS_SEGMENTATION} (components={welded_stats['components']}, "
       f"largest_frac={welded_stats['largest_component'] / max(welded_stats['verts'], 1):.3f})")
@@ -357,8 +399,43 @@ else:
     # to this path (see this file's docstring and the round-10 README section). No new UVs needed --
     # the original textured material/UVs are kept, just downsized to TEXTURE_SIZE, which is both
     # correct (nothing moved the surface relative to its own UVs) and far cheaper than a Cycles bake.
-    n_removed, v_removed = common.remove_small_components(obj, min_verts=50)
-    print(f"REMOVED {n_removed} tiny stray component(s) ({v_removed} verts)")
+    if GENERIC:
+        # Lead review of kirin_calib/bottom.png + left.png: a ground sheet/mud disc survived
+        # classify_and_remove_debris entirely -- it turned out to be topologically FUSED to the
+        # hooves (sharing geometry with the main body component), not a separate component, so a
+        # component-level classifier can never see it. Fixed at the FACE level instead, before any
+        # component-based cleanup: common.remove_ground_sheet_faces finds near-ground, nearly-
+        # horizontal face clusters and deletes the wide ones (the sheet + its jagged shards) while
+        # keeping compact ones (a hoof's own flat bottom cap) -- see that function's own docstring.
+        sheet_report = common.remove_ground_sheet_faces(obj)
+        report["ground_sheet_removal"] = sheet_report
+        print(f"GROUND SHEET FACES: removed {sheet_report['faces_deleted']} faces in "
+              f"{len(sheet_report['removed'])} wide cluster(s) "
+              f"(kept {len(sheet_report['kept'])} compact cluster(s), e.g. hoof caps)")
+        for e in sheet_report["removed"]:
+            print(f"  removed cluster: {e['faces']} faces, xy_extent={e['xy_extent']:.4f}")
+        for e in sheet_report["kept"]:
+            print(f"  kept cluster: {e['faces']} faces, xy_extent={e['xy_extent']:.4f}")
+
+        # anim-quads batch: a flat min-vertex-count cutoff can't tell a ground plate/debris scatter
+        # (which can hold far more verts than a stray reconstruction speck) from real small anatomy
+        # (horns, claws, toes) -- see common.classify_and_remove_debris's own docstring for the
+        # shape-based classification (largest component always kept; others removed only if tiny,
+        # OR flat+wide+low i.e. a ground plate). Reported per-component so a human can verify the
+        # removed set is really debris, not anatomy, before trusting it.
+        debris_report = common.classify_and_remove_debris(obj)
+        report["debris_removal"] = debris_report
+        n_removed_dbg = len(debris_report["removed"])
+        v_removed_dbg = sum(e["verts"] for e in debris_report["removed"])
+        print(f"REMOVED {n_removed_dbg} non-body component(s) ({v_removed_dbg} verts) as ground "
+              f"plate/debris; kept {len(debris_report['kept_other'])} other attached component(s)")
+        for e in debris_report["removed"]:
+            print(f"  removed [{e['reason']}]: {e['verts']} verts, bbox={e['bbox']}")
+        for e in debris_report["kept_other"]:
+            print(f"  kept [{e['reason']}]: {e['verts']} verts, bbox={e['bbox']}")
+    else:
+        n_removed, v_removed = common.remove_small_components(obj, min_verts=50)
+        print(f"REMOVED {n_removed} tiny stray component(s) ({v_removed} verts)")
     pre = common.topology_stats(obj)
 
     # Round 10: protect the leg-to-body transition zones from aggressive decimation, same reasoning
@@ -366,21 +443,27 @@ else:
     # entirely, so it never got any protection here before) -- confirmed via verify.py's edge-
     # stretch gate that a flat decimate left an unusually large triangle spanning the leg/pelvis
     # boundary. Built from HAND_LANDMARKS_NATIVE's own leg attachment points (fore shoulder and
-    # hind hip Y/Z), not hardcoded to this one mesh's absolute numbers.
-    try:
-        _leg_ys = [l["chain"][0][1] for l in template.HAND_LANDMARKS_NATIVE["legs"]]
-        _leg_zs = [l["chain"][0][2] for l in template.HAND_LANDMARKS_NATIVE["legs"]]
-        _y_lo, _y_hi = min(_leg_ys) - 0.20, max(_leg_ys) + 0.20
-        _z_lo, _z_hi = min(_leg_zs) - 0.15, max(_leg_zs) + 0.20
-        protect_vg = obj.vertex_groups.new(name="protect_leg_body")
-        protect_idx = [v.index for v in obj.data.vertices if _y_lo < v.co.y < _y_hi and _z_lo < v.co.z < _z_hi]
-        protect_vg.add(protect_idx, 1.0, "REPLACE")
-        print(f"LEG/BODY PROTECT ZONE: {len(protect_idx)}/{len(obj.data.vertices)} verts "
-              f"(y in [{_y_lo:.2f},{_y_hi:.2f}], z in [{_z_lo:.2f},{_z_hi:.2f}])")
-        protect_group_name = "protect_leg_body"
-    except Exception as e:
-        print(f"LEG/BODY PROTECT ZONE SKIPPED (no leg landmarks available): {e}")
-        protect_group_name = None
+    # hind hip Y/Z), not hardcoded to this one mesh's absolute numbers. Griffin-only: this reads the
+    # Griffin's OWN hand-placed landmarks, which would be silently wrong data for a different mesh,
+    # so the anim-quads batch skips this protect zone entirely rather than mis-apply it.
+    protect_group_name = None
+    if not GENERIC:
+        try:
+            _leg_ys = [l["chain"][0][1] for l in template.HAND_LANDMARKS_NATIVE["legs"]]
+            _leg_zs = [l["chain"][0][2] for l in template.HAND_LANDMARKS_NATIVE["legs"]]
+            _y_lo, _y_hi = min(_leg_ys) - 0.20, max(_leg_ys) + 0.20
+            _z_lo, _z_hi = min(_leg_zs) - 0.15, max(_leg_zs) + 0.20
+            protect_vg = obj.vertex_groups.new(name="protect_leg_body")
+            protect_idx = [v.index for v in obj.data.vertices if _y_lo < v.co.y < _y_hi and _z_lo < v.co.z < _z_hi]
+            protect_vg.add(protect_idx, 1.0, "REPLACE")
+            print(f"LEG/BODY PROTECT ZONE: {len(protect_idx)}/{len(obj.data.vertices)} verts "
+                  f"(y in [{_y_lo:.2f},{_y_hi:.2f}], z in [{_z_lo:.2f},{_z_hi:.2f}])")
+            protect_group_name = "protect_leg_body"
+        except Exception as e:
+            print(f"LEG/BODY PROTECT ZONE SKIPPED (no leg landmarks available): {e}")
+            protect_group_name = None
+    else:
+        print("LEG/BODY PROTECT ZONE SKIPPED (generic creature, no hand-placed landmarks yet)")
 
     # Round 15 (lead review: "clear the remaining stretch/blotch issues properly... add edge loops
     # at the shoulders/elbows/wrists, hips/knees/hocks, wing roots and the tail root... then
@@ -479,10 +562,20 @@ else:
             if node.type == "TEX_IMAGE":
                 node.image = tex_image
 
-    retopo_obj = obj
-    retopo_obj.name = "Griffin"
+    if GENERIC:
+        # "Feet on z=0" (task brief, anim-quads batch): the Griffin's own prepped output
+        # deliberately leaves an arbitrary raw Z offset for rig_creature.py's normalise_transform to
+        # resolve later (see calib_v10_render.py's own comment on this) -- but this batch's
+        # calibrated-view consumers want it already baked in, so bake it here (Z-only, no scale, no
+        # X/Y re-centring -- common.ground_to_zero, not the heavier normalise_transform).
+        z_offset = common.ground_to_zero(obj)
+        report["ground_to_zero_z_offset"] = z_offset
+        print(f"GROUND TO ZERO: feet translated by {z_offset:+.4f} (Z-only, no scale/centring)")
 
-out_glb = os.path.join(OUT, "griffin_prepped.glb")
+    retopo_obj = obj
+    retopo_obj.name = OBJ_NAME
+
+out_glb = os.path.join(OUT, f"{CREATURE}_prepped.glb")
 bpy.ops.object.select_all(action="SELECT")
 bpy.ops.export_scene.gltf(
     filepath=out_glb,

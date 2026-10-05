@@ -1,0 +1,196 @@
+{
+ "_note": "Lead hand-placed landmarks, NATIVE prepped-mesh coords (head=-Y, up=+Z, feet Z=0, L=-X, R=+X), read off <beast>_calib/{left,bottom,front}.png via calib.json. Leg chain = hip, knee, ankle, foot; toe_tip forward of foot. Tail may be a short stub inside the body for tail-less beasts. 'snout_tip' plays the Griffin's 'beak_tip' role.",
+ "_source": "lead hand-placed landmarks, scratchpad/anim-quads/landmarks_lead.json (2026-10-04)",
+ "legs": [
+  {
+   "side": "FL",
+   "is_front": true,
+   "chain": [
+    [
+     -0.36,
+     -0.46,
+     0.52
+    ],
+    [
+     -0.4,
+     -0.47,
+     0.22
+    ],
+    [
+     -0.43,
+     -0.48,
+     0.07
+    ],
+    [
+     -0.45,
+     -0.49,
+     0.0
+    ]
+   ],
+   "toe_tip": [
+    -0.45,
+    -0.58,
+    0.0
+   ]
+  },
+  {
+   "side": "FR",
+   "is_front": true,
+   "chain": [
+    [
+     0.3,
+     -0.2,
+     0.52
+    ],
+    [
+     0.32,
+     -0.2,
+     0.22
+    ],
+    [
+     0.33,
+     -0.21,
+     0.07
+    ],
+    [
+     0.34,
+     -0.21,
+     0.0
+    ]
+   ],
+   "toe_tip": [
+    0.34,
+    -0.3,
+    0.0
+   ]
+  },
+  {
+   "side": "BL",
+   "is_front": false,
+   "chain": [
+    [
+     -0.36,
+     0.47,
+     0.52
+    ],
+    [
+     -0.4,
+     0.49,
+     0.22
+    ],
+    [
+     -0.42,
+     0.49,
+     0.07
+    ],
+    [
+     -0.43,
+     0.49,
+     0.0
+    ]
+   ],
+   "toe_tip": [
+    -0.43,
+    0.41,
+    0.0
+   ]
+  },
+  {
+   "side": "BR",
+   "is_front": false,
+   "chain": [
+    [
+     0.4,
+     0.26,
+     0.52
+    ],
+    [
+     0.46,
+     0.28,
+     0.22
+    ],
+    [
+     0.5,
+     0.27,
+     0.07
+    ],
+    [
+     0.52,
+     0.27,
+     0.0
+    ]
+   ],
+   "toe_tip": [
+    0.52,
+    0.19,
+    0.0
+   ]
+  }
+ ],
+ "spine": {
+  "pelvis": [
+   0,
+   0.35,
+   0.8
+  ],
+  "spine_01": [
+   0,
+   0.05,
+   0.85
+  ],
+  "chest": [
+   0,
+   -0.25,
+   0.8
+  ],
+  "neck_base": [
+   0,
+   -0.42,
+   0.72
+  ],
+  "neck_mid": [
+   0,
+   -0.52,
+   0.68
+  ],
+  "head": [
+   0,
+   -0.66,
+   0.65
+  ],
+  "head_top": [
+   0,
+   -0.62,
+   1.0
+  ],
+  "snout_tip": [
+   0,
+   -0.93,
+   0.43
+  ],
+  "jaw_tip": [
+   0,
+   -0.85,
+   0.3
+  ]
+ },
+ "tail": [
+  [
+   0,
+   0.55,
+   0.78
+  ],
+  [
+   0,
+   0.72,
+   0.74
+  ],
+  [
+   0,
+   0.88,
+   0.7
+  ]
+ ],
+ "notes": "Mesh is in a mid-stride stance (feet diagonally offset: FL & BL forward-ish/back, FR & BR inboard). Legs short columns under a heavy shell. No visible tail: stub tail inside the shell rear, keep tail motion tiny. Shell spikes ride the spine (rigid).",
+ "_fix_round1": "Lead review: spine was running along the belly (landmark error) -- pelvis/spine_01/chest/neck_base/neck_mid/head/head_top raised in Z, all four leg hips (chain[0]) raised from Z 0.40/0.42 to 0.52 to match, tail raised to follow the (now correct) higher pelvis/rear-shell height."
+}

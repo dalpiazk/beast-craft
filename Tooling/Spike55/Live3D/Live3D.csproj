@@ -61,6 +61,18 @@
          Tooling/Spike55/blender_export_live_swarmling.py). Replaces the earlier procedural
          placeholder's custom Content/swarm/*.bin format. -->
     <None Include="Content\model\swarmling_live.glb" Link="Content\model\swarmling_live.glb" CopyToOutputDirectory="PreserveNewest" />
+    <!-- v18 wingless quadrupeds (Tooling/Animation/README.md): Golem, Kirin, Tarasque, Basilisk, rigged
+         and animated through the same pipeline as the Griffin, loaded via the "pilot-model" NAME option
+         alongside "pilot-sequence" mode (see Game1.LoadContent/LaunchOptions). Each GLB has its own
+         sidecar event-marker JSON, same convention as griffin_anim_events.json above. -->
+    <None Include="Content\model\golem_anim.glb" Link="Content\model\golem_anim.glb" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\model\golem_anim_events.json" Link="Content\model\golem_anim_events.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\model\kirin_anim.glb" Link="Content\model\kirin_anim.glb" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\model\kirin_anim_events.json" Link="Content\model\kirin_anim_events.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\model\tarasque_anim.glb" Link="Content\model\tarasque_anim.glb" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\model\tarasque_anim_events.json" Link="Content\model\tarasque_anim_events.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\model\basilisk_anim.glb" Link="Content\model\basilisk_anim.glb" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\model\basilisk_anim_events.json" Link="Content\model\basilisk_anim_events.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

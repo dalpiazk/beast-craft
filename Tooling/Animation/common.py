@@ -303,6 +303,206 @@ def remove_small_components(obj, min_verts=100):
     return len(small), sum(len(c) for c in small)
 
 
+def remove_ground_sheet_faces(obj, z_band_frac=0.05, normal_z_thresh=0.6, keep_horiz_frac=0.07):
+    """Generic (creature-agnostic) cleanup for a ground sheet/mud-disc that's topologically FUSED to
+    the creature's own feet (e.g. the Kirin mesh's ground disc + scattered debris, which turned out
+    to share vertices with the hooves -- `classify_and_remove_debris`'s connected-COMPONENT
+    classification can't see it at all, since it's part of the same single component as the body).
+
+    Works at the FACE level instead: a face is a ground-sheet candidate if it's both near the
+    mesh's own lowest point (`z_band_frac` of the total height) AND nearly horizontal
+    (`abs(face normal.z) >= normal_z_thresh` -- a thin flat sheet's faces, top or bottom side,
+    regardless of a hoof's own mostly-VERTICAL side-wall faces, which have normal.z near 0 and so
+    are never candidates). Candidate faces are then grouped into connected clusters (face-adjacency
+    via shared edges, restricted to the candidate set only -- a hoof's own flat bottom cap is a
+    candidate too, but forms its own small, separate cluster since it isn't edge-connected to the
+    ground sheet beyond touching it at a point/seam, not sharing a whole face edge). Each cluster's
+    own horizontal (XY) bounding extent decides its fate: a hoof's bottom cap is compact (confirmed
+    ~0.08 absolute units on the Kirin mesh, i.e. `keep_horiz_frac` of H with margin); a ground
+    sheet/shard is much wider. Clusters under the `keep_horiz_frac * H` extent are kept (hooves);
+    everything wider is deleted (sheet + its jagged shard fragments, which stay in the same cluster
+    as the slab they're torn from, confirmed on the Kirin mesh).
+
+    Deletes FACES only (not a hoof's shared boundary vertices), then purges any vertices left with
+    no remaining faces (a sheet-only vertex). Returns a report dict (clusters kept/removed, each
+    with face count and XY extent) for the caller to log/verify."""
+    me = obj.data
+    all_zs = [v.co.z for v in me.vertices]
+    z_min = min(all_zs)
+    H = max(all_zs) - z_min
+    if H <= 0:
+        return {"kept": [], "removed": []}
+    z_cut = z_min + z_band_frac * H
+    keep_extent = keep_horiz_frac * H
+
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.mode_set(mode="EDIT")
+    bm = bmesh.from_edit_mesh(obj.data)
+    bm.faces.ensure_lookup_table()
+
+    candidates = set()
+    for f in bm.faces:
+        centroid = f.calc_center_median()
+        if centroid.z > z_cut:
+            continue
+        n = f.normal
+        if n.length < 1e-9:
+            continue
+        if abs(n.z) / n.length < normal_z_thresh:
+            continue
+        candidates.add(f)
+
+    # Cluster candidates by face-adjacency (shared edge), restricted to the candidate set.
+    visited = set()
+    clusters = []
+    for seed in candidates:
+        if seed in visited:
+            continue
+        stack = [seed]
+        visited.add(seed)
+        cluster = []
+        while stack:
+            f = stack.pop()
+            cluster.append(f)
+            for e in f.edges:
+                for lf in e.link_faces:
+                    if lf in candidates and lf not in visited:
+                        visited.add(lf)
+                        stack.append(lf)
+        clusters.append(cluster)
+
+    report = {"kept": [], "removed": []}
+    faces_to_delete = []
+    for cluster in clusters:
+        xs, ys = [], []
+        for f in cluster:
+            for v in f.verts:
+                xs.append(v.co.x)
+                ys.append(v.co.y)
+        extent = max(max(xs) - min(xs), max(ys) - min(ys)) if xs else 0.0
+        entry = {"faces": len(cluster), "xy_extent": extent}
+        if extent > keep_extent:
+            report["removed"].append(entry)
+            faces_to_delete.extend(cluster)
+        else:
+            report["kept"].append(entry)
+
+    if faces_to_delete:
+        bmesh.ops.delete(bm, geom=faces_to_delete, context="FACES_ONLY")
+        # Purge any vertices left with no remaining faces (pure sheet verts with no hoof face left).
+        loose_verts = [v for v in bm.verts if not v.link_faces]
+        if loose_verts:
+            bmesh.ops.delete(bm, geom=loose_verts, context="VERTS")
+    bmesh.update_edit_mesh(obj.data)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    report["faces_deleted"] = len(faces_to_delete)
+    return report
+
+
+def classify_and_remove_debris(obj, min_verts=30, small_frac=0.01, ground_flatness_ratio=0.10,
+                                ground_footprint_frac=0.35, ground_z_frac=0.22):
+    """Generic (creature-agnostic) cleanup for the anim-quads batch: removes tiny reconstruction
+    specks AND ground plates/floating debris, while leaving rigid attachments that are part of the
+    creature's own silhouette (e.g. the Golem's standing stones) alone. Unlike
+    `remove_small_components` (kept verbatim for the Griffin's own segmentation/simple paths, a
+    flat min-vertex-count cutoff tuned for THAT mesh's reconstruction noise), this classifies every
+    non-largest component by its own shape and position, not just its size, because a Meshy ground
+    plate/debris scatter can hold far more than a few dozen vertices -- too big for a flat
+    min_verts cutoff to catch without also risking real small anatomy (horns, claws, toes).
+
+    The largest component is always kept unconditionally (the body). Every other component is
+    removed if EITHER:
+      - it's a tiny speck (`< max(min_verts, small_frac * largest_component_vert_count)`), or
+      - it looks like a ground plate: flat (height extent <= `ground_flatness_ratio` * its own
+        horizontal extent), wide (horizontal extent >= `ground_footprint_frac` * the BODY's own
+        horizontal extent -- so it's comparable in footprint to the creature standing on it, not
+        just a flat sliver of anatomy), AND sits near the bottom of the whole mesh's bounding box
+        (within `ground_z_frac` of the mesh's own height from the lowest point).
+    Everything else (not tiny, not flat-and-wide-and-low) is kept -- e.g. a rigid attachment like a
+    standing stone sits upright (tall relative to its own footprint), so it fails the flatness test
+    and survives.
+
+    Returns a report dict: {"kept_largest": {...}, "removed": [...], "kept_other": [...]} with each
+    component's vertex count and world-space bbox, for the caller to log/verify (e.g. confirm the
+    removed set is really the ground disc + debris, not an anatomical part)."""
+    me = obj.data
+    comps = connected_components(obj)
+    if not comps:
+        return {"kept_largest": None, "removed": [], "kept_other": []}
+
+    def bbox_of(comp):
+        xs = [me.vertices[i].co.x for i in comp]
+        ys = [me.vertices[i].co.y for i in comp]
+        zs = [me.vertices[i].co.z for i in comp]
+        return (min(xs), min(ys), min(zs), max(xs), max(ys), max(zs))
+
+    comps.sort(key=len, reverse=True)
+    largest = comps[0]
+    largest_bbox = bbox_of(largest)
+    body_horiz_extent = max(largest_bbox[3] - largest_bbox[0], largest_bbox[4] - largest_bbox[1])
+
+    all_zs = [v.co.z for v in me.vertices]
+    overall_min_z, overall_max_z = min(all_zs), max(all_zs)
+    overall_height = max(overall_max_z - overall_min_z, 1e-6)
+
+    report = {"kept_largest": {"verts": len(largest), "bbox": largest_bbox}, "removed": [],
+              "kept_other": []}
+    to_delete_idx = []
+    for comp in comps[1:]:
+        n = len(comp)
+        x0, y0, z0, x1, y1, z1 = bbox_of(comp)
+        horiz_extent = max(x1 - x0, y1 - y0)
+        height_extent = z1 - z0
+        is_speck = n < max(min_verts, small_frac * len(largest))
+        is_flat = height_extent <= ground_flatness_ratio * max(horiz_extent, 1e-6)
+        is_wide = horiz_extent >= ground_footprint_frac * body_horiz_extent
+        is_low = (z0 - overall_min_z) <= ground_z_frac * overall_height
+        # A component near the mesh's own ground level that is EITHER flat (a debris chunk/pebble --
+        # individually narrow, so the old `is_flat and is_wide` combination missed a SCATTER of many
+        # small flattish pieces, confirmed on the Kirin mesh: ~15 separate 90-400-vert debris
+        # fragments at the very bottom of the bbox, each too narrow on its own to pass a width test)
+        # OR wide (a single, thicker ground disc/plate) is ground debris -- a real separate
+        # anatomical piece at ground level (a hoof, a splayed toe) is, on every mesh checked so far,
+        # already PART OF the largest/body component (connected to its own leg), not a standalone
+        # component, so this is safe without also requiring width.
+        is_ground = is_low and (is_flat or is_wide)
+        entry = {"verts": n, "bbox": (x0, y0, z0, x1, y1, z1)}
+        if is_speck or is_ground:
+            entry["reason"] = "ground_plate" if (is_ground and not is_speck) else "speck_or_debris"
+            report["removed"].append(entry)
+            to_delete_idx.extend(comp)
+        else:
+            entry["reason"] = "kept_attachment"
+            report["kept_other"].append(entry)
+
+    if to_delete_idx:
+        bpy.context.view_layer.objects.active = obj
+        bpy.ops.object.mode_set(mode="EDIT")
+        bm = bmesh.from_edit_mesh(obj.data)
+        bm.verts.ensure_lookup_table()
+        to_delete = [bm.verts[vi] for vi in to_delete_idx]
+        bmesh.ops.delete(bm, geom=to_delete, context="VERTS")
+        bmesh.update_edit_mesh(obj.data)
+        bpy.ops.object.mode_set(mode="OBJECT")
+    return report
+
+
+def ground_to_zero(obj):
+    """Translates obj (Z only, applied) so its lowest point sits exactly at world Z=0 -- no scale,
+    no X/Y re-centring (unlike `normalise_transform`, which also scales to a fixed target height and
+    centres X/Y; this is the lighter-weight "feet on the ground" step the anim-quads generic prep
+    path needs on its OWN prepped-mesh output, ahead of the full normalise_transform rig_creature.py
+    applies later). Returns the Z offset applied (positive = mesh moved up)."""
+    bbox = [obj.matrix_world @ mathutils.Vector(c) for c in obj.bound_box]
+    min_z = min(v.z for v in bbox)
+    obj.location.z -= min_z
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.ops.object.transform_apply(location=True, rotation=False, scale=False)
+    return -min_z
+
+
 def retopologize_to_single_shell(obj, target_tri_band=(10000, 14000), small_component_min_verts=100,
                                   max_tries=6):
     """Voxel-remeshes `obj` (in place) to a single connected, manifold shell landing roughly in
@@ -876,6 +1076,38 @@ def normalize_weights(obj):
     bpy.ops.object.mode_set(mode="WEIGHT_PAINT")
     bpy.ops.object.vertex_group_normalize_all(lock_active=False)
     bpy.ops.object.mode_set(mode="OBJECT")
+
+
+def strip_bone_weight(obj, bone_name):
+    """Zeros `bone_name`'s vertex-group weight on every vertex that carries any (leaving every
+    other group on that vertex as-is; call normalize_weights after if the remainder should sum
+    back to 1). v18 finding (Golem): `root` is a near-zero-length hierarchy-only bone (rig_
+    templates build it purely as the top of the chain, (0,0,0)->(0,0,0.12*H) -- see build_bones'
+    docstring) that is never itself posed by anim/gait.py or anim/keyed.py (Idle/Move/Attack/Cast/
+    Hit/Victory never touch it; only KO's root.location drop does, uniformly for the whole body) --
+    so any mesh vertex that automatic weighting assigns meaningful `root` weight to is effectively
+    PINNED in place for the rest of every other clip, regardless of how its neighbours (weighted to
+    bones that DO move) are posed. For Golem's low, wide, ground-hugging belly (root sits right at
+    the mesh's own centre-bottom), this produced up to 81% root weight on some belly vertices --
+    confirmed as the actual mechanism behind both verify.py's worst edge-stretch (10-18x) and its
+    toe_deformation flipped-triangle count (thousands, across nearly every clip) for Golem's Move/
+    Attack/Cast/KO: the same vertex pair every time, one side pinned-static (root-dominant), the
+    other swinging through the leg's own full gait motion. Golem is the only one of the four new
+    creatures this affects (Kirin/Tarasque/Basilisk: 0 vertices with meaningful root weight,
+    confirmed directly); not called for Griffin (whose own root weight is already negligible, <=13%
+    on 8 vertices) to keep its rig byte-for-byte unchanged."""
+    me = obj.data
+    group = obj.vertex_groups.get(bone_name)
+    if group is None:
+        return 0
+    idx = group.index
+    stripped = 0
+    for vi, v in enumerate(me.vertices):
+        for g in list(v.groups):
+            if g.group == idx:
+                obj.vertex_groups[idx].remove([vi])
+                stripped += 1
+    return stripped
 
 
 def max_influences_per_vertex(obj):

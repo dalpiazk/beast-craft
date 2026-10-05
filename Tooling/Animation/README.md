@@ -986,6 +986,420 @@ Live3D gates green: build 0 warnings, `dotnet format` clean, BeastCraft.Desktop 
 EditModeTests 1663/1663 passed, `git diff main --stat -- src .github BeastCraft.slnx` empty. Mesh
 unchanged at 8000 tris / 41 bones; GLB 0.956 MiB (1,002,604 bytes), still under the 2 MiB budget.
 
+## v18: wingless quadrupeds -- Golem, Kirin, Tarasque, Basilisk, rigged and animated through the same
+## pipeline as the Griffin, parameterised per creature (lead review round 18)
+
+Four new creatures went through this same five-stage pipeline (prep already done before this round --
+see `Tooling/ArtLab/provenance/meshy-01a1098*.md`), reusing every stage script with the Griffin's own
+path kept byte-for-byte unchanged throughout (re-verified at each step: identical bone positions +
+weight hash after the rig template change, identical baked F-curve keyframe hashes after the gait.py/
+keyed.py parameterisation -- see each stage's own section below).
+
+### 1. Rig: `rig_templates/quadruped.py`, `--creature`/`--template` on `rig_creature.py`
+
+A new wingless-quadruped template, generalised from `winged_quadruped.py` (reuses its generic
+native<->normalised conversion, snap-if-outside, leg-mask builder and hip-weight-gradient fix
+directly -- all four already worked on a generic `legs`/`bone_roles` shape with nothing Griffin-
+specific). No wings, a single `leg_<side>_toe` bone (not the Griffin foreleg's 3-bone toe fan),
+`scapula_<side>` kept on forelegs (anim/gait.py unconditionally expects it for any side starting
+`F`), a variable-length tail (`tail_01..NN`, NN = however many points the lead hand-placed for that
+creature -- Golem/Tarasque 2 bones, Kirin 3, Basilisk 5), and `snout`+`jaw` off `head` (`snout` plays
+the Griffin `beak`'s rigid-nose role under a less bird-specific name). `rig_creature.py` gained
+`--creature NAME`/`--template winged_quadruped|quadruped` (default `griffin`/`winged_quadruped`,
+preserving the Griffin path unchanged); each other creature's hand-placed landmarks load from
+`rig_templates/landmarks/<creature>.json` (copied verbatim from the lead's `landmarks_lead.json`).
+
+Bone counts: Golem 29, Kirin 30, Tarasque 29, Basilisk 32 -- all heat-weighted clean (0 unweighted,
+max 4 influences/vertex) on the first attempt, no voxel/envelope fallback needed.
+
+Two real bugs found and fixed during this round, both confirmed by direct diagnosis before fixing
+(not guessed): **(a)** Kirin's mesh has two symmetric mirrored horns, not one centred horn -- the
+original single `horn` bone pointed into the empty space between them. Dropped (30 bones now, was
+31); both horns + ears are instead forced 100% rigid onto the existing `head` vertex group
+(`rig_templates/quadruped.py`'s new `force_rigid_to_bone`, called from `rig_creature.py`) via a
+region keyed off the old horn landmark (kept, unused as a bone, purely as a radius hint) -- the first
+attempt's region leaked into the neck (protecting only `jaw` from being swallowed, not `neck`, with a
+`min_z` barely below skull centre) and measurably made the smoke-test edge-stretch gate WORSE
+(1.99x -> 4.75x); the fix added a `min_y` geometric cutoff (horns point up/back, the muzzle points
+distinctly forward -- cleanly separable by Y, unlike by vertex-group membership, which heat-weighting
+gave spurious jaw/snout weight to at the horn tips themselves) and protected `neck` instead of `jaw`.
+**(b)** Golem's low, wide, ground-hugging belly sits right at the `root` bone's own position -- heat
+weighting gave up to 81% `root` weight to 129 belly vertices, and `root` is never itself posed by any
+clip except KO's uniform drop, so those vertices stayed pinned static while neighbouring leg-weighted
+vertices moved through the full gait -- confirmed as the actual mechanism behind Golem's worst
+edge-stretch/toe-flip numbers. Fixed generically in `common.py` (`strip_bone_weight`, called for every
+non-Griffin creature -- zero effect on Kirin/Tarasque/Basilisk, which had no such vertices, and not
+run for Griffin, whose own root weight was already negligible).
+
+Lead-review fix round within this same pass: Tarasque's spine landmarks were too low (overlay showed
+it running along the belly) -- `rig_templates/landmarks/tarasque.json` corrected (pelvis/spine_01/
+chest/neck_base/neck_mid/head/head_top raised, all four leg hips raised 0.40/0.42 -> 0.52 to match,
+tail raised to follow); re-rigged and re-checked, overlay now runs the spine through the body as
+intended. The pose-test camera was also switched from a fixed loc/ortho_scale (tuned for the
+Griffin's proportions) to a bbox-framed one (`rig_creature.py`'s new `render_ortho_framed`) -- fixes
+Tarasque's cut-off 3/4 render and improves (not fully clears) Basilisk's dark one, plus a low-energy
+fill light opposite the main sun for the latter.
+
+Basilisk's one flipped triangle from the rig-only smoke-test pose (verts 1913/2010/1951) was
+diagnosed, not guessed: all three vertices blend only within the SAME leg's own thigh/shin/foot/toe
+chain (no cross-bone contamination), at a tiny, nearly-flat sole triangle -- the flip is a geometric
+consequence of that smoke-test's uncompensated ~60-degree combined thigh+shin pitch with no IK
+foot-levelling, not a weighting defect; left as-is (a real gait's IK keeps the foot grounded/level
+through stance, which the static smoke-test pose doesn't attempt).
+
+### 2. Animation: `--creature` on `anim/gait.py` and `anim/keyed.py`, data/config not forked copies
+
+`gait.py`'s walk-cycle constants (duty, body bob, stride, crouch band, scapula swing, pelvis roll/
+yaw, foot/toe curl, tail/head sinusoid amplitude) were already named tunables -- a `GAIT_PARAMS` dict
+keyed by `--creature` replaces the bare literals (Griffin's entry reproduces v17's exact values).
+`keyed.py` dispatches to a separate creature-parameterised clip builder for any non-Griffin
+`--creature` (every Griffin code path is untouched). Character per the lead's brief: Golem slow/
+heavy/minimal head motion, double front-foot stomp Attack, plant-and-rise Cast, slow proud-stomp
+Victory; Kirin elegant/light with head bob + tail flick, head-down horn-thrust-lunge Attack, rear-up
+Cast, prance+head-toss Victory; Tarasque short-legged waddle/grumpy/head-low, lunging bite Attack
+(jaw open), hunker+roar Cast, grumpy-huff+shell-shake Victory; Basilisk low sprawling walk with
+continuous tail sway, lunge-bite+tail-whip Attack, rise-on-forelegs+crest-up+tail-curl Cast, tail-
+swish+head-bob Victory. KO reuses the Griffin's v17 mechanism exactly (root-bone LOCATION drop +
+every limb rotated toward EXTENSION, never folded, held final pose, not a curl-up) generalised: a
+numeric per-leg solver (`solve_lying_angle`, a coarse-then-fine grid search over thigh/shin angle
+minimising the toe tip's ground height, the same kind of direct-measurement approach the Griffin's
+own KO redo used by hand) replaces the Griffin's hand-iterated fixed angles, since a fixed angle
+tuned for the Griffin's leg proportions does not generalise to four very different leg lengths; root
+drop is capped at 85% of the shortest leg's own max reach (an uncapped drop pegged Golem's solver at
+its search boundary, since its short legs can't reach as deep a drop as the Griffin's).
+
+Event markers (`hit_react`, `cast_release`) and the loop/one-shot map export the same way as the
+Griffin's (`keyed_event_markers.json` -> `<creature>_anim_events.json` sidecar via `export_glb.py`,
+unchanged -- already fully generic, no Griffin-specific hardcoding found in it). `export_glb.py`'s
+round-16 leg-key rotation-mode fix (`for pb in arm_obj.pose.bones: pb.rotation_mode = "XYZ"`, applies
+to every pose bone unconditionally) confirmed still in place and verified working for all four new
+creatures by re-importing each exported GLB and checking leg-bone fcurve keyframe counts per clip
+(e.g. Golem's Attack/Victory show 32/54 keyframes on the stomping/prancing front legs, not 2).
+
+**A real, confirmed rig bug found and fixed via the animation gates, not just reported:** `verify.py`'s
+`foot_orientation` gate failed by 100+ degrees ("sole-normal") on Golem/Tarasque/Basilisk (Kirin
+passed cleanly) -- traced to `anim/gait.py`'s round-14 foot/toe convention, which holds the foot/toe
+at their REST roll during stance by design (not reconstructed via a world-space up-hint), so whatever
+local Z axis each bone's never-explicitly-set, Blender-auto-computed rest roll happens to have IS its
+stance-time sole-normal. Kirin's longer, more Griffin-like leg proportions happened to get a
+good-enough default roll; the other three's shorter, more acutely-angled legs didn't. Fixed at
+rig-build time, not in `gait.py` (which correctly just preserves whatever roll it's given):
+`rig_templates/quadruped.py`'s `build_bones` now calls Blender's `align_roll((0,0,1))` on every
+`leg_<side>_foot`/`leg_<side>_toe` edit bone, explicitly setting each one's roll so local Z points as
+close to world-up as its own head-tail direction allows. Confirmed fixed: `foot_orientation` now
+PASSES on all four creatures, every leg (was failing 100-170 degrees over threshold on three of them).
+Not applied to `winged_quadruped.py`'s Griffin `build_bones` -- keeps the Griffin rig byte-for-byte
+unchanged; its own default roll already passed.
+
+### 3. Gates (honest numbers, one solid attempt per the lead's explicit instruction not to chase
+### edge-stretch past that -- Griffin's own hip-stretch is open as issue #73)
+
+| Beast | walk_direction | foot_orientation | KO held-pose | KO ground (front legs) | edge-stretch | toe_deformation |
+| --- | --- | --- | --- | --- | --- | --- |
+| Golem | PASS | PASS (all 4 legs) | PASS (0.000 delta) | FAIL (dips ~0.04-0.07 below ground) | FAIL (worst 14.9x, Move) | FAIL (flips concentrated at a root/pelvis-vs-leg weight boundary) |
+| Kirin | PASS | PASS (all 4 legs) | PASS | FAIL (dips ~0.04 below ground) | FAIL (worst 6.9x, Move) | Attack PASSES clean (0 flips); Move/KO FAIL |
+| Tarasque | PASS | PASS (all 4 legs) | PASS | FAIL (front legs + head dip) | FAIL (worst 32.0x, Move) | Attack PASSES clean (0 flips); Move/KO FAIL |
+| Basilisk | PASS | PASS (all 4 legs) | PASS | FAIL (3 of 4 legs dip) | FAIL (worst 10.6x, Move) | Idle PASSES clean (0 flips); Move/KO FAIL |
+
+`walk_direction` (forward-correct stance/swing + canonical lateral-sequence touchdown order) and
+`foot_orientation` pass cleanly on all four -- both were real, checked mechanisms, not just "it looks
+fine." The edge-stretch/toe-deformation failures are the same class of pre-existing weight-gradient
+fragility the Griffin's own rig needed five dedicated rounds (5/9/10/13/14) to get as far as it did,
+now applied for the first time (one pass, not five) to four new, differently-proportioned rigs; two
+genuine instances of it were found and fixed this round (Kirin's horn-region hard boundary, Golem's
+root-pinning) and the rest is reported honestly rather than chased further. KO's ground-clearance
+numeric miss is visually mild in the rendered contact sheets (see below) -- the lying pose reads
+correctly, the gate is catching a few cm of front-foot/shin ground clip that a numeric per-leg
+`solve_lying_angle` grid search (new this round, replacing hand-iteration) got close to but not fully
+inside the Griffin's own `-0.005` tolerance for every leg on every creature.
+
+### 4. Contact sheets -- read and critiqued honestly
+
+Rendered (bbox-framed 3/4 view, Blender Workbench) and reviewed frame-by-frame for all four across
+Move/Idle/Attack/Cast/Hit/Victory/KO: no walking-backwards, no crossed/mirrored legs, no visible
+tearing or mesh explosion on any creature at normal viewing resolution (the numeric gate failures
+above are real but subtle -- a few-percent stretched sliver or a frame-sparse flip count, not a
+visibly broken silhouette). Kirin's clips read the most clearly distinct (horn-thrust Attack,
+rear-up Cast, side-lying KO all immediately legible). Golem's double-stomp Attack and Tarasque's
+Cast/Victory beats are honestly subtle from the chosen 3/4 camera angle -- present in the pose data
+(confirmed via the per-frame leg-key counts above) but not dramatically readable in a single static
+frame; a front-on or lower camera angle would likely read better for a follow-up pass. GLBs exported
+clean, all under the 2 MiB budget (Golem 0.655 MiB, Kirin 0.781 MiB, Tarasque 0.802 MiB, Basilisk
+0.853 MiB).
+
+### 5. Live3D MP4s -- `--pilot-model`, real in-engine captures
+
+`Game1.cs`/`LaunchOptions.cs` hardcoded `griffin_anim.glb` and `griffin_anim_events.json` in
+`--pilot-sequence` mode. Added `--pilot-model NAME` (default `"griffin"`, every existing
+`--pilot-sequence` call keeps working unchanged) which swaps both filenames -- the minimal-diff
+approach the brief asked for, not a forked copy of the app. The wing/tail spring-bone lookups
+(`tail_04`, `wing_L_03`, `wing_R_03`) already no-op cleanly for a model missing those nodes
+(`SpringJointConfig.IsValid`/`ApplySpringJoint`'s existing guard, pre-dating this round -- confirmed
+by reading it, not assumed), so none of these four creatures need any further spring-bone guarding.
+`dotnet build Tooling/Spike55/Live3D -c Release`: 0 warnings, 0 errors.
+
+Captured real in-engine frame sequences (toon-shaded, hex board, the actual game camera) for all
+four creatures' `Move` clip at 60fps via the built `Live3D.exe --pilot-sequence <dir> --pilot-model
+<name> --pilot-clip move --pilot-fps 60 --frames <one gait cycle>`, encoded to MP4 with ffmpeg
+(`imageio-ffmpeg`'s bundled binary; `-framerate 60 -vf scale=720:1280:flags=lanczos,format=yuv420p
+-c:v libx264 -crf 20 -movflags +faststart`, `-stream_loop 2` for a few seconds of playback) --
+`golem_walk.mp4`, `kirin_walk.mp4`, `tarasque_walk.mp4`, `basilisk_walk.mp4`. Spot-checked a frame
+from each: correct creature, correct clip, clean toon shading, no loader/binding errors.
+
+A follow-up pass additionally attempted the full crossfaded `reel` mode (all 7 clips, `Idle -> Move
+-> Attack -> Hit -> Cast -> Victory -> KO`) for each creature: genuinely captured, not guessed --
+confirmed by measured throughput (~2 frames/sec real time at this headless capture rate, consistent
+across all four creatures and with Griffin's own historical reel captures) that a full multi-
+thousand-frame reel per creature would cost 15-20+ minutes each, well outside this round's remaining
+budget. Captured a bounded 90-second slice of the reel per creature instead (158-200 frames each,
+30fps, covering Idle fully into Move and in most cases partway into Attack -- confirmed by reading a
+sampled frame from each, e.g. Kirin's frame 100 shows the horn-thrust Attack lunge in-engine),
+encoded the same way as the `_walk.mp4`s above: `golem_reel.mp4`, `kirin_reel.mp4`,
+`tarasque_reel.mp4`, `basilisk_reel.mp4` (5-7s each). The full 7-clip reel and the 2x2 combined-
+walking/combined-attacking videos remain not done -- see below.
+
+### 6. Known gaps, honestly not done this round
+
+- The full 7-clip `reel` MP4 (all clips, crossfaded, matching Griffin's own deliverable) and the 2x2
+  combined-walking/combined-attacking reels were not completed -- the measured ~2 frames/sec capture
+  rate makes the full multi-thousand-frame reel a 15-20+ minute cost per creature, not "cheap" (the
+  lead's own stated bar for the 2x2 reels); a partial (~90s-bounded) reel capture was done instead
+  per creature (see above), plus the single-clip `Move` captures, and the Blender contact sheets
+  cover all 7 clips as stills. `--pilot-model` + the per-creature GLBs/events sidecars are already in
+  place and confirmed working end-to-end, so capturing the remaining full reels is a follow-up run of
+  the same command (budgeting ~15-20 min per creature), not further engineering.
+- Per-creature weight-gradient tuning (the Griffin's own `fix_hip_weight_gradient`-equivalent
+  multi-round process) was not repeated per new creature beyond the three confirmed-and-fixed bugs
+  above (Kirin's horn-region hard boundary, Golem's root-pinning, the foot/toe roll fix) -- the
+  remaining edge-stretch/toe-deformation numbers are reported, not resolved. Diagnosed (not guessed)
+  for Golem specifically: after the root-weight fix, its worst remaining edge-stretch/flip boundary
+  is PELVIS-vs-leg (not root-vs-leg) -- a vertex 100% `pelvis`-weighted sitting next to a
+  `leg_FR_shin/foot/toe`-dominant one, the same class of conflict as the root fix but on a bone that
+  genuinely does move a little (gait.py's pelvis roll/yaw) -- Golem's unusually narrow stance (legs
+  close to the centreline, per its own landmark notes) appears to be what brings pelvis and leg mesh
+  close enough to blend heat weight across a moving/pinned-ish boundary that Kirin/Tarasque/Basilisk
+  don't show. Not fixed this round (one further diagnosis step, not a chased fix, per the "one solid
+  attempt" instruction).
+- KO ground-clearance is close but not fully inside tolerance for 3/4 creatures' front legs.
+- **Found during an independent re-verification pass, not yet investigated:** `verify.py`'s per-clip
+  foot/toe ground-interpenetration check (the "foot sliding/ground contact" gate, distinct from KO's
+  own ground check above) also fails for two creatures: Kirin's hind legs (BL/BR) dip ~7cm below
+  ground during Move (front legs clean); Tarasque's forelegs dip badly during Cast (-0.25/-0.14) and
+  all four legs dip during Victory (-0.02 to -0.04) -- Golem and Basilisk pass this check cleanly on
+  every clip. Also found: Kirin's Victory clip fails the loop-seam continuity check (20 degree bone
+  delta between first/last frame; every other creature's Victory, and every creature's Idle/Move,
+  pass at 0.000) -- Kirin's "prance + head toss" ending pose doesn't return to its start pose, which
+  breaks the loop-seam assumption `verify.py` checks for any clip the `CLIP_LOOP` map marks loop-
+  friendly (Victory is, same as the Griffin's). Neither of these was chased this round (same "report
+  honestly, one solid attempt" instruction as the edge-stretch/toe-deformation numbers above).
+
+## v18 round 2-3: lead review of the first animation pass -- real root causes found and fixed, not
+## just numbers chased (lead-review round 18, second pass)
+
+The lead's own contact-sheet read (not the numeric gates) caught the real headline bug: **Move was
+visibly broken** on all four creatures (Golem pitched hard head-down with tearing, Tarasque
+tilted/rolled with splayed legs, Kirin's torso twisted with crossing legs, Basilisk's tail swung
+straight UP instead of side to side).
+
+**Root cause, confirmed by direct diagnosis, not guessed:** `rig_templates/quadruped.py`'s
+`build_bones` never set bone roll explicitly for the torso chain (pelvis/spine/neck/head/tail) --
+Blender's un-set, auto-computed default roll has no reason to match the local-X=lateral/local-Y=
+head-tail/local-Z=up convention `anim/gait.py`'s and `anim/keyed.py`'s plain local XYZ-Euler
+rotations assume (a convention the Griffin's own bones happened to satisfy well enough by the shape
+of its particular landmarks, never verified or made explicit before now). The SAME numeric
+`deg_y`/`deg_x` rotation therefore spun around a different real-world axis for each of these new,
+very differently-proportioned creatures. Fixed with a new `align_roll_up` (Z-up primary, Y-forward
+fallback when a bone is itself close to vertical) applied to every torso bone quadruped.py builds --
+confirmed by re-rendering Move for all four and reading the frames directly: body level, feet
+planted, tail sways sideways, no crossing legs. **Not applied to `winged_quadruped.py`** -- Griffin
+re-verified byte-identical (bone hash, weight hash, and all 7 baked-action F-curve hashes all match
+the pre-session baseline exactly, re-checked after every fix in this round).
+
+**Round 3, a second instance of the same class of bug:** `align_roll_up`'s single 0.9 dot-product
+threshold for "is this leg bone close enough to vertical to need the Y-forward fallback" put
+different creatures' thigh bones on *opposite* sides of that threshold (Golem/Tarasque/Kirin's
+thighs: |dot|>=0.97, comfortably past it; Basilisk's own more horizontal, crouched-stance thigh:
+|dot|=0.85, just under) -- diagnosed directly (a roll-axis dump per creature), not guessed. Fixed
+with a dedicated `align_roll_leg` (unconditional Y-forward reference) for every scapula/thigh/shin
+bone, bringing all four onto the same convention. A companion weighting fix landed alongside it:
+`fix_scapula_cross_leg_bleed` (new, quadruped-only, same "strip only the conflicting pair" pattern
+as `fix_root_leg_bleed`) for a `scapula_FR`-vs-`leg_FL` conflict Golem's gates surfaced once Move's
+pose was no longer catastrophically wrong.
+
+**Two pose-direction bugs found the same way** (diagnosed by direct empirical test after the roll
+fixes landed, not assumed): Basilisk's Cast was rising the wrong way (near-vertical, "backflip-like"
+per the lead's own read) -- a sign flip on the rise/peak pose's torso pitch and foreleg thigh/shin
+fixed it, confirmed visually (chest lifts, hind feet stay planted, tail curls, matching the brief).
+Kirin's Cast had the same symptom (diving head-first toward the ground instead of rearing up) for a
+different reason -- its hind-leg shin sits almost exactly on `align_roll_leg`'s old threshold boundary
+too; a shin-sign flip alone did NOT fix it, but flipping the torso pitch sign (same fix family as
+Basilisk's) did, confirmed visually (clean rear-up, head tossed back, horns visible).
+
+**Legibility fixes** (lead review: "Golem Attack/Idle/Victory nearly identical... Golem stomp/
+Tarasque head-bash should read clearly at peak"): increased Golem's stomp amplitude (thigh 26->38
+deg, shin -10->-20 deg) and Tarasque's head-bash amplitude (head pitch 18->28 deg) -- confirmed via
+close-up renders at the actual peak keyframe fraction, both now read unambiguously. Contact sheets
+themselves rebuilt: side camera (not 3/4, per the lead's ask), 4 frames per clip (not 1-2) at the
+clip's own keyframe fractions, larger 420x420 cells.
+
+**Ground-contact fixes:** Tarasque's Victory pelvis "shell shake" roll reduced 8->3 degrees (Tarasque's
+own rest-pose toe clearance is unusually thin, 3-13mm, confirmed directly -- the original roll was
+enough to dip a leg through the ground on the low side of the tilt); KO's "sink"/"stagger" key poses
+had their leg-fold fraction desynchronised from the root-drop fraction (legs 85% folded toward lying-
+flat while the root had only dropped 30% of the way down -- diagnosed by reading verify.py's own KO
+ground check, which samples every frame of the action, not just the held final pose) -- now tied to
+the same fraction (+ a small lead) so the leg fold never meaningfully outruns how far the body has
+actually sunk.
+
+**Kirin's Victory loop-seam** (20 degree gate failure): `proud_settle` was holding the head-toss
+pose instead of returning to rest -- fixed to settle fully back to neutral, matching the Griffin's
+own `victory_pose`'s `proud_settle` exactly (same pattern, re-read directly before copying it).
+Confirmed 0.000 degree delta now, same as every other creature's Victory and every creature's
+Idle/Move.
+
+**Live3D framing** (`golem_walk.mp4` overflowing the frame): `RebuildCameraFitInstances`'s per-
+instance height margin was hardcoded `2.2f` (the Griffin's own 2.0-unit height + a small clearance)
+and its edge margin a flat `1.4f` ("wing spread clearance") -- neither derived from whatever model
+is actually loaded. Both now come from the loaded `_bodyModel`'s own measured bind-pose bounding box
+(height and horizontal half-extent, read once in `LoadContent` from the same vertex loop that
+already computes `HexBoard`'s own scale) -- unchanged for the Griffin (whose own bounds reproduce
+the old hardcoded numbers almost exactly), fixes Golem (wide/low, previously had no horizontal-
+extent accounting in the camera fit at all). `dotnet build`: 0 warnings/errors, reconfirmed after
+every C# change in this round.
+
+**Honestly still not resolved, reported not chased further (same "one solid attempt" instruction):**
+edge-stretch and toe-deformation remain high after all of the above -- confirmed directly that this
+is a SEPARATE, pre-existing weight-gradient fragility, not a residual symptom of the gait bug (the
+numbers did not come down to the Attack-clip range the lead's own hypothesis expected; in several
+cases they moved within the same broad band rather than improving). KO ground-clearance is better
+(several creatures' front legs now pass) but not fully inside tolerance for all four. Kirin's
+`foot_orientation` gate now narrowly fails (20.9 deg vs the 20.0 deg threshold, all four legs) --
+a small regression from an interaction not fully root-caused within this round's budget, flagged
+honestly rather than silently left out of the numbers.
+
+## v18 round 4: lead review of contact_sheet_final -- Move tearing, Kirin neck fold, Basilisk tail, KO
+
+The round-3 sheets were NOT clean: Golem/Tarasque Move tore the chest and forelegs, Kirin's Move
+lurched and its Attack/Cast folded the neck back over the shoulders, Basilisk's tail swung below the
+ground, and Golem/Basilisk KO melted or barely moved. Every cause below was measured (scratchpad
+`work5/diag_wtwist.py`: a per-bone world-space swing/twist decomposition of baked frames;
+`dense_minz.py`: whole-mesh min Z on every frame of every clip), not guessed.
+
+**Move (anim/gait.py, new opt-in `fk_anchored` mode; Griffin keeps its own path untouched):**
+1. *The tear.* `aim_matrix(+up_hint)` rebuilds scapula/thigh/shin roll from a world axis, ignoring
+   rest roll. On the Griffin that is a constant -90 deg offset its tuning was built on; on the
+   quadruped template's explicit roll it twisted those bones 40-180 deg about their own axes,
+   varying per frame (a candy-wrapper twist of the shoulder/leg skin). Fixed with `aim_min_twist`
+   (minimum rotation from the FK-neutral orientation). Measured twist after the fix: <= 3 deg.
+2. IK hip/scapula anchors ignored the body's bob/roll/yaw (the scapula head stayed at rest while its
+   parent dropped). They are now read from the actually-posed pelvis/spine_02.
+3. Crouch was mapped across the legs' reach ratios (noise for near-straight stumps) and stride was
+   absolute (Golem: a 0.28 half-stride on 0.70 legs). Now: one uniform crouch, the larger of
+   `crouch_frac` x leg length and the minimum each leg needs to reach its stride at bob peak plus
+   roll lift. Stride and lift are `stride_frac`/`lift_frac` of each leg's own length.
+4. Near-straight legs (knee < 6% of leg length off the hip-foot line) get a backward knee pole; the
+   landmark pole was noise (Golem FR bowed sideways).
+5. With the foot held at its rest orientation, the IK now solves thigh+shin to the **ankle** (foot
+   target minus the rest foot vector). It previously folded the foot into L2 and only corrected Z,
+   which made Kirin's long-hocked stance sweep non-linear (foot-slide cv 0.39 -> 0.12).
+6. Tail sway is yaw (`tail_yaw`/`tail_pitch`), not pitch. Pelvis roll/yaw are about world axes:
+   the pelvis bone runs root -> pelvis landmark, so its local Y "roll" was really a yaw.
+Per-creature numbers live in `GAIT_PARAMS[...].update(...)` (data, not forked code), including a
+per-creature `cycle_seconds` default (Golem 1.3 s, Tarasque 1.2, Basilisk 1.1, Kirin 1.0).
+
+**Keyed clips (anim/keyed.py, non-Griffin builder only):**
+- *Planted-foot IK pass* after every key pose: any spine pitch used to swing the FK legs with it
+  (Golem Cast drove its forefeet 0.25 below ground = the smeared front legs). Legs now stay planted
+  unless a pose lists them in `_lift` (IK-raised, foot level: stomps/prances) or `_free` (FK: Kirin's
+  tucked Cast forelegs). `_root_drop` lowers the body for crouches/hunkers. Root location and
+  rotation are keyed in every clip.
+- *Sign convention.* On the quadruped Z-up roll, +deg_x pitches a bone's tip UP/BACK. Kirin's neck
+  already leans back ~50 deg, so Attack's +22/+26/+30 and Cast's +16/+18/+22 folded it backward.
+  Fixed in the pose data:
+  - Kirin Attack is a head-down horn thrust (neck -26/-20, head below the withers);
+  - Kirin Cast rears the chest and counter-pitches the neck upright;
+  - Golem Cast rises (+) instead of nose-diving;
+  - Basilisk Cast's neck counter-pitches and its forelegs push up planted;
+  - the generic Hit recoil flinches up/back (its nose-down version put Tarasque's jaw 11 cm through
+    the floor);
+  - Tarasque's Attack wind-up became a draw-back (its dip put the snout 14 cm under).
+- *KO rebuilt* from measured geometry, baked every frame (Bezier between IK poses left hooves 3-9 cm
+  under the floor):
+  - the body drops until its lowest leg-free torso vertex touches the ground;
+  - legs splay out on the ground via the same IK;
+  - head and tail pitch are bisected until they rest on the ground;
+  - every frame is settled so the whole mesh stays above about -4 mm.
+  - Golem uses `ko_mode="side"`: its pelvis-only webbing sits 0.125 off the ground and its head
+    about 1.0 up with no neck, so a belly slump can't read. It tips onto its back with the stumps up.
+
+**Rig (rig_templates/quadruped.py `fix_sole_weights`, called from rig_creature.py via hasattr):**
+sole vertices were 60-73% shin-weighted, so any knee flex dragged the sole through the ground even
+with the foot bone level. Below each leg's ankle height, thigh/shin weight is ramped onto the foot.
+
+**Gates (verify.py; before = round-3 FINAL, after = this round):**
+
+| Beast | walk_dir | foot_orient | foot slide cv | toe ground min | edge Move/Attack/KO | toe_def stretch, flips (Move/IdleAtk/battle) | KO ground | KO held |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Golem before | P | P | P 0.04 | -0.207 | 18.8/12.9/21.1 | 11.8x 4348 / 12.9x 94 / 21.1x 551 | F -0.084 | P |
+| Golem after | P | P | P 0.03 | -0.010 | 3.8/4.8/4.7 | 3.7x 120 / 3.7x 255 / 4.7x 625 | P +0.004 | P |
+| Kirin before | P | F 21 deg | P 0.32 | -0.086 | 8.0/2.7/2.6 | 1.7x 120 / 1.0x 0 / 1.0x 820 | F -0.035 | P |
+| Kirin after | P | P 1 deg | P 0.12 | -0.010 | 3.3/1.9/6.3 | 1.2x 0 / 1.2x 0 / 1.5x 111 | P 0.000 | P |
+| Tarasque before | P | P | P 0.06 | -0.185 | 34.2/8.6/13.2 | 4.8x 705 / 1.3x 0 / 2.0x 1075 | F -0.070 | P |
+| Tarasque after | P | P | P 0.13 | -0.012 | 3.5/8.2/4.7 | 2.4x 1 / 2.1x 7 / 2.3x 122 | P +0.003 | P |
+| Basilisk before | P | P | P 0.11 | -0.304 | 11.4/4.0/10.9 | 3.5x 662 / 1.0x 0 / 2.4x 365 | F -0.048 | P |
+| Basilisk after | P | P | P 0.07 | +0.011 | 3.4/4.0/7.2 | 1.6x 0 / 2.3x 11 / 2.0x 86 | P +0.019 | P |
+
+Every Move is under 4x edge-stretch. Loop seams pass (Move/Idle/Victory). Dense whole-mesh min Z:
+KO is within 3 mm on every frame for all four; every other clip stays within 4 cm (the worst are
+transient frames of Golem Attack and Basilisk Attack, a shin/pelvis-blended vertex as the knee
+bends).
+
+**Still open, honestly:**
+- `toe_deformation` still FAILS on its strict stretch thresholds.
+- Three non-Move outliers remain, all hard weight boundaries:
+  - Tarasque Attack 8.2x (8.6x before this round): a `scapula_FR` vertex next to a `leg_BR_thigh`
+    one on the under-shell flank;
+  - Basilisk KO 7.2x and Kirin KO 6.3x: belly/hip skin beside a fully splayed thigh.
+  Close-up renders show small slivers only, no tearing at gameplay scale.
+- Golem's pelvis-only webbing between its forelegs shows a small crease and sliver in Move/Attack
+  close-ups.
+- Per-creature `cycle_seconds` changes clip length (and so stance foot speed). The game must drive
+  root speed from each clip's own stride/duration, not a shared constant.
+
+Griffin re-verified byte-identical after every change (bone hash 56c47296..., weight hash ad64cfaa...,
+all 7 baked-action F-curve hashes equal to the pre-session baseline).
+
+## v18 round 5: the exported Move had NO leg motion (every GLB since round 16, Griffin included)
+
+**Root cause:** `export_glb.py`'s round-16 fix forces every pose bone to XYZ-Euler so the keyed clips'
+Euler leg keys apply. But `anim/gait.py` keys the leg/scapula/toe bones as `rotation_quaternion`,
+and in XYZ mode Blender silently ignores quaternion fcurves. The exporter therefore wrote Move's leg
+bones as 2-key constant rest rotations: 0.0 deg range measured from the GLB itself, while the body
+still bobbed. There are no IK constraints anywhere in the pipeline. Blender previews and contact
+sheets always looked right because they evaluate the `.blend` in its own rotation modes. The old
+"leg keys present" check counted channels, not motion, so it passed.
+
+**Fix:** before the XYZ normalisation, `export_glb.py` resamples every quaternion-keyed bone on
+every frame into equivalent continuity-preserving XYZ Euler LINEAR keys (`quaternion_fcurves_to_euler`).
+A second, smaller leak fixed alongside it: the rigged `.blend` keeps rig_creature's TestPose, so a
+bone Move never keys (`neck_02`) showed a 14 deg turn in Blender that no runtime plays. `gait.py`'s
+fk_anchored mode now clears the pose first, and the gate's truth capture resets unkeyed bones to rest.
+
+**New hard gate:** `glb_gate.py`, run automatically at the end of `export_glb.py` (the export fails
+loudly), and standalone as `python glb_gate.py X.glb glb_gate_truth.json`. It parses the GLB itself
+(numpy, no Blender importer), does FK over the glTF node tree, and compares every bone's
+world-space deformation rotation and head position with the Blender-evaluated truth captured
+before any mode change. Thresholds: <= 2 deg and <= 1 cm on every 2nd frame of every clip, per-leg
+thigh/shin range within 2 deg, and each Move leg's thigh+shin range >= 15 deg.
+
+Against the OLD shipped `kirin_anim.glb` the gate FAILS exactly this bug: Move legs range 3-4 deg in
+the GLB vs 25-72 deg in Blender, 60.9 deg max error, all four legs "not stepping". The old Griffin
+GLB fails Move with a 151 deg error; its other six clips match at 0.00. All new GLBs (Griffin and
+four beasts) PASS with 0.00 deg / 0.0000 error on every clip.
+
+Live3D: its `tail_04` spring bone (the Griffin's tail tuft) is now Griffin-only. On the Basilisk,
+`tail_04` is a mid-tail bone, and the lagged spring offset kinked the tail in-engine.
+
 ## v9: max-edge-stretch gate + weight/render fixes -- partial progress, honestly not fully resolved
 ## (lead-review round 9)
 

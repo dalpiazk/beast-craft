@@ -1,0 +1,195 @@
+{
+ "_note": "Lead hand-placed landmarks, NATIVE prepped-mesh coords (head=-Y, up=+Z, feet Z=0, L=-X, R=+X), read off <beast>_calib/{left,bottom,front}.png via calib.json. Leg chain = hip, knee, ankle, foot; toe_tip forward of foot. Tail may be a short stub inside the body for tail-less beasts. 'snout_tip' plays the Griffin's 'beak_tip' role.",
+ "_source": "lead hand-placed landmarks, scratchpad/anim-quads/landmarks_lead.json (2026-10-04)",
+ "legs": [
+  {
+   "side": "FL",
+   "is_front": true,
+   "chain": [
+    [
+     -0.12,
+     -0.18,
+     0.5
+    ],
+    [
+     -0.1,
+     -0.2,
+     0.3
+    ],
+    [
+     -0.09,
+     -0.21,
+     0.08
+    ],
+    [
+     -0.08,
+     -0.21,
+     0.0
+    ]
+   ],
+   "toe_tip": [
+    -0.08,
+    -0.3,
+    0.0
+   ]
+  },
+  {
+   "side": "FR",
+   "is_front": true,
+   "chain": [
+    [
+     0.15,
+     -0.08,
+     0.5
+    ],
+    [
+     0.15,
+     -0.08,
+     0.3
+    ],
+    [
+     0.14,
+     -0.07,
+     0.08
+    ],
+    [
+     0.14,
+     -0.07,
+     0.0
+    ]
+   ],
+   "toe_tip": [
+    0.14,
+    -0.16,
+    0.0
+   ]
+  },
+  {
+   "side": "BL",
+   "is_front": false,
+   "chain": [
+    [
+     -0.17,
+     0.36,
+     0.5
+    ],
+    [
+     -0.16,
+     0.35,
+     0.3
+    ],
+    [
+     -0.15,
+     0.34,
+     0.08
+    ],
+    [
+     -0.15,
+     0.34,
+     0.0
+    ]
+   ],
+   "toe_tip": [
+    -0.15,
+    0.26,
+    0.0
+   ]
+  },
+  {
+   "side": "BR",
+   "is_front": false,
+   "chain": [
+    [
+     0.13,
+     0.52,
+     0.5
+    ],
+    [
+     0.12,
+     0.53,
+     0.3
+    ],
+    [
+     0.11,
+     0.54,
+     0.08
+    ],
+    [
+     0.11,
+     0.54,
+     0.0
+    ]
+   ],
+   "toe_tip": [
+    0.11,
+    0.46,
+    0.0
+   ]
+  }
+ ],
+ "spine": {
+  "pelvis": [
+   0,
+   0.45,
+   0.85
+  ],
+  "spine_01": [
+   0,
+   0.15,
+   0.9
+  ],
+  "chest": [
+   0,
+   -0.2,
+   0.88
+  ],
+  "neck_base": [
+   0,
+   -0.42,
+   0.88
+  ],
+  "neck_mid": [
+   0,
+   -0.58,
+   0.87
+  ],
+  "head": [
+   0,
+   -0.75,
+   0.85
+  ],
+  "head_top": [
+   0,
+   -0.72,
+   1.05
+  ],
+  "snout_tip": [
+   0,
+   -0.94,
+   0.85
+  ],
+  "jaw_tip": [
+   0,
+   -0.88,
+   0.72
+  ]
+ },
+ "tail": [
+  [
+   0,
+   0.7,
+   0.8
+  ],
+  [
+   0,
+   0.82,
+   0.75
+  ],
+  [
+   0,
+   0.9,
+   0.7
+  ]
+ ],
+ "notes": "Narrow stance: legs sit close to the centreline under a wide boulder body (feet only ~0.2-0.3 apart in X); legs are thick stumps, so knees barely bend. Face is low on the front of the body with almost no neck -- head motion should be small. Standing stones + moss are fused into the back mesh: weight them rigidly to the spine/chest bones (no jiggle). No tail: stub inside the rear."
+}

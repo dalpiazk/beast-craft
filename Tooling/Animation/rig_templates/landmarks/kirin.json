@@ -1,0 +1,213 @@
+{
+ "_note": "Lead hand-placed landmarks, NATIVE prepped-mesh coords (head=-Y, up=+Z, feet Z=0, L=-X, R=+X), read off <beast>_calib/{left,bottom,front}.png via calib.json. Leg chain = hip, knee, ankle, foot; toe_tip forward of foot. Tail may be a short stub inside the body for tail-less beasts. 'snout_tip' plays the Griffin's 'beak_tip' role.",
+ "_source": "lead hand-placed landmarks, scratchpad/anim-quads/landmarks_lead.json (2026-10-04)",
+ "legs": [
+  {
+   "side": "FL",
+   "is_front": true,
+   "chain": [
+    [
+     -0.13,
+     -0.12,
+     0.75
+    ],
+    [
+     -0.17,
+     -0.12,
+     0.45
+    ],
+    [
+     -0.2,
+     -0.14,
+     0.12
+    ],
+    [
+     -0.22,
+     -0.17,
+     0.0
+    ]
+   ],
+   "toe_tip": [
+    -0.22,
+    -0.24,
+    0.0
+   ]
+  },
+  {
+   "side": "FR",
+   "is_front": true,
+   "chain": [
+    [
+     0.13,
+     -0.12,
+     0.75
+    ],
+    [
+     0.17,
+     -0.12,
+     0.45
+    ],
+    [
+     0.2,
+     -0.14,
+     0.12
+    ],
+    [
+     0.22,
+     -0.17,
+     0.0
+    ]
+   ],
+   "toe_tip": [
+    0.22,
+    -0.24,
+    0.0
+   ]
+  },
+  {
+   "side": "BL",
+   "is_front": false,
+   "chain": [
+    [
+     -0.14,
+     0.41,
+     0.86
+    ],
+    [
+     -0.18,
+     0.47,
+     0.6
+    ],
+    [
+     -0.22,
+     0.56,
+     0.44
+    ],
+    [
+     -0.25,
+     0.46,
+     0.0
+    ]
+   ],
+   "toe_tip": [
+    -0.25,
+    0.4,
+    0.0
+   ]
+  },
+  {
+   "side": "BR",
+   "is_front": false,
+   "chain": [
+    [
+     0.14,
+     0.41,
+     0.86
+    ],
+    [
+     0.18,
+     0.47,
+     0.6
+    ],
+    [
+     0.22,
+     0.56,
+     0.44
+    ],
+    [
+     0.25,
+     0.46,
+     0.0
+    ]
+   ],
+   "toe_tip": [
+    0.25,
+    0.4,
+    0.0
+   ]
+  }
+ ],
+ "spine": {
+  "pelvis": [
+   0,
+   0.39,
+   0.9
+  ],
+  "spine_01": [
+   0,
+   0.15,
+   0.95
+  ],
+  "chest": [
+   0,
+   -0.11,
+   0.88
+  ],
+  "neck_base": [
+   0,
+   -0.26,
+   1.06
+  ],
+  "neck_mid": [
+   0,
+   -0.37,
+   1.25
+  ],
+  "head": [
+   0,
+   -0.55,
+   1.34
+  ],
+  "head_top": [
+   0,
+   -0.48,
+   1.56
+  ],
+  "snout_tip": [
+   0,
+   -0.79,
+   1.2
+  ],
+  "jaw_tip": [
+   0,
+   -0.7,
+   1.14
+  ]
+ },
+ "tail": [
+  [
+   0,
+   0.5,
+   1.01
+  ],
+  [
+   0,
+   0.61,
+   1.06
+  ],
+  [
+   0,
+   0.7,
+   0.99
+  ],
+  [
+   0,
+   0.67,
+   0.9
+  ]
+ ],
+ "horn": {
+  "base": [
+   0,
+   -0.53,
+   1.58
+  ],
+  "tip": [
+   0,
+   0.02,
+   1.89
+  ],
+  "_unused_as_bone": "Round-1 lead review: the mesh actually has TWO symmetric mirrored V horns, not one centred horn -- a single centreline bone built from this point (the original design) necessarily points into the empty space between them. No bone is built from this entry any more (see rig_templates/quadruped.py's build_bones); kept here, unused for bone placement, purely as the RADIUS HINT rig_creature.py's force_rigid_to_bone call uses to size the region it forces 100% rigid onto the 'head' bone (both horns + the ears)."
+ },
+ "notes": "Slender deer legs, hooves splay slightly outward (feet X +-0.22/0.25 vs hips +-0.13/0.14). Hind leg is digitigrade: stifle forward, hock back at Z~0.44, long cannon to the hoof -- the 4-point chain's ankle is the HOCK. Long neck (2 neck bones matter here). Curled fluffy tail (4 points, curls back over). Two horns in the mesh (design wants one -- leave for now), rigid to head; long horn sweeps back to Y~0.02, Z~1.89. Ears rigid to head."
+}

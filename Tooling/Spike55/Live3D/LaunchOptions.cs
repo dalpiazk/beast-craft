@@ -79,6 +79,14 @@ namespace BeastCraft.Spike55.Live3D
         // as the body lowers, making a lying-down pose hard to confirm from that angle alone.
         public bool PilotTopCamera;
 
+        // v18 (wingless quadrupeds -- Golem/Kirin/Tarasque/Basilisk): --pilot-sequence was hard-coded
+        // to "griffin_anim.glb"/"griffin_anim_events.json" (see Game1.LoadContent). Rather than fork
+        // Game1/LaunchOptions per creature, --pilot-model overrides the GLB/events basename pair --
+        // "golem" loads Content/model/golem_anim.glb + golem_anim_events.json the same way the
+        // Griffin path always has. Defaults to "griffin" so every existing --pilot-sequence call
+        // (scripts, README commands, CI) keeps behaving exactly as before with no flag change needed.
+        public string PilotModel = "griffin";
+
         public static LaunchOptions Parse(string[] args)
         {
             var o = new LaunchOptions();
@@ -151,6 +159,9 @@ namespace BeastCraft.Spike55.Live3D
                         break;
                     case "--pilot-top-camera":
                         o.PilotTopCamera = true;
+                        break;
+                    case "--pilot-model":
+                        o.PilotModel = args[++i];
                         break;
                     default:
                         Console.Error.WriteLine("Unrecognised argument: " + args[i]);
