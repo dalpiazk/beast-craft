@@ -17,6 +17,8 @@ import json
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import common
+import glb_gate
+import mathutils
 
 args = common.parse_args(common.get_argv())
 MOVE_BLEND = args["move"]
@@ -31,6 +33,93 @@ mesh_obj = next(o for o in bpy.data.objects if o.type == "MESH")
 move_action = bpy.data.actions.get("Move")
 if move_action is None:
     raise SystemExit("export_glb.py: no 'Move' action found in --move blend")
+
+# v18 round 5 (producer-caught: in-engine walks showed NO leg motion, Griffin included): capture the
+# Blender-evaluated TRUTH pose of every clip BEFORE any rotation-mode change below, so the exported
+# GLB can be checked against what the clips actually look like in Blender (glb_gate.py). Move is
+# sampled here with gait.py's own rotation modes (QUATERNION legs); the keyed clips are sampled
+# after they're appended, under XYZ (their authored mode -- keyed.py sets every bone XYZ).
+SCENE = bpy.context.scene
+FPS = SCENE.render.fps
+if arm_obj.animation_data is None:
+    arm_obj.animation_data_create()
+
+
+def _m(mat):
+    return [list(r) for r in mat]
+
+
+def capture_truth(action, step=2):
+    # Bones a clip doesn't key play at REST in glTF/any runtime -- reset the pose first so the truth
+    # matches those semantics (a leftover saved pose would otherwise leak into the comparison).
+    for pb in arm_obj.pose.bones:
+        pb.location = (0, 0, 0)
+        pb.rotation_quaternion = (1, 0, 0, 0)
+        pb.rotation_euler = (0, 0, 0)
+        pb.scale = (1, 1, 1)
+    arm_obj.animation_data.action = action
+    f0, f1 = int(round(action.frame_range[0])), int(round(action.frame_range[1]))
+    frames = sorted(set(list(range(f0, f1 + 1, step)) + [f1]))
+    out = {}
+    for f in frames:
+        SCENE.frame_set(f)
+        out[f] = {pb.name: _m(arm_obj.matrix_world @ pb.matrix) for pb in arm_obj.pose.bones}
+    return {"frame_start": f0, "frames": out}
+
+
+TRUTH = {"rest": {b.name: _m(arm_obj.matrix_world @ b.matrix_local) for b in arm_obj.data.bones},
+         "clips": {"Move": capture_truth(move_action)}}
+
+
+def quaternion_fcurves_to_euler(action):
+    """v18 round 5 ROOT-CAUSE FIX. The round-16 normalisation below forces every pose bone to
+    XYZ-Euler so the keyed clips' Euler leg keys apply -- but anim/gait.py keys the leg/scapula/toe
+    bones as rotation_QUATERNION, and in XYZ mode Blender silently ignores quaternion fcurves: every
+    GLB since round 16 (Griffin included) exported Move with 2-key CONSTANT leg rotations (measured
+    from the GLB itself: 0.0 deg range on every leg bone). Here every bone's quaternion fcurves are
+    re-sampled on every integer frame into equivalent rotation_euler (XYZ, continuity-preserving)
+    LINEAR keys and the quaternion fcurves removed, so the XYZ normalisation is lossless for every
+    clip. Returns the number of bones converted."""
+    converted = 0
+    for layer in action.layers:
+        for strip in layer.strips:
+            for slot in action.slots:
+                cb = strip.channelbag(slot)
+                if not cb:
+                    continue
+                by_path = {}
+                for fc in list(cb.fcurves):
+                    if fc.data_path.endswith(".rotation_quaternion"):
+                        by_path.setdefault(fc.data_path, {})[fc.array_index] = fc
+                for qpath, fcs in by_path.items():
+                    keys = sorted({int(round(k.co[0])) for fc in fcs.values() for k in fc.keyframe_points})
+                    if not keys:
+                        continue
+                    vals, prev = [], None
+                    for f in range(keys[0], keys[-1] + 1):
+                        q = mathutils.Quaternion([fcs[i].evaluate(f) if i in fcs else (1.0 if i == 0 else 0.0)
+                                                  for i in range(4)]).normalized()
+                        e = q.to_euler("XYZ", prev) if prev is not None else q.to_euler("XYZ")
+                        prev = e
+                        vals.append((f, e.copy()))
+                    epath = qpath.replace("rotation_quaternion", "rotation_euler")
+                    group = next((fc.group.name for fc in fcs.values() if fc.group), "")
+                    for fc in list(cb.fcurves):
+                        if fc.data_path == epath:
+                            cb.fcurves.remove(fc)
+                    for i in range(3):
+                        nf = cb.fcurves.new(epath, index=i, group_name=group)
+                        nf.keyframe_points.add(len(vals))
+                        for k, (f, e) in enumerate(vals):
+                            kp = nf.keyframe_points[k]
+                            kp.co = (f, e[i])
+                            kp.interpolation = "LINEAR"
+                        nf.update()
+                    for fc in fcs.values():
+                        cb.fcurves.remove(fc)
+                    converted += 1
+    return converted
+
 
 # Round 16 (producer review -- a Cast leg-pose edit that was correctly authored in keyed.py never
 # showed up in the exported GLB, root-caused here, not assumed): gait.py's own leg-posing code
@@ -53,6 +142,8 @@ if move_action is None:
 # action is appended or pushed onto an NLA strip, so every clip's leg-bone keyframes actually apply.
 for pb in arm_obj.pose.bones:
     pb.rotation_mode = "XYZ"
+_n_conv = quaternion_fcurves_to_euler(move_action)
+print(f"QUATERNION->EULER: {_n_conv} bones' Move rotation fcurves converted (round-5 fix)")
 
 # Append Idle/Attack/Cast/Hit/KO/Victory actions from the keyed .blend (same bone names/armature
 # structure, since both files trace back to the same rig_creature.py output -- action data keys
@@ -67,6 +158,9 @@ keyed_actions = {name: bpy.data.actions.get(name) for name in KEYED_CLIP_NAMES}
 missing = [n for n, a in keyed_actions.items() if a is None]
 if missing:
     raise SystemExit(f"export_glb.py: missing actions from --keyed blend: {missing}")
+for _name, _act in keyed_actions.items():
+    quaternion_fcurves_to_euler(_act)  # no-op for keyed.py's all-Euler clips; guards a future one
+    TRUTH["clips"][_name] = capture_truth(_act)
 
 # Push every clip onto its own NLA track (methodology doc's glTF export guidance -- the Blender
 # exporter reliably emits multiple named animations this way; relying on whichever action happens
@@ -132,7 +226,23 @@ if os.path.isfile(markers_path):
 else:
     print(f"EVENT MARKERS: no {markers_path} found, skipping sidecar (no markers this export)")
 
+# v18 round 5: hard gate on the GLB itself -- see glb_gate.py. Fails the export loudly.
+with open(os.path.join(OUT, "glb_gate_truth.json"), "w") as f:
+    json.dump({"fps": FPS, **TRUTH}, f)  # lets `python glb_gate.py GLB TRUTH` re-run the gate standalone
+gate_pass, gate_report = glb_gate.run_gate(out_path, TRUTH, FPS)
+with open(os.path.join(OUT, "glb_gate_report.json"), "w") as f:
+    json.dump(gate_report, f, indent=2)
+for _clip, _r in gate_report["clips"].items():
+    print(f"GLB GATE {_clip}: max_rot_err={_r['max_rot_err_deg']} deg max_pos_err={_r['max_pos_err']} "
+          f"leg ranges glb/blender={_r['leg_range_glb_vs_blender_deg']}")
+if not gate_pass:
+    print("GLB GATE FAILED:\n  " + "\n  ".join(gate_report["failures"]))
+    raise SystemExit("export_glb.py: GLB gate FAILED -- the exported GLB does not reproduce the "
+                     "Blender-evaluated pose (see glb_gate_report.json)")
+print("GLB GATE PASSED")
+
 report = {
+    "glb_gate": {"pass": gate_pass, "failures": gate_report["failures"]},
     "output": out_path,
     "output_bytes": size_bytes,
     "output_mib": size_bytes / (1024 * 1024),
