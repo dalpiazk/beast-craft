@@ -68,8 +68,11 @@ TARGET_HEIGHT = float(args.get("target-height", 2.0))
 CREATURE = args.get("creature", "griffin")
 # v19: birds (upright/hovering bipeds with wings) use rig_templates/winged_biped.py.
 BIRD_CREATURES = ("phoenix", "thunderbird")
+# v20: the Treant (upright biped with arms) and the Leviathan (legless serpent) have their own templates.
+V20_TEMPLATES = {"treant": "biped_arms", "leviathan": "serpent"}
 TEMPLATE_NAME = args.get("template") or ("winged_quadruped" if CREATURE == "griffin" else
-                                         "winged_biped" if CREATURE in BIRD_CREATURES else "quadruped")
+                                         "winged_biped" if CREATURE in BIRD_CREATURES else
+                                         V20_TEMPLATES.get(CREATURE, "quadruped"))
 os.makedirs(OUT, exist_ok=True)
 
 if TEMPLATE_NAME == "winged_quadruped":
@@ -78,9 +81,13 @@ elif TEMPLATE_NAME == "quadruped":
     import quadruped as template
 elif TEMPLATE_NAME == "winged_biped":
     import winged_biped as template
+elif TEMPLATE_NAME == "biped_arms":
+    import biped_arms as template
+elif TEMPLATE_NAME == "serpent":
+    import serpent as template
 else:
     raise SystemExit(f"rig_creature.py: unknown --template {TEMPLATE_NAME!r} (expected "
-                      f"'winged_quadruped' or 'quadruped')")
+                      f"'winged_quadruped', 'quadruped', 'winged_biped', 'biped_arms' or 'serpent')")
 print(f"CREATURE={CREATURE} TEMPLATE={TEMPLATE_NAME}")
 
 common.fresh_scene()
@@ -166,9 +173,11 @@ bpy.ops.object.mode_set(mode="OBJECT")
 # re-deriving (forward axis, locomotion mode, hover offset, outline-mask joints) -- see
 # winged_biped.armature_props. Other templates don't define it (their rigs are unchanged).
 if hasattr(template, "armature_props"):
-    for _k, _v in template.armature_props(lm).items():
+    _props = template.armature_props(lm)  # v20: quadruped returns {} unless the landmark file opts in
+    for _k, _v in _props.items():
         arm_data[_k] = _v
-    report["armature_props"] = template.armature_props(lm)
+    if _props:
+        report["armature_props"] = _props
 if hasattr(template, "dump_axes"):
     report["bone_axes"] = template.dump_axes(arm_obj)
 report["bone_count"] = len(bone_names)
@@ -306,6 +315,20 @@ if hasattr(template, "fix_wing_card_weights"):
     wing_cards = template.fix_wing_card_weights(obj, bone_roles, lm, H)
     report["weighting"]["wing_card_weights_fixed"] = wing_cards
     print(f"WING CARD WEIGHTS: {wing_cards} wing-majority vertices stripped of non-wing weight")
+if hasattr(template, "fix_arm_body_bleed"):
+    # v20 (biped_arms): arm vs leg/crown blends -> nearer chain only, see biped_arms.fix_arm_body_bleed.
+    arm_bleed = template.fix_arm_body_bleed(obj, bone_roles, lm)
+    report["weighting"]["arm_bleed_fixed"] = arm_bleed
+    print(f"ARM BLEED: {arm_bleed} vertices blending an arm with a leg/crown chain resolved")
+if hasattr(template, "fix_serpent_weights"):
+    # v20 (serpent): see serpent.fix_serpent_weights.
+    report["weighting"]["serpent_fixes"] = template.fix_serpent_weights(obj, bone_roles, lm)
+    print(f"SERPENT WEIGHTS: {report['weighting']['serpent_fixes']}")
+if hasattr(template, "fix_humanoid_weights") and lm.get("humanoid"):
+    # v20 round 2 (biped_arms humanoid opt-in): see biped_arms.fix_humanoid_weights.
+    report["weighting"]["humanoid_shell_vertices"] = template.fix_humanoid_weights(obj, bone_roles, lm)
+    print(f"HUMANOID WEIGHTS: {report['weighting']['humanoid_shell_vertices']} crown-shell vertices "
+          f"took their nearest crown/head body vertex's weights")
 if hasattr(template, "smooth_wing_seam") and lm.get("wing_seam_smooth"):
     # v19 round 2 (Phoenix, opt-in per landmark file): ramp the wing-card seams -- see
     # winged_biped.smooth_wing_seam.
@@ -357,6 +380,14 @@ if CREATURE == "kirin" and lm.get("horn") is not None:
     report["weighting"]["kirin_horns_ears_forced_rigid_to_head"] = horn_forced
     print(f"KIRIN HORNS/EARS: {horn_forced} vertices forced 100% rigid to 'head' "
           f"(region radius {horn_radius:.3f}, min_z {horn_min_z:.3f}, min_y {horn_min_y:.3f})")
+
+# v20 (opt-in per landmark file, Frost Wyrm): re-split the skull's head-group weight so the jaw bone
+# actually opens the (fused) mouth -- see quadruped.split_jaw_weights.
+if lm.get("jaw_split") and hasattr(template, "split_jaw_weights"):
+    report["weighting"]["jaw_split_vertices"] = template.split_jaw_weights(obj, lm, **(
+        lm["jaw_split"] if isinstance(lm["jaw_split"], dict) else {}))
+    common.normalize_weights(obj)
+    print(f"JAW SPLIT: {report['weighting']['jaw_split_vertices']} skull vertices re-split head/snout/jaw")
 
 # v18 finding (see common.strip_bone_weight's docstring): "root" is never itself posed by any clip
 # except KO's uniform root.location drop, so any vertex with meaningful root weight is effectively

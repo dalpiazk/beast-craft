@@ -81,19 +81,50 @@ def local_euler(pb, Rw, prev=None):
     return basis.to_euler("XYZ", prev) if prev is not None else basis.to_euler("XYZ")
 
 
+_LIMITS_CACHE = {}
+
+
+def joint_limits(arm_obj):
+    """v20 round 2 (humanoid Treant): {bone: {channel: [lo, hi]}} from the armature's
+    `joint_limits` JSON property (rig_templates/biped_arms.HUMAN_LIMITS); {} on every other rig."""
+    raw = arm_obj.data.get("joint_limits")
+    if not raw:
+        return {}
+    if raw not in _LIMITS_CACHE:
+        import json
+        _LIMITS_CACHE[raw] = json.loads(raw)
+    return _LIMITS_CACHE[raw]
+
+
 def set_semantic(arm_obj, fwd, name, ch):
     """ch: dict with any of pitch/turn/bank (non-wing) or flap/sweep/twist (wing_*), plus
-    optional sx/sy/sz scale. Missing bone -> no-op."""
+    optional sx/sy/sz scale. Missing bone -> no-op.
+    v20 round 2 (humanoid rigs only): non-wing bones also take flex (about the bone's own rest
+    local X = its hinge, + = flexion), abd (about FORWARD, + = away from the body on the bone's
+    side) and twist (about the bone's own axis); every channel listed in the armature's
+    joint_limits is clamped to its human range first (a hinge lists 0..0 for its off-axis
+    channels, so it can only flex)."""
     pb = arm_obj.pose.bones.get(name)
     if pb is None:
         return
     pb.rotation_mode = "XYZ"
+    lim = joint_limits(arm_obj).get(name)
+    if lim:
+        ch = dict(ch)
+        for k, (lo, hi) in lim.items():
+            if k in ch:
+                ch[k] = min(hi, max(lo, ch[k]))
     if name.startswith("wing_"):
         rest3 = pb.bone.matrix_local.to_3x3().normalized()
         Rw = wing_rot(fwd, rest3, wing_side(name), ch.get("flap", 0.0), ch.get("sweep", 0.0),
                       ch.get("twist", 0.0))
     else:
         Rw = world_rot(fwd, ch.get("pitch", 0.0), ch.get("turn", 0.0), ch.get("bank", 0.0))
+        if any(ch.get(k) for k in ("flex", "abd", "twist")):
+            rest3 = pb.bone.matrix_local.to_3x3().normalized()
+            Rw = (Rw @ Matrix.Rotation(math.radians(ch.get("abd", 0.0)), 3, fwd * wing_side(name))
+                  @ Matrix.Rotation(math.radians(ch.get("flex", 0.0)), 3, rest3.col[0])
+                  @ Matrix.Rotation(math.radians(ch.get("twist", 0.0)), 3, rest3.col[1]))
     pb.rotation_euler = local_euler(pb, Rw, pb.rotation_euler.copy())
     pb.scale = (ch.get("sx", 1.0), ch.get("sy", 1.0), ch.get("sz", 1.0))
 
@@ -329,6 +360,8 @@ def leg_ik_data(arm_obj, side, fwd):
     t = max(0.0, min(1.0, (knee - hip).dot(ha) / max(ha.length_squared, 1e-9)))
     off = knee - (hip + ha * t)
     pole = off.normalized() if off.length / max(th.length + sh.length, 1e-6) >= 0.06 else fwd.copy()
+    if arm_obj.data.get("humanoid"):  # v20 round 2: a human knee only ever bends forward
+        pole = fwd.copy()
     return {"L1": th.length, "L2": sh.length, "ankle_rest": ankle, "pole": pole}
 
 
@@ -405,5 +438,10 @@ def verify_axes(arm_obj, deg=20.0):
                 Rw = world_rot(fwd, **{k: deg})
                 rec[f"+{k}_tip_moves"] = name_dir(tip_move(pb, rest3.inverted() @ Rw @ rest3))
             rec["local_x_dot_lateral"] = round(rest3.col[0].dot(lat), 3)
+            if joint_limits(arm_obj) and pb.name.startswith("arm_"):  # v20 round 2 humanoid arms
+                Rf = Matrix.Rotation(math.radians(deg), 3, rest3.col[0])
+                Ra = Matrix.Rotation(math.radians(deg), 3, fwd * wing_side(pb.name))
+                rec["+flex_tip_moves"] = name_dir(tip_move(pb, rest3.inverted() @ Rf @ rest3))
+                rec["+abd_tip_moves"] = name_dir(tip_move(pb, rest3.inverted() @ Ra @ rest3))
         out[pb.name] = rec
     return out

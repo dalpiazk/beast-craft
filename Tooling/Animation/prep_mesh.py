@@ -77,7 +77,17 @@ What this stage deliberately does NOT do, and why:
 
 Run headless:
   blender -b --python prep_mesh.py -- --glb INPUT.glb --out OUTDIR [--target-tris 8000]
-                                        [--texture-size 1024]
+                                        [--texture-size 1024] [--creature NAME]
+                                        [--rotate-z-deg DEG] [--no-ground-sheet]
+
+`--no-ground-sheet` (generic/non-Griffin creatures only): skips `common.remove_ground_sheet_faces`'s
+face-level ground-sheet/mud-disc pass. That pass's near-ground + near-horizontal + wide-extent
+heuristic assumes the removed faces are a thin slab the creature's feet merely touch -- wrong for a
+creature whose own anatomy rests flat/wide against the ground (e.g. a serpent's coiled tail resting
+on the floor, whose own underside is near-ground, near-horizontal and wide by the same measure).
+Pass this flag for such a creature; `classify_and_remove_debris` (component-level) still runs
+unconditionally and still catches any genuinely DETACHED ground plate/debris component. Default
+(flag absent) is unchanged.
 """
 import bpy
 import sys
@@ -109,6 +119,18 @@ TEXTURE_SIZE = int(args.get("texture-size", 1024))
 CREATURE = args.get("creature", "griffin")
 GENERIC = CREATURE != "griffin"
 ROTATE_Z_DEG = float(args.get("rotate-z-deg", 0.0))
+# anim-last round (Leviathan lead review): `common.remove_ground_sheet_faces`'s near-ground +
+# near-horizontal + wide-extent heuristic assumes a "ground sheet" is a thin slab the creature's
+# feet merely touch -- true for a quadruped's hoof-fused mud disc (the heuristic's original Kirin
+# case), but WRONG for a creature whose own body rests flat against the ground across a wide area
+# (e.g. a serpent's coiled tail): the tail's own flat underside is itself near-ground, near-
+# horizontal and wide, so the heuristic deleted real anatomy (confirmed: the Leviathan's coiled
+# tail lost its underside, leaving an open shell showing the interior through the belly). `--no-
+# ground-sheet` opts a creature out of this ONE pass entirely; `classify_and_remove_debris`
+# (component-level, run unconditionally right after) still runs and still catches any genuinely
+# DETACHED ground plate/debris component. Default (flag absent) is unchanged for every existing
+# creature.
+NO_GROUND_SHEET = bool(args.get("no-ground-sheet", False))
 OBJ_NAME = "Griffin" if not GENERIC else CREATURE[:1].upper() + CREATURE[1:]
 os.makedirs(OUT, exist_ok=True)
 
@@ -400,22 +422,30 @@ else:
     # the original textured material/UVs are kept, just downsized to TEXTURE_SIZE, which is both
     # correct (nothing moved the surface relative to its own UVs) and far cheaper than a Cycles bake.
     if GENERIC:
-        # Lead review of kirin_calib/bottom.png + left.png: a ground sheet/mud disc survived
-        # classify_and_remove_debris entirely -- it turned out to be topologically FUSED to the
-        # hooves (sharing geometry with the main body component), not a separate component, so a
-        # component-level classifier can never see it. Fixed at the FACE level instead, before any
-        # component-based cleanup: common.remove_ground_sheet_faces finds near-ground, nearly-
-        # horizontal face clusters and deletes the wide ones (the sheet + its jagged shards) while
-        # keeping compact ones (a hoof's own flat bottom cap) -- see that function's own docstring.
-        sheet_report = common.remove_ground_sheet_faces(obj)
-        report["ground_sheet_removal"] = sheet_report
-        print(f"GROUND SHEET FACES: removed {sheet_report['faces_deleted']} faces in "
-              f"{len(sheet_report['removed'])} wide cluster(s) "
-              f"(kept {len(sheet_report['kept'])} compact cluster(s), e.g. hoof caps)")
-        for e in sheet_report["removed"]:
-            print(f"  removed cluster: {e['faces']} faces, xy_extent={e['xy_extent']:.4f}")
-        for e in sheet_report["kept"]:
-            print(f"  kept cluster: {e['faces']} faces, xy_extent={e['xy_extent']:.4f}")
+        if not NO_GROUND_SHEET:
+            # Lead review of kirin_calib/bottom.png + left.png: a ground sheet/mud disc survived
+            # classify_and_remove_debris entirely -- it turned out to be topologically FUSED to the
+            # hooves (sharing geometry with the main body component), not a separate component, so a
+            # component-level classifier can never see it. Fixed at the FACE level instead, before any
+            # component-based cleanup: common.remove_ground_sheet_faces finds near-ground, nearly-
+            # horizontal face clusters and deletes the wide ones (the sheet + its jagged shards) while
+            # keeping compact ones (a hoof's own flat bottom cap) -- see that function's own docstring.
+            # NOT run when --no-ground-sheet is passed (see that flag's own comment above) -- a
+            # creature whose own anatomy rests flat/wide against the ground would otherwise lose real
+            # surface here, not just debris.
+            sheet_report = common.remove_ground_sheet_faces(obj)
+            report["ground_sheet_removal"] = sheet_report
+            print(f"GROUND SHEET FACES: removed {sheet_report['faces_deleted']} faces in "
+                  f"{len(sheet_report['removed'])} wide cluster(s) "
+                  f"(kept {len(sheet_report['kept'])} compact cluster(s), e.g. hoof caps)")
+            for e in sheet_report["removed"]:
+                print(f"  removed cluster: {e['faces']} faces, xy_extent={e['xy_extent']:.4f}")
+            for e in sheet_report["kept"]:
+                print(f"  kept cluster: {e['faces']} faces, xy_extent={e['xy_extent']:.4f}")
+        else:
+            report["ground_sheet_removal"] = None
+            print("GROUND SHEET FACES: SKIPPED (--no-ground-sheet) -- relying on classify_and_remove_"
+                  "debris (component-level) only")
 
         # anim-quads batch: a flat min-vertex-count cutoff can't tell a ground plate/debris scatter
         # (which can hold far more verts than a stray reconstruction speck) from real small anatomy

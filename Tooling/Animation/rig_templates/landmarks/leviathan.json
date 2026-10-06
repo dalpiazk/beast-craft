@@ -1,0 +1,162 @@
+{
+ "body_plan": "legless serpent, upright S-curve neck, tail coiled flat on the ground",
+ "legs": [],
+ "body_chain": [
+  [
+   0,
+   -0.4,
+   0.16
+  ],
+  [
+   0,
+   -0.48,
+   0.42
+  ],
+  [
+   0,
+   -0.41,
+   0.68
+  ],
+  [
+   0,
+   -0.2,
+   0.94
+  ],
+  [
+   0,
+   0.1,
+   1.17
+  ],
+  [
+   0,
+   -0.06,
+   1.34
+  ]
+ ],
+ "spine": {
+  "head": [
+   0,
+   -0.24,
+   1.46
+  ],
+  "head_top": [
+   0,
+   -0.06,
+   1.74
+  ],
+  "snout_tip": [
+   0,
+   -0.5,
+   1.43
+  ],
+  "jaw_tip": [
+   0,
+   -0.43,
+   1.37
+  ]
+ },
+ "tail": [
+  [
+   0,
+   -0.4,
+   0.13
+  ],
+  [
+   -0.19,
+   -0.3,
+   0.12
+  ],
+  [
+   -0.3,
+   -0.12,
+   0.12
+  ],
+  [
+   -0.35,
+   0.06,
+   0.12
+  ],
+  [
+   -0.34,
+   0.25,
+   0.12
+  ],
+  [
+   -0.24,
+   0.46,
+   0.12
+  ],
+  [
+   0.0,
+   0.575,
+   0.12
+  ],
+  [
+   0.26,
+   0.5,
+   0.12
+  ],
+  [
+   0.4,
+   0.28,
+   0.11
+  ],
+  [
+   0.43,
+   0.08,
+   0.12
+  ]
+ ],
+ "fins": [
+  {
+   "side": "L",
+   "root": [
+    -0.12,
+    -0.3,
+    0.62
+   ],
+   "tip": [
+    -0.33,
+    0.0,
+    0.78
+   ]
+  },
+  {
+   "side": "R",
+   "root": [
+    0.12,
+    -0.3,
+    0.62
+   ],
+   "tip": [
+    0.33,
+    0.0,
+    0.78
+   ]
+  }
+ ],
+ "notes": "body_chain runs from the bottom of the S (where neck meets the ground coil) up to the head base; tail runs from that same base point around the flat coil (passes along -X side, behind, ending on the +X side). The coil rests ON the ground and must stay on it (it is the support - root/pelvis is the coil base). Locomotion = slither: travelling S-wave down the tail coil (yaw) + gentle neck sway; neck/head bob like a sea serpent. Frill/crest around the head and down the back of the upper neck: rigid to head/upper neck bones (or 1 soft bone). Side fins: one bone each, small flutter. Attack = neck rears back then strikes forward (bite, jaw opens). Cast = rises tall, frill flares, head up. KO = neck collapses forward/sideways onto the coil, head resting on the ground. Nothing below Z=0.",
+ "frill": {
+  "base": [
+   0,
+   -0.24,
+   1.46
+  ],
+  "tip": [
+   0,
+   -0.06,
+   1.74
+  ]
+ },
+ "_lead_fixes": [
+  "body_chain[0] [0, -0.5, 0.15] -> [0, -0.4, 0.16]: x=0 sagittal section at z 0.15 spans y -0.58..-0.21 (centre -0.39); -0.50 sat on the front skin of the neck base",
+  "body_chain[1] [0, -0.56, 0.42] -> [0, -0.48, 0.42]: z 0.42 neck spans y -0.67..-0.23 at x=0 (centre -0.45); -0.56 was 2/3 of the way to the front skin",
+  "body_chain[4] [0, -0.02, 1.18] -> [0, 0.1, 1.17]: top of the S curls BACK: at z 1.18 the neck runs from y -0.02 (front skin -- the given point sat 1.7 cm outside, on it) to ~+0.25 before the back crest",
+  "tail [[0, -0.5, 0.15], [-0.3, -0.4, 0.12], [-0.43, -0.15, 0.12], [-0.37, 0.39, 0.12], [0.0, 0.62, 0.12], [0.34, 0.52, 0.12], [0.43, 0.12, 0.12]] -> [[0, -0.4, 0.13], [-0.19, -0.3, 0.12], [-0.3, -0.12, 0.12], [-0.35, 0.06, 0.12], [-0.34, 0.25, 0.12], [-0.24, 0.46, 0.12], [0.0, 0.575, 0.12], [0.26, 0.5, 0.12], [0.4, 0.28, 0.11], [0.43, 0.08, 0.12]]: re-measured as the coil's mid-line (radial mid-point of the z<0.26 vertices every 30 deg around the coil centre (0,0.05)); several given points sat on the coil's outer skin (tail[1] 3.9 cm, tail[2] 1.1 cm outside). 10 points -> 9 tail bones so the slither wave has enough joints to travel smoothly.",
+  "fins[L].tip [-0.3, -0.05, 0.78] -> [-0.33, 0.0, 0.78]: the fin's outer-most vertices average (-0.35, +0.01, 0.79); the given tip was 4-4.5 cm outside the thin fin",
+  "fins[R].tip [0.3, -0.05, 0.78] -> [0.33, 0.0, 0.78]: the fin's outer-most vertices average (0.35, +0.01, 0.79); the given tip was 4-4.5 cm outside the thin fin",
+  "frill (new): one soft bone head -> head_top for the crest flare (Cast) and follow-through."
+ ],
+ "locomotion": "slither",
+ "_note": "v20 (anim-last): from the lead's landmarks_lead.json (native prepped-mesh coords, head=-Y, up=+Z); every change in _lead_fixes was measured from sections / vertex probes of leviathan_prepped.glb (scratchpad anim-last/tools/lmcheck.py)."
+}

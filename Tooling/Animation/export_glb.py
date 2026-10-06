@@ -72,7 +72,7 @@ TRUTH = {"rest": {b.name: _m(arm_obj.matrix_world @ b.matrix_local) for b in arm
 # v19 (birds): per-creature facts stored on the armature by rig_templates/winged_biped.py (absent
 # on every other rig, which keeps its exact previous behaviour): the flier gate mode, the engine
 # hover offset and extra outline-mask joints, both forwarded to the events sidecar below.
-MOVE_MODE = "hover" if arm_obj.data.get("locomotion") == "hover" else "walk"
+MOVE_MODE = {"hover": "hover", "slither": "slither"}.get(arm_obj.data.get("locomotion"), "walk")
 HOVER_OFFSET = float(arm_obj.data.get("hover_offset", 0.0))
 OUTLINE_MASK_ZERO = list(arm_obj.data.get("outline_mask_zero", []))
 TRUTH["move_mode"] = MOVE_MODE
