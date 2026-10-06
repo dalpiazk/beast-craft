@@ -1699,6 +1699,20 @@ def _P(*dicts, **bones):
     return out
 
 
+def _tr_arms(L, R):
+    """Treant (humanoid) arm pose: per side (shoulder flex, shoulder abd, elbow flex, wrist flex),
+    abd/flex relative to the rest A-pose (abd -12 = the relaxed hang)."""
+    out = {}
+    for s_, (fl, ab, el, wr) in (("L", L), ("R", R)):
+        out[f"arm_{s_}_upper"] = {"flex": fl, "abd": ab}
+        out[f"arm_{s_}_fore"] = {"flex": el}
+        out[f"arm_{s_}_hand"] = {"flex": wr}
+    return out
+
+
+_TR_REL = _tr_arms((0, -12, 14, 6), (0, -12, 14, 6))  # relaxed hang = gait.py's _TREANT_HOLD
+
+
 _TB_TAIL_SWAY = [("b", "tail_01", "pitch", 2.5, 2, -1.2), ("b", "tail_02", "pitch", 3.5, 2, -1.8),
                  ("b", "tail_03", "pitch", 4.5, 2, -2.4), ("b", "tail_04", "pitch", 5.5, 2, -3.0),
                  ("b", "tail_03", "turn", 3.0, 1, 0.3), ("b", "tail_04", "turn", 5.0, 1, -0.5),
@@ -1871,12 +1885,297 @@ BIRD_PARAMS = {
 }
 
 
+# ---------------------------------------------------------------------------
+# v20 (anim-last): Frost Wyrm (quadruped template), Treant (biped_arms template) and Leviathan
+# (serpent template) reuse the bird builder below: every clip is DATA (sparse semantic key poses +
+# sine layers in anim/bird_pose.py channels, converted through each bone's rest matrix, so they never
+# depend on bone roll), baked per frame with planted-foot IK. Extra spec keys used only by these
+# entries are documented where build_bird_clips reads them ("ko_settle").
+# ---------------------------------------------------------------------------
+def _legs(pitch_f, pitch_b, bank=0.0, sh_f=0.0, sh_b=0.0):
+    """Four-leg semantic splay: front thighs pitch `pitch_f` (+ = tip forward for a hanging leg),
+    hind thighs `pitch_b`, left legs bank outward (-bank), right legs outward (+bank)."""
+    out = {}
+    for side in ("FL", "FR", "BL", "BR"):
+        front = side.startswith("F")
+        b = -bank if side.endswith("L") else bank
+        out[f"leg_{side}_thigh"] = {"pitch": pitch_f if front else pitch_b, "bank": b}
+        out[f"leg_{side}_shin"] = {"pitch": sh_f if front else sh_b}
+    return out
+
+
+_FW_TAIL_IDLE = [("b", "tail_01", "turn", 3.0, 1, 0.0), ("b", "tail_02", "turn", 4.0, 1, -0.5),
+                 ("b", "tail_03", "turn", 5.0, 1, -1.0), ("b", "tail_04", "turn", 7.0, 1, -1.5),
+                 ("b", "tail_04", "pitch", -3.0, 2, -0.8)]
+LAST_PARAMS = {
+    # Wise, wry: calm, deliberate, a little smug. Feet planted (IK) except KO.
+    "frost_wyrm": dict(
+        hover=False, planted=True,
+        clips={
+            "Idle": dict(seconds=3.0, keys=[(0.0, {}), (1.0, {})],
+                         bob=(-0.012, 0.006, 2), layers=_FW_TAIL_IDLE + [
+                             ("b", "spine_02", "pitch", 1.2, 2, 0.0), ("b", "neck_01", "pitch", -1.0, 2, 0.3),
+                             ("b", "head", "turn", 5.0, 1, 0.8), ("b", "head", "pitch", 2.0, 2, 1.0),
+                             ("b", "jaw", "pitch", -1.5, 2, 0.5)]),
+            # Lunge + frost-breath head thrust: draw back (head up, jaw parting), then a sharp
+            # forward lunge with the neck thrust out and the jaw wide (the breath), held, recover.
+            "Attack": dict(seconds=1.15, sharp=2, layers=_FW_TAIL_IDLE, keys=[
+                (0.0, {}),
+                (0.30, _P(spine_02=(5, 0, 0), neck_01=(12, 0, 0), neck_02=(8, 0, 0), head=(10, 0, 0),
+                          tail_01=(0, -6, 0), tail_02=(0, -8, 0), jaw=-10,
+                          _root={"f": -0.05, "z": -0.02})),
+                (0.46, _P(spine_02=(-4, 0, 0), neck_01=(-8, 0, 0), neck_02=(-2, 0, 0), head=(8, 0, 0),
+                          tail_01=(-4, 10, 0), tail_02=(0, 14, 0), tail_03=(0, 10, 0), jaw=-30,
+                          _root={"f": 0.10, "z": -0.04})),
+                (0.70, _P(spine_02=(-3, 0, 0), neck_01=(-6, 0, 0), neck_02=(-2, 0, 0), head=(6, 0, 0),
+                          tail_01=(-4, 6, 0), tail_02=(0, 8, 0), jaw=-26,
+                          _root={"f": 0.08, "z": -0.035})),
+                (1.0, {})]),
+            # Rears up a little on the hind legs, forepaws raised, neck and head lifted high, jaw
+            # parted; held, then the forepaws come back down (cast_release at the peak).
+            "Cast": dict(seconds=1.35, sharp=2, marker=(2, "cast_release"), layers=_FW_TAIL_IDLE, keys=[
+                (0.0, {}),
+                (0.30, _P(spine_02=(-3, 0, 0), neck_01=(-4, 0, 0), head=(-4, 0, 0),
+                          _root={"z": -0.03, "f": -0.02})),
+                (0.52, _P(neck_01=(14, 0, 0), neck_02=(8, 0, 0), head=(6, 0, 0), jaw=-14,
+                          tail_01=(-8, 0, 0), tail_02=(-2, 0, 0),
+                          _lift={"FL": (0.12, 0.03), "FR": (0.12, 0.03)},
+                          _root={"pitch": 8, "z": -0.03, "f": -0.03})),
+                (0.70, _P(neck_01=(14, 0, 0), neck_02=(8, 0, 0), head=(8, 0, 0), jaw=-12,
+                          tail_01=(-8, 0, 0), tail_02=(-2, 0, 0),
+                          _lift={"FL": (0.12, 0.03), "FR": (0.12, 0.03)},
+                          _root={"pitch": 8, "z": -0.03, "f": -0.03})),
+                (1.0, {})]),
+            # Struck: a sharp flinch back and up, head snapped aside, then settle.
+            "Hit": dict(seconds=0.55, sharp=1, marker=(1, "hit_react"), keys=[
+                (0.0, {}),
+                (0.24, _P(spine_02=(4, 0, 0), neck_01=(10, 8, 0), head=(12, 10, 6), jaw=-12,
+                          tail_01=(-3, -10, 0), tail_02=(0, -12, 0),
+                          _root={"f": -0.06, "z": -0.025, "bank": -4})),
+                (0.50, _P(neck_01=(4, 3, 0), head=(5, 4, 2), jaw=-4, tail_01=(0, -4, 0),
+                          _root={"f": -0.03, "z": -0.015})),
+                (1.0, {})]),
+            # Smug: a slow head tilt and nod with a sly jaw twitch while the tail flicks (three
+            # crisp flicks travelling down the tail); returns exactly to rest (loops).
+            "Victory": dict(seconds=2.0,
+                            layers=[("b", "tail_02", "turn", 8.0, 3, 0.0), ("b", "tail_03", "turn", 14.0, 3, -0.7),
+                                    ("b", "tail_04", "turn", 20.0, 3, -1.4), ("b", "tail_04", "pitch", -6.0, 3, -1.0)],
+                            keys=[(0.0, {}),
+                                  (0.25, _P(neck_01=(6, 0, 0), head=(6, 6, -14), jaw=-6, _root={"z": -0.01})),
+                                  (0.55, _P(neck_01=(8, 0, 0), head=(2, 10, -18), jaw=-3, _root={"z": -0.01})),
+                                  (0.80, _P(neck_01=(3, 0, 0), head=(4, 3, -6), _root={"z": -0.005})),
+                                  (1.0, {})]),
+            # Slumps flat on its belly, legs splayed out on the ground, head down on the floor.
+            "KO": dict(seconds=1.6, ko=True, impact=0.55, keys=[
+                (0.0, {}),
+                (0.20, _P(neck_01=(-6, 0, 0), head=(-8, 6, 8), jaw=-6,
+                          _root={"bank": 6, "z": -0.04})),
+                (0.55, _P(_legs(60, -60, 5), spine_02=(-3, 0, 0), neck_01=(-16, 0, 0), neck_02=(-10, 0, 0),
+                          head=(-14, 4, 6), jaw=-4, tail_01=(-10, 6, 0), tail_02=(4, 8, 0),
+                          _root={"z": -0.25})),
+                (0.84, _P(_legs(78, -78, 6), spine_02=(-4, 0, 0), neck_01=(-22, 0, 0), neck_02=(-17, 0, 0),
+                          head=(-13, 4, 6), jaw=-3, tail_01=(-16, 8, 0), tail_02=(7, 10, 0),
+                          tail_03=(3, 6, 0), _root={"z": -0.30})),
+                (1.0, "same")]),
+        }),
+    # v20 round 2 (producer review): HUMANOID Treant (biped_arms `humanoid` opt-in). Gentle: slow,
+    # swaying, kindly. Arms are authored in the humanoid channels (bird_pose.set_semantic): upper
+    # `flex` = shoulder flexion (+ forward/up), `abd` = abduction (+ out/up from the side), fore/hand
+    # `flex` = elbow/wrist flexion (+ = bend forward); every value is clamped to the human ranges in
+    # the armature's joint_limits (hinges can only flex). Every clip starts/ends in _TR_REL (the
+    # relaxed arm hang the walk also holds) so clip-to-clip blends match. Feet planted (IK) except KO.
+    "treant": dict(
+        hover=False, planted=True,
+        clips={
+            # Breathing (chest rises, shoulders lift), arms drifting a little at shoulder, elbow
+            # and wrist (left and right out of step), head looking about, crown rustling.
+            "Idle": dict(seconds=3.2, keys=[(0.0, _TR_REL), (1.0, _TR_REL)], bob=(-0.008, 0.005, 2), layers=[
+                ("b", "spine_02", "pitch", 1.2, 2, 0.4), ("b", "spine_03", "pitch", 1.5, 2, 0.1),
+                ("b", "arm_L_clav", "abd", 2.0, 2, 0.1), ("b", "arm_R_clav", "abd", 2.0, 2, 0.1),
+                ("b", "spine_01", "bank", 1.5, 1, 0.0),
+                ("b", "head", "turn", 4.0, 1, 0.8), ("b", "head", "bank", 2.0, 1, 1.6),
+                ("b", "arm_L_upper", "flex", 5.0, 1, 0.5), ("b", "arm_R_upper", "flex", 5.0, 1, 2.3),
+                ("b", "arm_L_upper", "abd", 3.0, 1, 1.4), ("b", "arm_R_upper", "abd", 3.0, 1, -0.4),
+                ("b", "arm_L_fore", "flex", 6.0, 1, 0.0), ("b", "arm_R_fore", "flex", 6.0, 1, 1.8),
+                ("b", "arm_L_hand", "flex", 6.0, 2, 0.3), ("b", "arm_R_hand", "flex", 6.0, 2, 1.9),
+                ("b", "crown_01", "pitch", 3.0, 3, 0.0), ("b", "crown_01", "turn", 2.0, 2, 0.7),
+                ("b", "crown_02", "turn", 3.0, 2, 1.1), ("b", "crown_02", "pitch", 2.0, 3, 0.4),
+                ("b", "crown_03", "bank", 3.0, 3, 2.0), ("b", "crown_03", "turn", 2.0, 2, 0.2)]),
+            # Two-armed branch swing: both arms rise up and back over the right shoulder (club held
+            # high, trunk wound round and leaning back), then sweep down and across in front as the
+            # trunk unwinds and leans in (arms extended, elbows nearly straight), follow through,
+            # recover.
+            "Attack": dict(seconds=1.4, sharp=2, keys=[
+                (0.0, _TR_REL),
+                (0.32, _P(_tr_arms((5, 110, 85, -15), (5, 105, 85, -15)),
+                          spine_01=(5, 12, 0), spine_02=(6, 6, 0), spine_03=(6, 6, 0), head=(4, -10, 0),
+                          crown_01=(-4, 0, 0), crown_03=(4, 0, 0), _root={"z": -0.02})),
+                (0.50, _P(_tr_arms((80, -15, 8, -25), (85, -10, 8, -25)),
+                          spine_01=(-6, -12, 0), spine_02=(-6, -8, 0), spine_03=(-8, -6, 0), head=(-4, 6, 0),
+                          crown_01=(6, -6, 0), crown_02=(-6, 4, 0), crown_03=(-6, 4, 0),
+                          _root={"f": 0.05, "z": -0.04})),
+                (0.70, _P(_tr_arms((55, -10, 20, -15), (60, -8, 20, -15)),
+                          spine_01=(-4, -8, 0), spine_02=(-4, -5, 0), spine_03=(-4, -4, 0), head=(-2, 4, 0),
+                          crown_01=(-3, 4, 0), crown_02=(4, -3, 0), crown_03=(4, -3, 0),
+                          _root={"f": 0.04, "z": -0.03})),
+                (1.0, _TR_REL)]),
+            # Gather (hands drawn in to the chest, head bowed), then both arms rise wide and high,
+            # palms up, head lifted, crown flared (bones stretch a little), held; gentle settle
+            # (cast_release at the peak).
+            "Cast": dict(seconds=1.5, sharp=2, marker=(2, "cast_release"), layers=[
+                ("b", "crown_01", "pitch", 2.0, 4, 0.0), ("b", "crown_03", "bank", 2.0, 4, 1.0)], keys=[
+                (0.0, _TR_REL),
+                (0.30, _P(_tr_arms((35, -25, 85, 10), (35, -25, 85, 10)),
+                          spine_02=(-4, 0, 0), spine_03=(-3, 0, 0), head=(-8, 0, 0), _root={"z": -0.035})),
+                (0.55, _P(_tr_arms((15, 110, 25, -35), (15, 110, 25, -35)),
+                          spine_02=(4, 0, 0), spine_03=(5, 0, 0), head=(14, 0, 0),
+                          crown_01={"pitch": -10, "sy": 1.1}, crown_02={"pitch": 6, "sy": 1.08},
+                          crown_03={"bank": 10, "sy": 1.1}, _root={"z": -0.01})),
+                (0.78, _P(_tr_arms((14, 106, 28, -30), (14, 106, 28, -30)),
+                          spine_02=(4, 0, 0), spine_03=(4, 0, 0), head=(12, 0, 0),
+                          crown_01={"pitch": -8, "sy": 1.08}, crown_02={"pitch": 5, "sy": 1.06},
+                          crown_03={"bank": 8, "sy": 1.08}, _root={"z": -0.01})),
+                (1.0, _TR_REL)]),
+            # Struck: the trunk rocks back, head and crown whip, both arms fly up and out (elbows
+            # bending), then settle.
+            "Hit": dict(seconds=0.6, sharp=1, marker=(1, "hit_react"), keys=[
+                (0.0, _TR_REL),
+                (0.25, _P(_tr_arms((-20, 35, 50, 20), (-20, 35, 50, 20)),
+                          spine_01=(4, 0, 0), spine_02=(8, 0, -4), spine_03=(6, 0, 0), head=(10, 0, 8),
+                          crown_01=(8, 0, 0), crown_02=(10, 0, 0), crown_03=(-8, 0, 0),
+                          _root={"f": -0.05, "z": -0.02})),
+                (0.55, _P(_tr_arms((-5, 10, 30, 8), (-5, 10, 30, 8)),
+                          spine_02=(3, 0, -2), head=(4, 0, 3),
+                          crown_01=(-3, 0, 0), crown_02=(-4, 0, 0), crown_03=(3, 0, 0),
+                          _root={"f": -0.02, "z": -0.012})),
+                (1.0, _TR_REL)]),
+            # Happy: BOTH arms raised high and waving, swaying side to side with a little knee
+            # bounce, head tilting, crown bouncing; returns exactly to rest (loops).
+            "Victory": dict(seconds=2.4, bob=(-0.02, 0.012, 4), layers=[
+                ("b", "spine_01", "bank", 5.0, 2, 0.0), ("b", "head", "bank", 6.0, 2, 0.4),
+                ("b", "arm_L_upper", "abd", 9.0, 4, 0.0), ("b", "arm_R_upper", "abd", 9.0, 4, 3.14),
+                ("b", "arm_L_fore", "flex", 14.0, 4, -0.6), ("b", "arm_R_fore", "flex", 14.0, 4, 2.5),
+                ("b", "arm_L_hand", "flex", 12.0, 4, -1.2), ("b", "arm_R_hand", "flex", 12.0, 4, 1.9),
+                ("b", "crown_01", "pitch", 4.0, 4, 0.0), ("b", "crown_02", "pitch", -4.0, 4, 0.4),
+                ("b", "crown_03", "bank", 4.0, 4, 0.8)], keys=[
+                (0.0, _TR_REL),
+                (0.16, _P(_tr_arms((10, 100, 35, -10), (10, 100, 35, -10)), head=(8, 0, 0))),
+                (0.84, _P(_tr_arms((10, 100, 35, -10), (10, 100, 35, -10)), head=(8, 0, 0))),
+                (1.0, _TR_REL)]),
+            # Topples backward like a felled tree and lies on its back, arms flung out to the sides,
+            # crown on the ground (root pivots at the feet; the ground settle rests the lowest point
+            # on z=0). The feet slide forward under it ("f") so the body lands on its own tile.
+            "KO": dict(seconds=1.8, ko=True, impact=0.6, keys=[
+                (0.0, _TR_REL),
+                (0.22, _P(_tr_arms((20, 35, 40, 0), (20, 35, 40, 0)),
+                          spine_02=(-8, 0, 0), spine_03=(-4, 0, 0), head=(-10, 0, 0),
+                          _root={"bank": 4, "z": -0.03})),
+                (0.60, _P(_tr_arms((-15, 60, 25, 0), (-15, 55, 25, 0)),
+                          spine_02=(2, 0, 0), head=(-6, 0, 0), crown_01=(6, 0, 0), crown_03=(-6, 0, 0),
+                          _root={"pitch": 80, "bank": 8, "f": 0.45})),
+                (0.85, _P(_tr_arms((-10, 70, 15, 10), (-10, 65, 15, 10)),
+                          spine_02=(4, 0, 0), head=(4, 0, 0), crown_01=(4, 0, 0), crown_03=(-4, 0, 0),
+                          _root={"pitch": 86, "bank": 6, "f": 0.55})),
+                (1.0, "same")]),
+        }),
+    # Legless sea serpent: the coil is the support and never leaves the ground (no root motion);
+    # every clip lives in the S-neck, head, jaw, frill, fins and a coil ripple. Semantic signs
+    # (serpent.py axis dump): +pitch on an upright neck bone tips it BACK, -pitch bows it
+    # forward/down; "turn" (about world UP) is the safe coil/neck sway channel.
+    "leviathan": dict(
+        hover=False, planted=True,
+        clips={
+            "Idle": dict(seconds=3.0, keys=[(0.0, {}), (1.0, {})], layers=[
+                ("b", "body_02", "turn", 2.0, 1, 0.0), ("b", "body_03", "turn", 3.0, 1, -0.6),
+                ("b", "body_04", "turn", 3.0, 1, -1.2), ("b", "head", "turn", -3.0, 1, -1.0),
+                ("b", "body_03", "pitch", 1.5, 2, 0.0), ("b", "body_04", "pitch", -2.0, 2, -0.6),
+                ("b", "head", "pitch", 2.0, 2, -1.2), ("b", "jaw", "pitch", -2.0, 2, 0.3),
+                ("b", "fin_L", "pitch", 8.0, 2, 0.0), ("b", "fin_R", "pitch", 8.0, 2, 0.0),
+                ("b", "frill", "pitch", 3.0, 2, -1.5),
+                ("b", "tail_05", "turn", 2.0, 1, 0.0), ("b", "tail_07", "turn", 3.0, 1, -1.0),
+                ("b", "tail_09", "turn", 5.0, 1, -2.0)]),
+            # Rears back (neck coils up, head lifted, jaw parting), then a fast forward strike --
+            # the neck uncoils, head drives forward-down, jaw wide (the bite) -- and recovers.
+            "Attack": dict(seconds=1.2, sharp=2, keys=[
+                (0.0, {}),
+                (0.32, _P(body_02=(6, 0, 0), body_03=(10, 0, 0), body_04=(12, 0, 0), body_05=(8, 0, 0),
+                          head=(10, 0, 0), jaw=-12, frill=(-6, 0, 0), fin_L=(-15, 0, 0), fin_R=(-15, 0, 0),
+                          tail_07=(0, 6, 0), tail_09=(0, 10, 0))),
+                (0.48, _P(body_01=(-4, 0, 0), body_02=(-10, 0, 0), body_03=(-16, 0, 0),
+                          body_04=(-14, 0, 0), body_05=(-6, 0, 0), head=(-6, 0, 0), jaw=-32,
+                          frill=(8, 0, 0), fin_L=(12, 0, 0), fin_R=(12, 0, 0),
+                          tail_07=(0, -8, 0), tail_09=(0, -14, 0))),
+                (0.68, _P(body_02=(-7, 0, 0), body_03=(-11, 0, 0), body_04=(-10, 0, 0),
+                          body_05=(-4, 0, 0), head=(-4, 0, 0), jaw=-20, frill=(4, 0, 0),
+                          tail_09=(0, -6, 0))),
+                (1.0, {})]),
+            # Rises tall (the S straightens up), head tipped up, jaw open, frill flared wide and
+            # raised, fins spread; held, then settles (cast_release at the peak).
+            "Cast": dict(seconds=1.4, sharp=2, marker=(2, "cast_release"), layers=[
+                ("b", "frill", "pitch", 3.0, 4, 0.0), ("b", "fin_L", "pitch", 6.0, 4, 0.0),
+                ("b", "fin_R", "pitch", 6.0, 4, 0.0)], keys=[
+                (0.0, {}),
+                (0.30, _P(body_03=(-4, 0, 0), body_04=(-6, 0, 0), head=(-6, 0, 0), jaw=-4,
+                          frill={"pitch": 6, "sy": 0.95})),
+                (0.55, _P(body_01=(4, 0, 0), body_02=(5, 0, 0), body_03=(-8, 0, 0), body_04=(-10, 0, 0),
+                          body_05=(-6, 0, 0), head=(16, 0, 0), jaw=-18,
+                          frill={"pitch": -14, "sx": 1.2, "sy": 1.25, "sz": 1.2},
+                          fin_L=(-25, 0, 0), fin_R=(-25, 0, 0))),
+                (0.78, _P(body_01=(4, 0, 0), body_02=(5, 0, 0), body_03=(-8, 0, 0), body_04=(-10, 0, 0),
+                          body_05=(-6, 0, 0), head=(14, 0, 0), jaw=-14,
+                          frill={"pitch": -12, "sx": 1.18, "sy": 1.22, "sz": 1.18},
+                          fin_L=(-22, 0, 0), fin_R=(-22, 0, 0))),
+                (1.0, {})]),
+            # Struck: the head snaps back and aside, neck recoils, coil flinches.
+            "Hit": dict(seconds=0.55, sharp=1, marker=(1, "hit_react"), keys=[
+                (0.0, {}),
+                (0.25, _P(body_03=(6, 6, 0), body_04=(10, 6, 0), body_05=(10, 0, 0), head=(12, 8, 10),
+                          jaw=-12, frill=(10, 0, 0), fin_L=(-10, 0, 0), fin_R=(-10, 0, 0),
+                          tail_06=(0, -6, 0), tail_09=(0, -10, 0))),
+                (0.55, _P(body_04=(4, 2, 0), body_05=(4, 0, 0), head=(4, 3, 4), jaw=-4,
+                          frill=(3, 0, 0), tail_09=(0, -3, 0))),
+                (1.0, {})]),
+            # Proud: head held high, a big slow neck sway and a fast happy coil ripple, frill and
+            # fins fluttering; returns exactly to rest (loops).
+            "Victory": dict(seconds=2.2, layers=[
+                ("b", "body_02", "turn", 5.0, 2, 0.0), ("b", "body_03", "turn", 6.0, 2, -0.6),
+                ("b", "body_04", "turn", 5.0, 2, -1.2), ("b", "head", "turn", -6.0, 2, -1.0),
+                ("b", "frill", "pitch", 6.0, 4, 0.0), ("b", "fin_L", "pitch", 14.0, 4, 0.0),
+                ("b", "fin_R", "pitch", 14.0, 4, 0.0)] + [
+                ("b", f"tail_{i:02d}", "turn", 3.0 + 0.8 * i, 2, -0.75 * i) for i in range(1, 10)], keys=[
+                (0.0, {}),
+                (0.2, _P(body_04=(-6, 0, 0), head=(14, 0, 0), jaw=-10)),
+                (0.8, _P(body_04=(-6, 0, 0), head=(14, 0, 0), jaw=-10)),
+                (1.0, {})]),
+            # The neck sways, then collapses back and to the side down ONTO its own coil, the upper
+            # neck lying on the floor inside the coil ring and the head resting on the coil (a
+            # forward collapse that put the head on the floor in front measured ~1.3 units past
+            # the coil and left the battle camera's framing in-engine) (ko_settle: the authored collapse overshoots; per frame the
+            # fraction of it applied is bisected so the head/neck rest exactly on the floor -- the
+            # coil already is the ground contact, so the root never moves).
+            "KO": dict(seconds=1.8, ko=True, impact=0.62,
+                       ko_settle={"bones": ["body_01", "body_02", "body_03", "body_04", "body_05", "head"],
+                                  "region": ["head", "snout", "jaw", "frill", "body_04", "body_05"]},
+                       keys=[
+                (0.0, {}),
+                (0.25, _P(body_03=(-4, 10, 0), body_04=(-6, 8, 0), head=(6, 0, 10), jaw=-8)),
+                (0.62, _P(body_01=(4, 8, 0), body_02=(14, 6, 0), body_03=(30, 4, 0),
+                          body_04=(44, 0, 0), body_05=(18, 0, 0), head=(-80, 0, 20), jaw=-6,
+                          frill=(10, 0, 0), fin_L=(20, 0, 0), fin_R=(20, 0, 0))),
+                (0.85, _P(body_01=(6, 10, 0), body_02=(18, 8, 0), body_03=(36, 4, 0),
+                          body_04=(52, 0, 0), body_05=(20, 0, 0), head=(-95, 0, 24), jaw=-4,
+                          frill=(12, 0, 0), fin_L=(22, 0, 0), fin_R=(22, 0, 0))),
+                (1.0, "same")]),
+        }),
+}
+
+
 def build_bird_clips(creature):
     import mathutils
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import bird_pose as BP
 
-    BPAR = BIRD_PARAMS[creature]
+    BPAR = BIRD_PARAMS[creature] if creature in BIRD_PARAMS else LAST_PARAMS[creature]  # v20
     FWD = BP.forward_of(arm_obj)
     HOVER = float(arm_obj.data.get("hover_offset", 0.0))
     mesh_obj = next(o for o in bpy.data.objects if o.type == "MESH")
@@ -1918,6 +2217,30 @@ def build_bird_clips(creature):
             res.append((f, conv_pose(p), "inout"))
             prev = p
         return res
+
+    def _bone_chans(c):
+        per = {}
+        for k, v in c.items():
+            if k[0] == "b":
+                per.setdefault(k[1], {})[k[2]] = v
+        return per
+
+    _region_cache = {}
+
+    def region_min(bones):
+        """min world Z of the vertices whose dominant vertex group is one of `bones`."""
+        key = tuple(bones)
+        if key not in _region_cache:
+            names = [g.name for g in mesh_obj.vertex_groups]
+            _region_cache[key] = [v.index for v in mesh_obj.data.vertices if len(v.groups) and
+                                  names[max(v.groups, key=lambda g: g.weight).group] in bones]
+        bpy.context.view_layer.update()
+        dg = bpy.context.evaluated_depsgraph_get()
+        eo = mesh_obj.evaluated_get(dg)
+        me = eo.to_mesh()
+        mz = min((eo.matrix_world @ me.vertices[i].co).z for i in _region_cache[key])
+        eo.to_mesh_clear()
+        return mz
 
     def eval_min_z():
         bpy.context.view_layer.update()
@@ -1966,6 +2289,28 @@ def build_bird_clips(creature):
                     up, fw = lifts.get(side, (0.0, 0.0))
                     tgt = LEG_IK[side]["ankle_rest"] + mathutils.Vector((0, 0, up)) + FWD * fw
                     BP.plant_leg(arm_obj, side, LEG_IK[side], tgt)
+            if spec.get("ko") and spec.get("ko_settle"):
+                # v20 (Leviathan): bisect the fraction of the listed bones' authored KO pose that
+                # is applied so the region (head/upper neck) rests on the floor (+4 mm) -- before
+                # impact only if it would go through; the root is never moved.
+                ks = spec["ko_settle"]
+                full = {b: dict(ch) for b, ch in _bone_chans(c).items() if b in ks["bones"]}
+                if region_min(ks["region"]) < 0.004 or t >= spec["impact"]:
+                    if region_min(ks["region"]) < 0.004:
+                        lo, hi = 0.0, 1.0
+                        for _ in range(14):
+                            mid = (lo + hi) / 2
+                            for b, ch in full.items():
+                                BP.set_semantic(arm_obj, FWD, b, {k: v * mid if k in ("pitch", "turn", "bank")
+                                                                  else v for k, v in ch.items()})
+                            if region_min(ks["region"]) >= 0.004:
+                                lo = mid
+                            else:
+                                hi = mid
+                        for b, ch in full.items():
+                            BP.set_semantic(arm_obj, FWD, b, {k: v * lo if k in ("pitch", "turn", "bank")
+                                                              else v for k, v in ch.items()})
+                return
             if spec.get("ko"):
                 # ground settle: before impact only lift out of the floor; from impact on, rest the
                 # lowest vertex exactly on it (+4 mm).
@@ -2003,7 +2348,7 @@ def build_bird_clips(creature):
 
 if CREATURE == "griffin":
     build_griffin_clips()
-elif CREATURE in BIRD_PARAMS:
+elif CREATURE in BIRD_PARAMS or CREATURE in LAST_PARAMS:  # v20: same data-driven builder
     build_bird_clips(CREATURE)
 else:
     build_creature_clips(CREATURE)

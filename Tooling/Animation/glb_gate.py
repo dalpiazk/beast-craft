@@ -21,6 +21,12 @@ constant), so it passed. This gate measures MOTION and MATCH instead:
     the leg check above is replaced by a WING-motion check -- each wing's wing_*_01 + wing_*_02
     rotation range in the GLB must be >= `move_min_wing_range_deg` and match Blender's range
     (same <= max_ang_err_deg tolerance) -- the flier equivalent of "the legs actually step".
+  * v20, legless serpent (`move_mode="slither"`, the Leviathan): the leg check is replaced by a
+    BODY-WAVE check on the GLB itself -- every tail_*/body_* bone's range must match Blender's; the
+    tail ranges must sum to >= `move_min_wave_sum_deg` with >= 5 tail bones moving >= 3 deg; the
+    neck (body_*) ranges must sum to >= 6 deg; and the wave must TRAVEL: the phase of each tail
+    bone's world-yaw signal (first harmonic over the loop) must lag the previous bone's, same sign
+    on >= 75% of pairs -- a frozen or in-step (rigid) coil fails.
 
 Coordinates: glTF is Y-up; Blender is Z-up. The Blender glTF exporter maps (x, y, z)_blender ->
 (x, z, -y)_gltf, so C (gltf -> blender) = [[1,0,0],[0,0,-1],[0,1,0]].
@@ -172,8 +178,19 @@ def _rot_angle(m3):
     return math.degrees(math.acos(max(-1.0, min(1.0, (np.trace(r) - 1) / 2))))
 
 
+def _yaw_deg(m3):
+    return math.degrees(math.atan2(m3[1, 0] - m3[0, 1], m3[0, 0] + m3[1, 1]))
+
+
+# v20 round 2: per-clip minimum shoulder + elbow LOCAL rotation range per arm (deg), for rigs with
+# arm_* bones.
+ARM_MIN_RANGE_DEG = {"Move": 12.0, "Idle": 3.0, "Attack": 40.0, "Cast": 40.0, "Hit": 15.0,
+                     "Victory": 40.0, "KO": 10.0}
+
+
 def run_gate(glb_path, truth, fps, max_ang_err_deg=2.0, max_pos_err=0.01,
-             move_min_leg_range_deg=15.0, move_mode="walk", move_min_wing_range_deg=25.0):
+             move_min_leg_range_deg=15.0, move_mode="walk", move_min_wing_range_deg=25.0,
+             move_min_wave_sum_deg=30.0):
     """truth: {"rest": {bone: 4x4}, "clips": {clip: {"frame_start": f0, "frames": {f: {bone: 4x4}}}}}
     (Blender world matrices, lists). Returns (passed, report)."""
     g = GlbPose(glb_path)
@@ -210,7 +227,9 @@ def run_gate(glb_path, truth, fps, max_ang_err_deg=2.0, max_pos_err=0.01,
         for b in bones:
             is_leg = b.startswith("leg_") and (b.endswith("_thigh") or b.endswith("_shin"))
             is_wing = move_mode == "hover" and b.startswith("wing_") and b[-3:] in ("_01", "_02")
-            if not (is_leg or is_wing):
+            is_wave = move_mode == "slither" and b.startswith(("tail_", "body_"))
+            is_arm = b.startswith("arm_") and b.endswith(("_upper", "_fore"))  # v20 round 2
+            if not (is_leg or is_wing or is_wave or is_arm):
                 continue
             rg = max(_rot_angle(m @ d_g[b][0].T) for m in d_g[b])
             rt = max(_rot_angle(m @ d_t[b][0].T) for m in d_t[b])
@@ -229,6 +248,32 @@ def run_gate(glb_path, truth, fps, max_ang_err_deg=2.0, max_pos_err=0.01,
                 if tot < move_min_wing_range_deg:
                     report["failures"].append(f"Move: wing {s} 01+02 range {tot:.1f} deg < "
                                               f"{move_min_wing_range_deg} in the GLB (wings not flapping)")
+        elif clip == "Move" and move_mode == "slither":
+            tails = sorted(b for b in leg_ranges if b.startswith("tail_"))
+            tsum = sum(leg_ranges[b][0] for b in tails)
+            nmov = sum(1 for b in tails if leg_ranges[b][0] >= 3.0)
+            bsum = sum(leg_ranges[b][0] for b in leg_ranges if b.startswith("body_"))
+            # wave travel, measured on the GLB's own world-yaw signals
+            ph = []
+            for b in tails:
+                ys = [_yaw_deg(m) for m in d_g[b]]
+                n = len(ys)
+                c = sum(y * math.cos(2 * math.pi * k / n) for k, y in enumerate(ys))
+                s_ = sum(y * math.sin(2 * math.pi * k / n) for k, y in enumerate(ys))
+                ph.append(math.atan2(s_, c))
+            lags = [((b - a + math.pi) % (2 * math.pi)) - math.pi for a, b in zip(ph, ph[1:])]
+            pos = sum(1 for d in lags if d > 0)
+            neg = sum(1 for d in lags if d < 0)
+            report.setdefault("wave", {})["Move"] = {"tail_range_sum": round(tsum, 2), "tail_moving": nmov,
+                                                     "neck_range_sum": round(bsum, 2),
+                                                     "lags_rad": [round(d, 3) for d in lags]}
+            if tsum < move_min_wave_sum_deg or nmov < 5:
+                report["failures"].append(f"Move: tail wave sum {tsum:.1f} deg / {nmov} bones moving "
+                                          f"in the GLB (frozen slither)")
+            if bsum < 6.0:
+                report["failures"].append(f"Move: neck sway sum {bsum:.1f} deg < 6 in the GLB")
+            if max(pos, neg) < 0.75 * len(lags):
+                report["failures"].append(f"Move: tail wave does not travel in the GLB (lags {lags})")
         elif clip == "Move":
             sides = sorted({b.split("_")[1] for b in leg_ranges if b.startswith("leg_")})
             for s in sides:
@@ -236,6 +281,26 @@ def run_gate(glb_path, truth, fps, max_ang_err_deg=2.0, max_pos_err=0.01,
                 if tot < move_min_leg_range_deg:
                     report["failures"].append(f"Move: leg {s} thigh+shin range {tot:.1f} deg < "
                                               f"{move_min_leg_range_deg} in the GLB (legs not stepping)")
+        # v20 round 2 (arm rigs, the humanoid Treant): BOTH arms must visibly move in the GLB --
+        # per side, upper-arm + forearm rotation range >= the clip's minimum (and match Blender,
+        # checked above with the legs). Rigs without arm_* bones are unaffected.
+        # Ranges here are LOCAL (each bone relative to its parent: shoulder = upper vs clav, elbow
+        # = fore vs upper), so trunk/root motion does not count as arm motion.
+        arm_sides = sorted({b.split("_")[1] for b in leg_ranges if b.startswith("arm_")})
+
+        def _local_range(b, pa):
+            if b not in d_g or pa not in d_g:
+                return 0.0
+            rel = [d_g[pa][k].T @ d_g[b][k] for k in range(len(d_g[b]))]
+            return max(_rot_angle(m @ rel[0].T) for m in rel)
+        for s_ in arm_sides:
+            tot = (_local_range(f"arm_{s_}_upper", f"arm_{s_}_clav")
+                   + _local_range(f"arm_{s_}_fore", f"arm_{s_}_upper"))
+            need = ARM_MIN_RANGE_DEG.get(clip, 0.0)
+            report.setdefault("arms", {}).setdefault(clip, {})[s_] = round(tot, 2)
+            if tot < need:
+                report["failures"].append(f"{clip}: arm {s_} shoulder+elbow local range {tot:.1f} deg < {need} "
+                                          f"in the GLB (arm not moving)")
         report["clips"][clip] = {"max_rot_err_deg": round(worst_ang, 3),
                                  "max_pos_err": round(worst_pos, 5),
                                  "worst_at": worst_where,
@@ -255,6 +320,8 @@ if __name__ == "__main__":
                        move_mode=_truth.get("move_mode", "walk"))
     for c, r in rep["clips"].items():
         print(f"{c:8s} max_rot_err={r['max_rot_err_deg']:7.2f} deg  max_pos_err={r['max_pos_err']:.4f}")
+    for c, a in rep.get("arms", {}).items():
+        print(f"{c:8s} arm shoulder+elbow LOCAL range deg {a}")
     print("PASS" if ok else "FAIL:")
     for x in rep["failures"]:
         print("  " + x)

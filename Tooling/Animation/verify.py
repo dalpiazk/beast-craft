@@ -46,14 +46,18 @@ def _peek_rig_props(path):
     arm = next(o for o in bpy.data.objects if o.type == "ARMATURE")
     return {k: (list(arm.data[k]) if hasattr(arm.data[k], "__len__") and not isinstance(arm.data[k], str)
                 else arm.data[k])
-            for k in ("template", "locomotion", "hover_offset", "forward") if k in arm.data}
+            for k in ("template", "locomotion", "hover_offset", "forward", "hinges") if k in arm.data}
 
 
 RIG_PROPS = _peek_rig_props(MOVE_BLEND or KEYED_BLEND)
 IS_BIRD = RIG_PROPS.get("template") == "winged_biped"
+# v20: rigs that carry the armature props (winged_biped, the opted-in quadruped Frost Wyrm, and the
+# new biped_arms / serpent templates) all get the whole-mesh ground gate and every-clip edge stretch.
+EXT = RIG_PROPS.get("template") in ("winged_biped", "quadruped", "biped_arms", "serpent")
+SLITHER = RIG_PROPS.get("locomotion") == "slither"
 HOVER = RIG_PROPS.get("locomotion") == "hover"
 HOVER_OFFSET = float(RIG_PROPS.get("hover_offset", 0.0))
-if IS_BIRD:
+if EXT:
     report["rig_props"] = RIG_PROPS
     print(f"VERIFY bird rig: {RIG_PROPS}")
 
@@ -123,6 +127,10 @@ if MOVE_BLEND:
         # measure, so foot-slide and knee-range are skipped (documented, not silently dropped);
         # check_wing_motion below is the flier's Move gate instead.
         move_report["skipped"] = "hover flier: no foot contact (foot-slide/knee gates n/a)"
+        leg_sides = []
+    if SLITHER:
+        # v20 legless serpent: no feet at all; check_body_wave below is its Move gate instead.
+        move_report["skipped"] = "legless slither: no feet (foot-slide/knee gates n/a)"
         leg_sides = []
     for side in leg_sides:
         if set(leg_sides) == set(LATERAL_SEQUENCE):
@@ -288,7 +296,8 @@ if KEYED_BLEND:
         for f in range(int(f0), int(f1) + 1):
             scene.frame_set(f)
             total = sum(math.degrees(arm_obj.pose.bones[b].rotation_euler.x)
-                        for b in ("spine_02", "neck_01", "neck_02", "head"))
+                        for b in ("spine_02", "neck_01", "neck_02", "head")
+                        if b in arm_obj.pose.bones)  # v20: the serpent has no spine/neck_* bones
             max_head_pitch = max(max_head_pitch, abs(total))
         ok = max_head_pitch < 120
         report.setdefault("attack", {})["joint_limits"] = {
@@ -607,7 +616,10 @@ def check_walk_direction(blend_path, action_name="Move"):
     return result
 
 
-if MOVE_BLEND and HOVER:
+if MOVE_BLEND and SLITHER:
+    report["walk_direction"] = {"pass": True, "skipped": "legless slither: no feet"}
+    print("  walk_direction: SKIPPED (legless slither -- see check_body_wave)")
+elif MOVE_BLEND and HOVER:
     report["walk_direction"] = {"pass": True, "skipped": "hover flier: no foot contact"}
     print("  walk_direction: SKIPPED (hover flier, no foot contact -- see check_wing_motion)")
 elif MOVE_BLEND:
@@ -735,7 +747,9 @@ def check_foot_orientation(blend_path, action_name="Move"):
     return {"forward": list(round(c, 4) for c in forward), "legs": leg_results, "pass": overall_pass}
 
 
-if MOVE_BLEND and HOVER:
+if MOVE_BLEND and SLITHER:
+    report["foot_orientation"] = {"pass": True, "skipped": "legless slither: no feet"}
+elif MOVE_BLEND and HOVER:
     report["foot_orientation"] = {"pass": True, "skipped": "hover flier: feet never planted"}
 elif MOVE_BLEND:
     foot_orient_result = check_foot_orientation(MOVE_BLEND, "Move")
@@ -1056,7 +1070,164 @@ def check_wing_motion(blend_path, action_name="Move", H=2.0):
     return {"sides": res, "pass": ok}
 
 
-if IS_BIRD:
+# v20 body_wave (legless serpent, hard gate): a slither must actually ripple down the coil, the
+# wave must TRAVEL (not every bone swinging in step), the coil must stay on the ground (it is the
+# support) and the neck must sway. Measured from the baked Move, independent of gait.py's maths:
+#   * per tail bone, its ground-plane heading relative to frame 0 (signed yaw) every frame; range
+#     >= WAVE_MIN_DEG on >= 70% of the tail bones;
+#   * per tail bone, the phase of that yaw signal's first harmonic over the loop; successive bones
+#     must lag the previous one (same sign) on >= 75% of pairs, mean |lag| >= 0.2 rad;
+#   * coil grounded: every tail bone head's Z stays within 1 cm of its rest Z on every frame, and the
+#     lowest coil-dominated vertex stays within [-5 mm, +1 cm] of the floor on every frame;
+#   * neck sway: the head bone's lateral travel >= 2% of body height.
+WAVE_MIN_DEG = 4.0
+
+
+def check_body_wave(blend_path, H=2.0):
+    arm_obj = load(blend_path)
+    mesh_obj = next(o for o in bpy.data.objects if o.type == "MESH")
+    action = bpy.data.actions.get("Move")
+    arm_obj.animation_data_create()
+    arm_obj.animation_data.action = action
+    scene = bpy.context.scene
+    fwd = mathutils.Vector(tuple(arm_obj.data["forward"]))
+    lat = fwd.cross(mathutils.Vector((0, 0, 1))).normalized()
+    tails = sorted(b.name for b in arm_obj.data.bones if b.name.startswith("tail_"))
+    names = [g.name for g in mesh_obj.vertex_groups]
+    coil_v = [v.index for v in mesh_obj.data.vertices if len(v.groups) and
+              names[max(v.groups, key=lambda g: g.weight).group].startswith(("tail_", "pelvis"))]
+    f0, f1 = [int(round(x)) for x in action.frame_range]
+    frames = list(range(f0, f1))  # f1 == f0 (loop) -- one full cycle
+    rest_dir = {}
+    rest_z = {b: (arm_obj.matrix_world @ arm_obj.data.bones[b].head_local).z for b in tails}
+    yaw = {b: [] for b in tails}
+    head_lat = []
+    worst_dz, coil_min, coil_max_low = 0.0, 1e9, -1e9
+    for f in frames:
+        scene.frame_set(f)
+        for b in tails:
+            pb = arm_obj.pose.bones[b]
+            d = (pb.tail - pb.head)
+            d.z = 0.0
+            if b not in rest_dir:
+                rest_dir[b] = d.normalized()
+            a = rest_dir[b]
+            dn = d.normalized()
+            yaw[b].append(math.degrees(math.atan2(a.x * dn.y - a.y * dn.x, a.dot(dn))))
+            worst_dz = max(worst_dz, abs((arm_obj.matrix_world @ pb.head).z - rest_z[b]))
+        head_lat.append((arm_obj.matrix_world @ arm_obj.pose.bones["head"].head).dot(lat))
+        dg = bpy.context.evaluated_depsgraph_get()
+        eo = mesh_obj.evaluated_get(dg)
+        me = eo.to_mesh()
+        mz = min((eo.matrix_world @ me.vertices[i].co).z for i in coil_v)
+        eo.to_mesh_clear()
+        coil_min = min(coil_min, mz)
+        coil_max_low = max(coil_max_low, mz)
+    n = len(frames)
+    ranges, phases = {}, {}
+    for b in tails:
+        ys = yaw[b]
+        ranges[b] = max(ys) - min(ys)
+        c = sum(y * math.cos(2 * math.pi * k / n) for k, y in enumerate(ys))
+        si = sum(y * math.sin(2 * math.pi * k / n) for k, y in enumerate(ys))
+        phases[b] = math.atan2(si, c)
+    lags = []
+    for a, b in zip(tails, tails[1:]):
+        d = phases[b] - phases[a]
+        d = (d + math.pi) % (2 * math.pi) - math.pi
+        lags.append(d)
+    moving = sum(1 for b in tails if ranges[b] >= WAVE_MIN_DEG)
+    sign = 1 if sum(1 for d in lags if d > 0) >= sum(1 for d in lags if d < 0) else -1
+    same = sum(1 for d in lags if d * sign > 0)
+    mean_lag = sum(abs(d) for d in lags) / max(1, len(lags))
+    sway = max(head_lat) - min(head_lat)
+    res = {
+        "tail_yaw_range_deg": {b: round(r, 2) for b, r in ranges.items()},
+        "tail_moving": f"{moving}/{len(tails)}",
+        "phase_lag_rad": [round(d, 3) for d in lags], "lag_same_sign": f"{same}/{len(lags)}",
+        "mean_abs_lag_rad": round(mean_lag, 3),
+        "coil_bone_max_dz": round(worst_dz, 4), "coil_min_z": round(coil_min, 4),
+        "coil_lowest_vertex_max_over_frames": round(coil_max_low, 4),
+        "neck_sway": round(sway, 4),
+    }
+    ok_wave = moving >= 0.7 * len(tails)
+    ok_travel = same >= 0.75 * len(lags) and mean_lag >= 0.2
+    ok_ground = worst_dz <= 0.01 and coil_min >= -0.005 and coil_max_low <= 0.01
+    ok_sway = sway >= 0.02 * H
+    res.update({"wave_pass": ok_wave, "travel_pass": ok_travel, "coil_grounded_pass": ok_ground,
+                "neck_sway_pass": ok_sway, "pass": ok_wave and ok_travel and ok_ground and ok_sway})
+    print(f"  body_wave: tail bones moving >= {WAVE_MIN_DEG} deg {moving}/{len(tails)} "
+          f"(ranges {[round(r, 1) for r in ranges.values()]}); wave travel lags {res['phase_lag_rad']} "
+          f"same sign {same}/{len(lags)} mean {mean_lag:.2f} rad; coil bone dz {worst_dz:.4f}, coil min z "
+          f"{coil_min:.4f}, lowest coil vertex <= {coil_max_low:.4f}; neck sway {sway:.3f} -> "
+          f"{'PASS' if res['pass'] else 'FAIL'}")
+    return res
+
+
+if MOVE_BLEND and SLITHER:
+    report["body_wave"] = check_body_wave(MOVE_BLEND)
+
+# v20 round 2 (humanoid Treant, hard gate): every hinge (elbows, knees -- rig_templates/biped_arms
+# HINGES, stored on the armature as `hinges`) must bend like a human one on EVERY frame of every
+# clip: the child bone's direction in the parent's posed frame is split into a flexion angle about
+# the parent's local X (the hinge; sign so + = flexion: forearm forward, shin back) and an off-hinge
+# component; flexion must stay within the joint's range (no backward knee or elbow) and the off-hinge
+# change vs rest within its tolerance (a hinge cannot bend sideways).
+def check_joint_limits(blend_path, clip_names, hinges):
+    arm_obj = load(blend_path)
+    scene = bpy.context.scene
+    out = {}
+
+    def rel(pa, ch, posed):
+        if posed:
+            Rp = arm_obj.pose.bones[pa].matrix.to_3x3().normalized()
+            c = arm_obj.pose.bones[ch].matrix.to_3x3().col[1].normalized()
+        else:
+            Rp = arm_obj.data.bones[pa].matrix_local.to_3x3().normalized()
+            c = arm_obj.data.bones[ch].matrix_local.to_3x3().col[1].normalized()
+        cl = Rp.transposed() @ c
+        return math.degrees(math.atan2(cl.z, cl.y)), math.degrees(math.asin(max(-1.0, min(1.0, cl.x))))
+    rest = {h: rel(pa, ch, False) for h, (pa, ch, sg, rng, off) in hinges.items()}
+    for name in clip_names:
+        action = bpy.data.actions.get(name)
+        if action is None:
+            continue
+        arm_obj.animation_data_create()
+        arm_obj.animation_data.action = action
+        f0, f1 = [int(round(x)) for x in action.frame_range]
+        rec = {h: {"flex_min": 1e9, "flex_max": -1e9, "off_max": 0.0} for h in hinges}
+        for f in range(f0, f1 + 1):
+            scene.frame_set(f)
+            for h, (pa, ch, sg, rng, off) in hinges.items():
+                th, ox = rel(pa, ch, True)
+                fl = sg * th
+                r = rec[h]
+                r["flex_min"] = min(r["flex_min"], fl)
+                r["flex_max"] = max(r["flex_max"], fl)
+                r["off_max"] = max(r["off_max"], abs(ox - rest[h][1]))
+        ok = True
+        for h, (pa, ch, sg, rng, off) in hinges.items():
+            r = rec[h]
+            r.update({k: round(v, 1) for k, v in r.items()})
+            r["pass"] = rng[0] <= r["flex_min"] and r["flex_max"] <= rng[1] and r["off_max"] <= off
+            ok = ok and r["pass"]
+        out[name] = {"hinges": rec, "pass": ok}
+        print(f"  joint_limits {name}: " + ", ".join(
+            f"{h} flex {r['flex_min']}..{r['flex_max']} off {r['off_max']}" for h, r in rec.items())
+            + f" -> {'PASS' if ok else 'FAIL'}")
+    return out
+
+
+if EXT and RIG_PROPS.get("hinges"):
+    _hin = json.loads(RIG_PROPS["hinges"])
+    jl = {}
+    if MOVE_BLEND:
+        jl.update(check_joint_limits(MOVE_BLEND, ["Move"], _hin))
+    if KEYED_BLEND:
+        jl.update(check_joint_limits(KEYED_BLEND, ["Idle", "Attack", "Cast", "Hit", "KO", "Victory"], _hin))
+    report["joint_limits"] = {"clips": jl, "pass": all(v["pass"] for v in jl.values()), "spec": _hin}
+
+if EXT:
     ground = {}
     if MOVE_BLEND:
         ground.update(check_mesh_ground(MOVE_BLEND, ["Move"])["clips"])
@@ -1082,8 +1253,8 @@ print("VERIFY DONE")
 # so a failure can't be silently skipped past in a batch/CI context.
 hard_fail = False
 _HARD = ("walk_direction", "foot_orientation", "toe_fan", "toe_deformation")
-if IS_BIRD:  # v19: correctness gates for the birds (existing creatures' exit behaviour unchanged)
-    _HARD = _HARD + ("mesh_ground_clearance", "wing_motion")
+if EXT:  # v19/v20: correctness gates for the new rigs (v18 creatures' exit behaviour unchanged)
+    _HARD = _HARD + ("mesh_ground_clearance", "wing_motion", "body_wave", "joint_limits")
 for gate_name in _HARD:
     if gate_name in report and not report[gate_name].get("pass", False):
         print("=" * 70)

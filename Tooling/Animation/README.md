@@ -1521,6 +1521,328 @@ removing it (wing card vs leg, then wing vs head tuft, then wing feather vs body
 cards physically touch) -- the same v9/v18 finding; in-engine strips show no tearing at gameplay
 scale, but the Thunderbird's wing/head-tuft contact is the likeliest place for a visible sliver.
 
+## v20: Frost Wyrm, Treant, Leviathan -- two new templates (`biped_arms`, `serpent`), a slither Move with body-wave gates, Phoenix talon holes closed
+
+Three beasts through the same pipeline. All were prepped with `prep_mesh.py --no-ground-sheet`. The
+Griffin, Golem, Kirin, Tarasque, Basilisk, Phoenix and Thunderbird are untouched:
+- `regress/run_regress.sh` re-run on all seven: rig bone and weight hashes and every Move/keyed F-curve
+  hash match the v19 baselines;
+- re-exported Kirin and Phoenix GLBs are byte-identical to the committed ones.
+
+Every new behaviour is keyed off landmark-file opt-ins, armature properties or `--creature` data.
+
+**Fixed on the way:** the uncommitted `--no-ground-sheet` change to `prep_mesh.py` had moved
+`classify_and_remove_debris` under the new `elif`, so a default generic prep would have skipped
+debris removal. It now runs for every generic creature again. The three prepped meshes were single
+components, so they were not affected.
+
+### Rigs (every roll explicit; axis dumps in `<beast>_anim/axes_check.json`)
+
+| Beast | Template | Bones | Notes |
+| --- | --- | --- | --- |
+| Frost Wyrm | `quadruped` | 31 | Opt-ins in `landmarks/frost_wyrm.json` (see below) |
+| Treant | **new `biped_arms`** | 26 | No jaw: the face is painted on the trunk |
+| Leviathan | **new `serpent`** | 22 | `locomotion: "slither"` |
+
+Frost Wyrm (`quadruped`) opt-ins:
+- `"forward_mode": "body"` stores a pelvis->chest `forward` on the armature. The head is turned
+  ~20 deg, which is the Phoenix problem.
+- `"roll_policy": "lateral"` sets local X = the body's lateral axis on every bone. The old
+  `align_roll((0,0,1))` was degenerate on its straight-down foot bones.
+- `"jaw_split"` adds `quadruped.split_jaw_weights`. The mouth is a fused seam ~5 cm below the
+  skull-centre landmark; heat weighting spread `jaw` over 863 vertices, only 18 of them > 0.5. The
+  split re-divides the skull's weight about a mouth plane read off a section along the turned head.
+
+Treant (`biped_arms`) bones:
+- root, pelvis, spine x2, neck x2, head;
+- 3 soft `crown_*` bones fanned from the crown base to each leaf lobe;
+- per arm: `arm_<s>_clav/upper/fore/hand`;
+- 2 legs: thigh/shin/foot/toe.
+
+Roll and weights:
+- A bone that runs along the lateral axis (the out-stretched left arm, the left crown lobe) falls
+  back to local Z = UP.
+- `fix_arm_body_bleed`: an arm blended with a leg or the crown goes to the nearer chain.
+
+Leviathan (`serpent`) bones:
+- root on the ground under the coil base;
+- pelvis = the coil base;
+- `body_01..05` up the S-neck, then head, snout, jaw, and one soft `frill`;
+- `tail_01..09` round the coil (re-measured mid-line, 10 points);
+- `fin_L/R`.
+
+`fix_serpent_weights` keeps each vertex on chain bones within 2 links of its dominant one. The neck
+base sits against the first coil loop, and loops lie against each other.
+
+**Landmark fixes (old -> new, all in `_lead_fixes`):** each one was measured with the new
+`lmcheck.py` (scratchpad `anim-last/tools`). It gives x-ray silhouettes plus sections,
+inside/outside ray tests and vertex probes.
+
+Frost Wyrm:
+- spine_01 and tail_0/1 raised to mid-body (they were at 23-40% of the section height);
+- four toe tips moved inside the paws (1.3-2.3 cm outside);
+- mouth hinge and seam points added.
+
+Treant (20 points):
+- the right leg's shin goes BACK below the knee (staggered stance). The given ankle and toe were
+  6 / 18.5 cm in front of it.
+- the left arm is held in front of the body plane (y -0.09, not 0).
+- the right elbow's outer bend is at (0.25, -0.07, 0.78), not (0.23, -0.12, 0.70).
+- the crown lobes sit BEHIND the head (y +0.17..0.19), not at y 0, where they were 12-17 cm
+  outside.
+
+Leviathan:
+- body_chain[0]/[1] centred in the neck base;
+- body_chain[4] moved off the front skin (the S top curls back);
+- coil re-measured as its mid-line;
+- fin tips moved into the thin fins (4-4.5 cm outside).
+
+### Clips
+
+Every clip is DATA in `anim/keyed.py` `LAST_PARAMS` and goes through the same builder as the birds:
+semantic pitch/turn/bank channels, baked per frame, with planted-foot IK. The builder gained one
+spec key for the serpent, `ko_settle`: the root never moves (the coil is the ground contact). The
+fraction of the authored neck collapse is bisected per frame so the head region rests on the floor.
+
+Move:
+- **Frost Wyrm:** `gait.py` fk_anchored with Tarasque-class amplitudes for its ~0.55 legs
+  (stride_frac 0.13, lift 0.11, 1.25 s). Stance sweep/half-stride ~0.07; lateral sequence.
+- **Treant:** the same fk_anchored 2-leg walk plus `bird`-style semantic layers. This is a slow
+  1.6 s cycle with a pelvis rock and spine bank. The out-stretched arm swings with `turn` (a pitch
+  would only twist it) and the bent arm with `pitch`, opposite their legs. The crown sways and
+  rustles. `knee_pole: "forward"`: the wide stance made the landmark knees bow sideways.
+- **Leviathan:** a new `slither` branch in `gait.py`. A travelling yaw wave runs down the 9 coil
+  bones (lag 0.75 rad/bone, 3->9 deg). `turn` is about world UP, so the coil stays flat on the
+  floor. The neck sways and bobs with the head counter-turned, and the fins and frill flutter.
+
+### Gates
+
+`verify.py` changes:
+- The bird-only gates (whole-mesh ground on every frame of every clip, every-clip edge stretch, hard
+  fail) now apply to every rig that carries the armature props (`EXT`).
+- A slither rig skips foot-slide, knee, walk_direction and foot_orientation, reported as `skipped`.
+- **New `body_wave` hard gate:**
+  - >= 70% of tail bones yaw >= 4 deg;
+  - first-harmonic phase lags the same sign on >= 75% of neighbour pairs, mean >= 0.2 rad (a
+    frozen or in-step coil fails);
+  - coil bone heads within 1 cm of rest Z, and the coil's lowest vertex within [-5 mm, +1 cm] on
+    every frame;
+  - neck sway >= 2% H.
+
+`glb_gate.py` gains `move_mode="slither"`, measured on the GLB itself:
+- tail/neck ranges match Blender;
+- tail sum >= 30 deg with >= 5 bones >= 3 deg;
+- neck sum >= 6 deg;
+- the wave travels (the same phase test).
+
+| Gate | Frost Wyrm | Treant | Leviathan |
+| --- | --- | --- | --- |
+| loop seams Move/Idle/Victory | 0.000 | 0.000 | 0.000 |
+| walk_direction / foot_orientation | PASS (worst toe 15.9, sole 14.2 deg) | PASS (9.1 / 5.0) | skipped (legless) |
+| foot slide cv / knee range | PASS (<= 0.06; 105-179 deg) | PASS (<= 0.04; 114-179) | skipped |
+| body_wave | -- | -- | PASS (9/9 bones 6-25 deg, lags 8/8 same sign, mean 0.63 rad, coil dz 0.000, neck sway 0.11) |
+| mesh ground, every frame, 7 clips | PASS (min -0.0000; KO 0.004) | PASS (KO 0.004) | PASS |
+| KO held | 0.000 | 0.000 | 0.000 |
+| edge stretch Move/Attack/KO (others) | 2.7/5.0/8.8 (1.7-3.0) FAIL | 4.1/3.4/4.6 (2.0-4.0) FAIL | 1.4/2.7/3.0 (1.3-2.0) FAIL |
+| toe_deformation | FAIL 1.73x stretch, 0 flips (exits 1) | n/a | n/a |
+| glb_gate, 7 clips | PASS 0.00 deg / 0.0000 | PASS 0.00 / 0.0000 | PASS 0.00 / 0.0000 (wave 136 deg, lags all +) |
+
+Notes on the failures:
+- The Frost Wyrm's 8.8x (Attack/KO) is one tiny edge on the back crest whose two vertices carry
+  near-identical weights.
+- The Treant's worst edges are the crown's lower edge against the shoulder (clavicle) skin and the
+  bent right arm against the chest.
+- None show in the in-engine strips.
+
+### In-engine (Live3D `--pilot-model`, copies in the bin's Content/model only)
+
+Per beast there are full-set MP4s for:
+- battle camera (`<beast>_fullset.mp4`);
+- head-on (`_front`; for the Frost Wyrm yaw -70, i.e. at the turned face);
+- side (`_side`).
+
+Each MP4 plays all 7 clips, labelled:
+- Idle/Move/Victory looped twice;
+- one-shots +0.4 s, KO +1 s;
+- libx264 crf 20 slow, yuv420p 720x1280 60 fps, +faststart.
+
+Strips (`*_move8.png`, `*_peaks.png`) are cut FROM those MP4s.
+
+Fixes made after reading the strips:
+- **Frost Wyrm KO:** first slumped onto stiff legs with the belly 15 cm up, then onto its snout,
+  then its tail. Leg splay, neck and tail angles were iterated against per-region min Z.
+- **Frost Wyrm Attack:** read as a head-butt (head pitched under the crest); the head is now
+  thrust level.
+- **Treant KO:** fell a full body length behind its tile and out of the side camera; the feet now
+  slide forward as it goes over.
+- **Treant arms:** the raised arm in Cast/Victory barely lifted (raised further, checked head-on).
+- **Leviathan KO:** forward or sideways collapses put the head ~1.3 units past the coil, out of the
+  battle frame (the camera fits the bind pose), or upside-down. It now folds back down onto its
+  own coil.
+
+### Phoenix talon holes (`tools/fillholes_glb.py`, scratchpad)
+
+The shipped `phoenix_anim.glb` has 251 boundary edges in 8 real loops, all within 11 cm of the floor:
+- both talon pads;
+- the toe undersides;
+- the flame tail tip.
+
+The raw Meshy mesh has 2 (a 2-edge sliver both share). These are the ground-sheet removal's holes.
+
+The repair appends triangles to the GLB's index buffer (ear-clipped loops, wound like their
+neighbours). The fill uses copies of the rim vertices: same position, joints and weights, a flat
+patch normal and one UV per patch.
+
+The result is `scratchpad/anim-last/phoenix_talonfix.glb`:
+- 2 boundary edges;
+- `glb_gate` PASS 0.00 deg / 0.0000;
+- skeleton and animation data untouched.
+
+The repo copy is unchanged.
+
+### v20 round 2: Treant producer review -- both arms free, a full crown back, a humanoid rig
+
+The producer rejected the first Treant on three points: the right arm barely moved (the forearm and
+hand were fused into the chest), the back of the crown was a flat slab (the mesh came from a
+front-view drawing), and the limbs did not bend like a person's. The approved mesh, face and texture
+were kept and fixed in Blender. No other beast changed (see Regression).
+
+**Mesh surgery: `meshfix/treant_surgery.py`** (local-only, like `eyefix/`; its docstring has the
+details). Input `treant_prepped.glb`, output a new prepped GLB that `rig_creature.py` takes as is.
+
+| Step | Verts | Tris | Open edges | Non-manifold | Components |
+| --- | --- | --- | --- | --- | --- |
+| Input (welded) | 3957 | 7999 | 9 | 22 | 1 |
+| After clean | 3961 | 7996 | 0 | 0 | 1 |
+| After right forearm/hand removed, chest filled | 3841 | 7748 | 0 | 0 | 1 |
+| After the new right arm is unioned on | 4060 | 8182 | 0 | 0 | 1 (+6-vert sliver, dropped) |
+| Final (crown added, slivers welded, re-grounded) | 5327 | 10774 | 0 | 0 | 8 |
+
+- The final 8 components are the body plus 7 closed leaf shells on the crown back. One shell was
+  welded into the body by the 3 mm sliver weld.
+- **Right arm:** the forearm's z-sections overlap the chest's (it runs through the chest), so there
+  was no back surface to separate along. The forearm and hand were deleted, the chest holes filled,
+  and a mirrored copy of the free LEFT arm was unioned on at the right shoulder. The mirror plane is
+  the trunk mid-plane, x = -0.03, and the copy is aligned half-way (14 deg) to the old upper arm,
+  which stays inside it under the shoulder leaves. This replaces the old raised-hand gesture with the
+  left arm's open hand.
+- **Left arm:** lowered 40 deg about the shoulder (8 cm ramp), so the rest pose is a symmetric relaxed
+  A-pose.
+- **Fill textures:** every fill takes its UVs from its own boundary ring. A triangle whose ring
+  straddles a UV seam collapses to one ring texel: 62 of 325 fill faces. This removed the striped
+  smear a naive fill produced on the chest.
+- **Crown:** the front leaf surface (1070 faces) is mirrored to the back through y = 0.19, with depth
+  x0.7 plus a dome bulge and +-8 deg jitter per leaf island. The hole over the back of the head is
+  filled with stepped copies of the leaves above it. The result is decimated and solidified back
+  INTO the old slab (variable thickness, no see-through gap), +2686 tris. The rim walls take one
+  mid-green leaf texel; stretched rim UVs read as pale streaks in-engine.
+- The crown stays as separate shells: an exact union with the self-intersecting slab blew up to 17k
+  tris and 783 non-manifold edges.
+- The script is not bit-reproducible. A re-run gives identical step stats, but 19 of 10774 crown-back
+  triangles differ. The shipped asset is the scratchpad's `treant_prep_v2`.
+
+**Rig: `biped_arms` with a `"humanoid": true` landmark opt-in.** Only the Treant uses the template,
+and the old branch is kept.
+- **Bones (26):** root, pelvis, spine_01/02/03, neck, head, crown_01..03, and per arm
+  clav/upper/fore/hand (clavicle, shoulder, elbow, wrist). Per leg: thigh/shin/foot/toe (hip, knee,
+  ankle).
+- **Arm rolls:** local Z = FORWARD, so local X is each joint's hinge.
+- **New `bird_pose` channels**, used only when the armature carries `joint_limits`:
+  - `flex`: about the bone's local X, + = flexion;
+  - `abd`: about FORWARD, + = away from the body;
+  - `twist`.
+- **Joint limits** (`HUMAN_LIMITS`) are clamped on every posed frame of Move and every keyed clip:
+  - shoulder: flex -45..125, abd -35..110;
+  - elbow: flex 0..140 and nothing else (a hinge);
+  - wrist: flex -60..70;
+  - spine/neck/head: human ranges.
+- Planted-foot IK uses pole = FORWARD on humanoid rigs, so a knee only bends forward.
+- **Landmarks re-measured:**
+  - The BL knee sat 7 cm BEHIND the hip-ankle line, so the rest pose had a hyperextended knee. It is
+    now 1.2 cm in front.
+  - The elbows sat 15 deg hyperextended. They now rest slightly flexed.
+  - New arm chains follow the surgery's own transforms.
+- **Weights (`fix_humanoid_weights`):**
+  - Crown shells take the weights of the nearest crown/head body vertex.
+  - Arm weight that heat weighting bled onto the flank and chest (a hip vertex had 12% arm, a chest
+    vertex 93%) is ramped off by radius-normalised distance (arm vs trunk) and handed to the nearest
+    spine bone.
+  - Influences are capped at 4. The cap was 5 before the cap, and glTF would have dropped one.
+
+**Clips (all data):**
+- **Move** (`gait.py` `_TREANT_SWAY`/`_TREANT_HOLD`):
+  - contralateral shoulder swing +-16 deg. Checked numerically: the right hand is forward when the
+    left foot is;
+  - elbows held at 14 deg and flexing +-9 deg on the forward swing; wrists trailing;
+  - shoulder counter-turn, torso sway over the stance foot, crown follow-through;
+  - foot_curl/toe_curl 10/16 for heel-to-toe. 16/18 pushed the toes 1 cm into the floor.
+- **Keyed clips** (`keyed.py` `_tr_arms`, `_TR_REL`), all starting and ending on the walk's relaxed
+  hang:
+  - Idle: breathing plus both arms drifting;
+  - Attack: both arms up, then a two-armed swing down in front;
+  - Cast: gather, then both arms raised wide;
+  - Hit: both arms fly out;
+  - Victory: both arms up, waving in alternation;
+  - KO: topples back, arms flung out.
+
+**Gates:**
+
+| Gate | Result |
+| --- | --- |
+| loop seams Move/Idle/Victory | 0.000 |
+| foot slide / knee range / walk_direction / foot_orientation | PASS (worst toe 9.1, sole 5.0 deg) |
+| **joint_limits** (new hard gate, every frame, 7 clips) | PASS: elbows flex 6..91 deg, off-hinge <= 10.7 (tol 12); knees 0.7..63.5, off-hinge <= 11.4 (tol 15); no backward knee or elbow |
+| mesh ground, every frame, 7 clips | PASS (min -0.0000; KO 0.004) |
+| KO held | 0.000 |
+| edge stretch Move/Attack/KO (Idle/Cast/Hit/Victory) | 2.4/6.6/4.8 (2.6/6.5/3.4/6.3) FAIL, soft gate |
+| glb_gate, 7 clips | PASS 0.00 deg / 0.0000 |
+
+- **The new hard gate:** verify.py `joint_limits` runs for rigs with a `hinges` property.
+  - Each child bone's direction in its parent's posed frame is split into a flexion angle about the
+    hinge and an off-hinge angle.
+  - Flexion must stay in -5..150 on every frame. The off-hinge change against rest must stay within
+    tolerance.
+- **The new arm check:** glb_gate.py checks arm motion for rigs with `arm_*` bones. It measures the
+  LOCAL range of the shoulder (upper vs clav) plus the elbow (fore vs upper) per arm. The minimums
+  are Move 12, Idle 3, Attack/Cast/Victory 40, Hit 15 and KO 10. Measured on the GLB:
+  - Move 48.7/48.7;
+  - Idle 15/21;
+  - Attack 189/185;
+  - Cast 192/192;
+  - Hit 85/85;
+  - KO 108/104;
+  - Victory 164/148.
+- **Edge stretch, the worst edges:**
+  - the chest skin at the front of the right shoulder, where it meets the unioned arm (arms raised);
+  - crown_03 tip leaves under Cast's crown flare scale;
+  - a hip/thigh crease in Move.
+
+  None show in the in-engine frames.
+
+**In-engine** (Live3D `--pilot-model`, the copy is in the bin's Content/model only):
+- full-set MP4s from the battle camera, head-on and side, in the usual format;
+- a back-start Idle turntable, `treant_idle_turntable_back.mp4`. It has 48 camera yaws, each showing
+  the matching Idle frame, played twice;
+- strips cut from those MP4s, plus 2x zooms.
+
+Read from the strips:
+- **Both arms move in every clip.** The side walk shows a clear contralateral swing.
+- Elbows bend smoothly, with no tearing at the shoulder union or the chest fill.
+- The crown is full and rounded from behind and the sides.
+- Both eyes show head-on.
+- **Weaker points:**
+  - From the head-on and battle cameras, Attack's forward swing is foreshortened. It reads best from
+    the side.
+  - The crown back is busier and more faceted than the painted front.
+  - Pale bottom leaves of the old slab still show as a light band at the base of the crown from
+    behind.
+
+**Regression:** `regress/run_regress.sh` was re-run on all nine other beasts.
+- Rig bone and weight hashes and every Move/keyed F-curve hash match:
+  - the v20 baselines for Griffin, Golem, Kirin, Tarasque, Basilisk, Phoenix and Thunderbird;
+  - fresh pre-change baselines for the Frost Wyrm and Leviathan.
+- Re-exported Kirin, Phoenix and Leviathan GLBs are byte-identical to the shipped ones.
+
 ## v9: max-edge-stretch gate + weight/render fixes -- partial progress, honestly not fully resolved
 ## (lead-review round 9)
 

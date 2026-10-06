@@ -160,7 +160,35 @@ def detect_landmarks_handplaced(obj, H, to_normalized, beast_name):
         "tail_points": tail_points,
         "horn": horn,
         "notes": data.get("notes", ""),
+        # v20 (Frost Wyrm), opt-in per landmark file -- absent for every v18 creature, whose rigs
+        # are therefore unchanged: "forward_mode": "body" stores the pelvis->chest walk axis on the
+        # armature (the head is turned ~20 deg, so head-minus-pelvis is crabwise); "roll_policy":
+        # "lateral" makes every bone's roll explicit as local X = the body's lateral axis.
+        "forward_mode": data.get("forward_mode"),
+        "roll_policy": data.get("roll_policy"),
+        "jaw_split": data.get("jaw_split"),
+        # optional explicit mouth geometry for split_jaw_weights (native points, not snapped)
+        "jaw_hinge": (to_normalized(data["jaw_split"]["hinge"]) if isinstance(data.get("jaw_split"), dict)
+                      and "hinge" in data["jaw_split"] else None),
+        "jaw_mouth_tip": (to_normalized(data["jaw_split"]["mouth_tip"]) if isinstance(data.get("jaw_split"), dict)
+                          and "mouth_tip" in data["jaw_split"] else None),
     }
+
+
+def _body_forward(lm):
+    f = lm["chest"] - lm["pelvis"]
+    f.z = 0.0
+    return f.normalized()
+
+
+def armature_props(lm):
+    """v20: armature custom properties (same keys as winged_biped.armature_props) -- ONLY for a
+    landmark file that opts in with "forward_mode": "body"; every v18 quadruped gets {} (no
+    properties, so gait.py/verify.py keep deriving FORWARD from head - pelvis exactly as before)."""
+    if lm.get("forward_mode") != "body":
+        return {}
+    return {"forward": list(_body_forward(lm)), "locomotion": "walk", "hover_offset": 0.0,
+            "outline_mask_zero": [], "template": "quadruped"}
 
 
 def build_bones(eb, lm, H):
@@ -336,6 +364,26 @@ def build_bones(eb, lm, H):
         # (keeps the Griffin rig byte-for-byte unchanged; its own default roll already works).
         foot_b.align_roll(mathutils.Vector((0, 0, 1)))
         toe_b.align_roll(mathutils.Vector((0, 0, 1)))
+
+    if lm.get("roll_policy") == "lateral":
+        # v20 (opt-in, Frost Wyrm): EVERY bone's roll set explicitly to local X = the body's
+        # lateral axis LAT = FORWARD x UP (projected perpendicular to the bone), local Z = X x Y --
+        # the winged_biped convention. Needed because align_roll((0,0,1)) is DEGENERATE on a
+        # vertical bone: the Frost Wyrm's foot bones (ankle -> foot) point straight down, so their
+        # "explicit" roll would be whatever Blender picks for a zero-length reference. With this
+        # policy raw deg_x is a pitch about LAT on every bone (+ = tip toward UP for a forward bone),
+        # and a flat toe's local Z is UP (the stance sole normal verify.py's foot_orientation reads).
+        # FORWARD here is the BODY axis (pelvis -> chest), not head - pelvis (the head is turned).
+        fwd = _body_forward(lm) if lm.get("forward_mode") == "body" else             mathutils.Vector((0.0, lm["forward_sign"], 0.0))
+        lat = fwd.cross(mathutils.Vector((0, 0, 1))).normalized()
+        for n in names:
+            b = eb[n]
+            d = (b.tail - b.head).normalized()
+            lat_p = lat - lat.dot(d) * d
+            if lat_p.length < 1e-4:  # a bone along LAT itself: fall back to UP as local Z
+                b.align_roll(mathutils.Vector((0, 0, 1)))
+                continue
+            b.align_roll(lat_p.normalized().cross(d))
 
     return names, roles
 
@@ -532,4 +580,65 @@ def fix_sole_weights(obj, legs, bone_roles, ramp_frac=0.6, max_influences=4):
                 obj.vertex_groups[groups[0].group].remove([vi])
                 groups = groups[1:]
             changed += 1
+    return changed
+
+
+def split_jaw_weights(obj, lm, band=0.05, hinge_ramp=0.3, min_head=0.6, max_depth=None, **_):
+    """v20 (opt-in via the landmark file's "jaw_split": true; Frost Wyrm). Heat weighting smears the
+    `jaw` bone's weight thinly over the whole skull (measured on the Frost Wyrm: 863 vertices carry
+    some jaw weight, only 18 more than 0.5), so a jaw rotation tilts the whole head a little and never
+    opens the mouth. The mouth is a FUSED (closed, manifold) seam, so here the head-group weight
+    (head + snout + jaw) of every skull vertex is re-split by geometry: the mouth plane runs through
+    the hinge (the `head` landmark) along hinge -> mouth tip (midway between snout_tip and jaw_tip)
+    and the body's lateral axis; a vertex below that plane and forward of the hinge goes to `jaw`,
+    above it to snout/head, with a `band`-wide ramp across the plane and a ramp from the hinge
+    (`hinge_ramp` x mouth length) so the cheeks bend instead of tearing. Only vertices whose head
+    group already holds >= `min_head` of their weight are touched. The landmark file may give the
+    mouth corner ("hinge") and the front of the mouth seam ("mouth_tip") explicitly (native coords,
+    read off a section along the head axis) -- the skull-centre `head` landmark sits at eye height,
+    well above the mouth -- and `max_depth` (normalised units below the mouth plane) keeps the throat
+    off the jaw. Returns the count changed."""
+    gi = {g.name: g.index for g in obj.vertex_groups}
+    if not all(n in gi for n in ("head", "snout", "jaw")):
+        return 0
+    hinge = lm["jaw_hinge"] if lm.get("jaw_hinge") is not None else lm["head"]
+    tip = lm["jaw_mouth_tip"] if lm.get("jaw_mouth_tip") is not None else (lm["snout_tip"] + lm["jaw_tip"]) / 2
+    d = tip - hinge
+    L = d.length
+    d.normalize()
+    fwd = _body_forward(lm) if lm.get("forward_mode") == "body" else mathutils.Vector((0, lm["forward_sign"], 0))
+    lat = fwd.cross(mathutils.Vector((0, 0, 1))).normalized()
+    lat = (lat - lat.dot(d) * d).normalized()
+    n = lat.cross(d).normalized()
+    if n.z < 0:
+        n = -n
+    ih, isn, ij = gi["head"], gi["snout"], gi["jaw"]
+    hg = {ih, isn, ij}
+    changed = 0
+
+    def sstep(x):
+        x = max(0.0, min(1.0, x))
+        return x * x * (3 - 2 * x)
+    for vi, v in enumerate(obj.data.vertices):
+        w = {g.group: g.weight for g in v.groups}
+        tot = sum(w.values())
+        H = sum(w.get(g, 0.0) for g in hg)
+        if tot <= 1e-6 or H / tot < min_head:
+            continue
+        rel = v.co - hinge
+        t = rel.dot(d) / L
+        if t < -0.15:
+            continue
+        s = sstep(0.5 - rel.dot(n) / band) * sstep(t / hinge_ramp)
+        if max_depth is not None:  # throat/chest far below the mouth stay off the jaw
+            s *= 1.0 - sstep((-rel.dot(n) - max_depth) / band)
+        up = w.get(ih, 0.0) + w.get(isn, 0.0)
+        frac_sn = w.get(isn, 0.0) / up if up > 1e-6 else (0.5 if t > 0.5 else 0.0)
+        new = {ij: H * s, isn: H * (1 - s) * frac_sn, ih: H * (1 - s) * (1 - frac_sn)}
+        for g, val in new.items():
+            if val > 1e-4:
+                obj.vertex_groups[g].add([vi], val, 'REPLACE')
+            elif g in w:
+                obj.vertex_groups[g].remove([vi])
+        changed += 1
     return changed

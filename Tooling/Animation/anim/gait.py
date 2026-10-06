@@ -131,6 +131,75 @@ GAIT_PARAMS["kirin"].update(_FK_COMMON, cycle_seconds=1.0, crouch_frac=0.05, str
 GAIT_PARAMS["basilisk"].update(_FK_COMMON, cycle_seconds=1.1, crouch_frac=0.04, stride_frac=0.16,
                                lift_frac=0.10, scapula_swing=5.0, pelvis_roll=1.5, pelvis_yaw=5.0,
                                body_bob=0.004, tail_yaw=7.0, tail_pitch=0.0, head_amp=0.8)
+# v20 (anim-last): Frost Wyrm -- quadruped template, BODY forward axis stored on the armature (head
+# turned ~20 deg). Short stocky near-vertical legs (~0.5 normalised): Golem/Tarasque-class stride and
+# lift fractions (NOT Griffin amplitudes), a calm deliberate 1.25 s cycle, and the long 4-bone tail
+# carrying the visible secondary motion (yaw sway, a little pitch).
+GAIT_PARAMS["frost_wyrm"] = dict(GAIT_PARAMS["tarasque"])
+GAIT_PARAMS["frost_wyrm"].update(_FK_COMMON, cycle_seconds=1.25, duty=0.6, crouch_frac=0.07,
+                                 stride_frac=0.13, lift_frac=0.11, scapula_swing=4.0,
+                                 pelvis_roll=2.5, pelvis_yaw=3.0, body_bob=0.006, tail_yaw=5.0,
+                                 tail_pitch=1.0, head_amp=0.8)
+# v20 (anim-last): Treant -- rig_templates/biped_arms.py. Upright biped walk on the same fk_anchored
+# 2-leg machinery (BL/BR alternate at phase 0/0.5) plus `bird`-style semantic DATA layers (the
+# extras mechanism is generic: any bone, any bird_pose channel): a slow 1.6 s cycle, gentle steps
+# (stride/lift scaled to its ~0.55 legs), a wide side-to-side rock (pelvis roll + spine bank over the
+# planted foot), each arm swinging opposite its same-side leg (the out-stretched left arm swings with
+# "turn" -- it points along LAT, so a pitch would only twist it -- the bent right arm with "pitch"),
+# forearms lagging, and the leaf crown swaying/rustling behind the head. `knee_pole`: "forward" --
+# a biped's knee bows forward (the wide stance makes the landmark knees bow sideways in X).
+# v20 round 2 (producer review): the Treant is now a HUMANOID rig (biped_arms `humanoid` opt-in:
+# relaxed A-pose arms, clavicle/shoulder/elbow/wrist, hip/knee/ankle, 3-segment spine + neck), so the
+# walk is authored as a human one, gentle and slow: CONTRALATERAL arm swing (each upper arm's `flex`
+# -- shoulder flexion, + = forward -- in antiphase with its same-side leg, so the left arm comes
+# forward with the right leg), elbows held softly bent and flexing a little more on the forward
+# swing (forearm lags the upper arm), wrists trailing; arms held ~12 deg in from the rest A-pose
+# (`abd` hold) so they hang relaxed; shoulders counter-rotate against the hips (spine_03 turn), the
+# torso sways over the stance foot (spine_01 bank), the neck keeps the gaze level, and the crown
+# follows through behind the head (each lobe lags the next). Heel-to-toe on the root feet: a larger
+# foot_curl/toe_curl (heel peels up and the toes roll at push-off), and a higher lift for a clear
+# knee bend in swing. Every channel is clamped to bird_pose's human joint limits on the frame it is
+# posed (the hinge bones can only flex). gait.py's own spine_02/neck_01/head sinusoids (HEAD_AMP)
+# still run; spine_02/head get no semantic layers here because those raw sinusoids overwrite them.
+_TREANT_SWAY = [
+    ("b", "arm_L_upper", "flex", 16.0, 1, -1.57), ("b", "arm_R_upper", "flex", 16.0, 1, 1.57),
+    ("b", "arm_L_fore", "flex", 9.0, 1, -2.07), ("b", "arm_R_fore", "flex", 9.0, 1, 1.07),
+    ("b", "arm_L_hand", "flex", 7.0, 1, -2.5), ("b", "arm_R_hand", "flex", 7.0, 1, 0.64),
+    ("b", "arm_L_clav", "abd", 2.0, 2, 0.0), ("b", "arm_R_clav", "abd", 2.0, 2, 0.0),
+    ("b", "spine_01", "bank", 2.5, 1, 0.3), ("b", "spine_03", "turn", 3.0, 1, -1.57),
+    ("b", "neck", "bank", -1.5, 1, 0.3), ("b", "neck", "turn", -2.0, 1, -1.57),
+    ("b", "crown_01", "turn", 3.0, 1, -0.6), ("b", "crown_01", "pitch", 2.5, 2, -0.9),
+    ("b", "crown_02", "turn", 3.0, 1, -0.9), ("b", "crown_02", "pitch", -3.0, 2, -1.2),
+    ("b", "crown_03", "turn", 3.0, 1, -1.2), ("b", "crown_03", "pitch", 2.5, 2, -1.5)]
+_TREANT_HOLD = [("b", "arm_L_upper", "abd", -12.0), ("b", "arm_R_upper", "abd", -12.0),
+                ("b", "arm_L_fore", "flex", 14.0), ("b", "arm_R_fore", "flex", 14.0),
+                ("b", "arm_L_hand", "flex", 6.0), ("b", "arm_R_hand", "flex", 6.0)]
+GAIT_PARAMS["treant"] = dict(GAIT_PARAMS["tarasque"])
+GAIT_PARAMS["treant"].update(_FK_COMMON, cycle_seconds=1.6, duty=0.6, crouch_frac=0.06,
+                             stride_frac=0.14, lift_frac=0.11, pelvis_roll=4.0, pelvis_yaw=4.0,
+                             body_bob=0.01, tail_yaw=0.0, tail_pitch=0.0, head_amp=0.6,
+                             foot_curl=10.0, toe_curl=16.0,
+                             knee_pole="forward", bird=True, bird_layers=_TREANT_SWAY,
+                             bird_hold=_TREANT_HOLD)
+# v20 (anim-last): Leviathan -- rig_templates/serpent.py, `locomotion: "slither"`. No legs: Move is
+# an in-place slither, baked per frame through anim/bird_pose.py's semantic channels: a TRAVELLING
+# yaw wave runs down the flat coil from the neck base to the tail tip (each tail bone's "turn" lags
+# the previous one by `wave_lag` rad, amplitude growing toward the tip; turn is about world UP, so
+# the coil -- the creature's support -- stays flat on the ground), the S-neck sways side to side and
+# bobs like a sea serpent (neck turn/pitch layers, head counter-turned to keep the gaze forward),
+# side fins flutter, the frill trails. Integer cycles keep the loop seamless; the root never moves.
+GAIT_PARAMS["leviathan"] = dict(
+    locomotion="slither", cycle_seconds=1.5, n_tail=9, wave_cycles=1, wave_lag=0.75,
+    wave_amp=(3.0, 9.0),  # deg on tail_01 .. tail_NN (linear ramp)
+    layers=[("b", "body_01", "turn", 2.0, 1, 0.0), ("b", "body_02", "turn", 3.0, 1, -0.5),
+            ("b", "body_03", "turn", 3.5, 1, -1.0), ("b", "body_04", "turn", 3.0, 1, -1.5),
+            ("b", "body_05", "turn", 2.0, 1, -2.0), ("b", "head", "turn", -5.0, 1, -1.0),
+            ("b", "body_02", "pitch", 2.0, 2, 0.0), ("b", "body_03", "pitch", -2.5, 2, -0.6),
+            ("b", "body_04", "pitch", 2.5, 2, -1.2), ("b", "head", "pitch", -2.0, 2, -1.8),
+            ("b", "fin_L", "pitch", 12.0, 2, 0.0), ("b", "fin_R", "pitch", 12.0, 2, 0.0),
+            ("b", "fin_L", "turn", 6.0, 2, 1.2), ("b", "fin_R", "turn", -6.0, 2, 1.2),
+            ("b", "frill", "pitch", 4.0, 2, -2.2), ("b", "jaw", "pitch", -2.0, 2, 0.5)],
+)
 # v19 (birds, rig_templates/winged_biped.py). `bird=True` (the Phoenix's first, walking pass; no
 # creature uses it now, the code path is kept): an upright bird's hop-walk on the same
 # fk_anchored biped machinery (2 legs alternate at phase 0/0.5 via the existing 2-leg branch) plus
@@ -287,6 +356,27 @@ if GP.get("locomotion") == "hover":
     BP.bake_frames(arm_obj, scene, FORWARD, "Move", _n, _hover_chans)
     bpy.ops.object.mode_set(mode="OBJECT")
     print(f"MOVE ACTION (hover): {_n + 1} frames @ {FPS}fps, flap cycles {GP['flap_cycles']}")
+    bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, f"{CREATURE}_move.blend"))
+    print("GAIT DONE")
+    raise SystemExit(0)
+
+
+if GP.get("locomotion") == "slither":
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import bird_pose as BP
+    _n = int(round(CYCLE_SECONDS * FPS))
+    _a0, _a1 = GP["wave_amp"]
+    _nt = GP["n_tail"]
+    _layers = list(GP["layers"])
+    for _i in range(1, _nt + 1):
+        _amp = _a0 + (_a1 - _a0) * (_i - 1) / max(1, _nt - 1)
+        _layers.append(("b", f"tail_{_i:02d}", "turn", _amp, GP["wave_cycles"], -GP["wave_lag"] * _i))
+    bpy.context.view_layer.objects.active = arm_obj
+    bpy.ops.object.mode_set(mode="POSE")
+    BP.bake_frames(arm_obj, scene, FORWARD, "Move", _n, lambda t: BP.sines(_layers, t))
+    bpy.ops.object.mode_set(mode="OBJECT")
+    print(f"MOVE ACTION (slither): {_n + 1} frames @ {FPS}fps, {_nt} tail bones, wave lag "
+          f"{GP['wave_lag']} rad/bone, amp {_a0}..{_a1} deg")
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, f"{CREATURE}_move.blend"))
     print("GAIT DONE")
     raise SystemExit(0)
@@ -775,6 +865,8 @@ for side in leg_sides:
             leg_bend_dir = -FORWARD.copy()
             print(f"LEG {side}: near-straight (knee offset {_knee_off:.3f} of leg length) -> "
                   f"knee pole overridden to -FORWARD")
+        if GP.get("knee_pole") == "forward":  # v20 Treant: a biped's knee bows forward
+            leg_bend_dir = FORWARD.copy()
     legs[side] = {"hip": hip, "hip_rest": hip_rest, "L1": L1, "L2": L2, "shin_len": shin_len, "foot_rest": foot, "toe_rest": toe,
                   "stride": safe_stride, "lift": lift, "_ankle_frac": ankle_frac, "ground_z": ground_z,
                   "knee_rest": knee, "ankle_rest": ankle,
@@ -1295,6 +1387,10 @@ for i in range(FRAMES + 1):  # +1: bake the loop-closing frame identical to fram
                     "wing_R_01", "wing_R_02", "spine_02", "neck_01", "head", "pelvis")
     if GP.get("bird"):
         _keyed_names = _keyed_names + ("wing_L_03", "wing_R_03", "neck_02", "crest_01", "crest_02")
+        # v20: every bone the semantic layers drive (the Treant's arms/crown) is keyed too
+        _keyed_names = _keyed_names + tuple(sorted({L[1] for L in GP["bird_layers"]} - set(_keyed_names)))
+        # v20 round 2: ... and every bone a constant hold drives (the Treant's held arm pose)
+        _keyed_names = _keyed_names + tuple(sorted({L[1] for L in GP["bird_hold"]} - set(_keyed_names)))
     for name in _keyed_names:
         pb = arm_obj.pose.bones.get(name)
         if pb:

@@ -1,0 +1,245 @@
+{
+ "body_plan": "standing quadruped (wingless), long tail",
+ "legs": [
+  {
+   "side": "FL",
+   "is_front": true,
+   "chain": [
+    [
+     -0.07,
+     -0.48,
+     0.23
+    ],
+    [
+     -0.09,
+     -0.49,
+     0.12
+    ],
+    [
+     -0.1,
+     -0.5,
+     0.035
+    ],
+    [
+     -0.1,
+     -0.5,
+     0.01
+    ]
+   ],
+   "toe_tip": [
+    -0.09,
+    -0.545,
+    0.02
+   ]
+  },
+  {
+   "side": "FR",
+   "is_front": true,
+   "chain": [
+    [
+     0.07,
+     -0.47,
+     0.23
+    ],
+    [
+     0.08,
+     -0.48,
+     0.12
+    ],
+    [
+     0.09,
+     -0.49,
+     0.035
+    ],
+    [
+     0.09,
+     -0.5,
+     0.01
+    ]
+   ],
+   "toe_tip": [
+    0.09,
+    -0.545,
+    0.02
+   ]
+  },
+  {
+   "side": "BL",
+   "is_front": false,
+   "chain": [
+    [
+     -0.1,
+     -0.2,
+     0.21
+    ],
+    [
+     -0.13,
+     -0.22,
+     0.11
+    ],
+    [
+     -0.15,
+     -0.16,
+     0.035
+    ],
+    [
+     -0.16,
+     -0.18,
+     0.01
+    ]
+   ],
+   "toe_tip": [
+    -0.165,
+    -0.22,
+    0.02
+   ]
+  },
+  {
+   "side": "BR",
+   "is_front": false,
+   "chain": [
+    [
+     0.06,
+     -0.2,
+     0.21
+    ],
+    [
+     0.07,
+     -0.22,
+     0.11
+    ],
+    [
+     0.08,
+     -0.16,
+     0.035
+    ],
+    [
+     0.08,
+     -0.17,
+     0.01
+    ]
+   ],
+   "toe_tip": [
+    0.07,
+    -0.23,
+    0.02
+   ]
+  }
+ ],
+ "spine": {
+  "pelvis": [
+   -0.02,
+   -0.2,
+   0.25
+  ],
+  "spine_01": [
+   -0.01,
+   -0.33,
+   0.3
+  ],
+  "chest": [
+   0.0,
+   -0.46,
+   0.3
+  ],
+  "neck_base": [
+   0.03,
+   -0.55,
+   0.38
+  ],
+  "neck_mid": [
+   0.07,
+   -0.62,
+   0.45
+  ],
+  "head": [
+   0.13,
+   -0.77,
+   0.55
+  ],
+  "head_top": [
+   0.1,
+   -0.72,
+   0.75
+  ],
+  "snout_tip": [
+   0.22,
+   -0.95,
+   0.58
+  ],
+  "jaw_tip": [
+   0.2,
+   -0.9,
+   0.52
+  ]
+ },
+ "tail": [
+  [
+   -0.02,
+   -0.04,
+   0.25
+  ],
+  [
+   -0.03,
+   0.22,
+   0.14
+  ],
+  [
+   -0.04,
+   0.48,
+   0.1
+  ],
+  [
+   -0.05,
+   0.72,
+   0.15
+  ],
+  [
+   -0.05,
+   0.95,
+   0.23
+  ]
+ ],
+ "horns": {
+  "base": [
+   0.08,
+   -0.61,
+   0.71
+  ],
+  "tip": [
+   0.0,
+   -0.33,
+   0.75
+  ]
+ },
+ "notes": "Low, long-bodied chibi ice dragon: body is compact in the front ~40% of length, tail is the rest (4 tail bones). Head is turned ~20 deg toward +X in the rest pose (like the Phoenix) - use the BODY forward axis (pelvis->chest), not head-pelvis, for gait/verify. Legs are short and stocky, near-vertical; paws flat. Spiky ice crest runs from the head down the back to the tail tip - weight spikes rigidly to the nearest spine/tail bone. Swept horns + small blue fin-ears: rigid to head. No wings. Personality: Wise, wry - calm, deliberate, a little smug. Attack = lunge + frost-breath head thrust (jaw open). Cast = rears up on hind legs slightly, head high. Victory = smug tail flick + head tilt. KO = slumps flat on its belly, legs splayed, head down.",
+ "_lead_fixes": [
+  "spine.spine_01 [-0.01,-0.33,0.27] -> [-0.01,-0.33,0.30]: y=-0.33 transverse section puts the torso at z 0.11..0.52; 0.27 sat at 40% of that height (belly side), 0.30 is mid-body.",
+  "tail[0] [-0.02,-0.04,0.19] -> [-0.02,-0.04,0.25]: y=-0.04 section spans z 0.12..0.43; 0.19 was at 23% (on the belly skin). Raised to mid-depth so the tail root bone runs through the tail base, level with the pelvis.",
+  "tail[1] [-0.03,0.22,0.12] -> [-0.03,0.22,0.14]: y=0.22 section z 0.03..0.25, centred.",
+  "legs[FL].toe_tip [-0.1, -0.57, 0.01] -> [-0.09, -0.545, 0.02]: the given tip sat 1.3-2.3 cm outside the paw at Z 0.01 (snapping needed > the 0.04-normalised budget, skewing the toe); moved to just inside the measured front-most paw vertices (z<0.05 near the foot).",
+  "legs[FR].toe_tip [0.09, -0.57, 0.01] -> [0.09, -0.545, 0.02]: the given tip sat 1.3-2.3 cm outside the paw at Z 0.01 (snapping needed > the 0.04-normalised budget, skewing the toe); moved to just inside the measured front-most paw vertices (z<0.05 near the foot).",
+  "legs[BL].toe_tip [-0.16, -0.25, 0.01] -> [-0.165, -0.22, 0.02]: the given tip sat 1.3-2.3 cm outside the paw at Z 0.01 (snapping needed > the 0.04-normalised budget, skewing the toe); moved to just inside the measured front-most paw vertices (z<0.05 near the foot).",
+  "legs[BR].toe_tip [0.08, -0.24, 0.01] -> [0.07, -0.23, 0.02]: the given tip sat 1.3-2.3 cm outside the paw at Z 0.01 (snapping needed > the 0.04-normalised budget, skewing the toe); moved to just inside the measured front-most paw vertices (z<0.05 near the foot).",
+  "jaw_split (new, v20): mouth corner [0.121,-0.752,0.50] and seam front [0.205,-0.905,0.515] read off a mesh section along the turned head axis (head_section.png): the mouth is a fused seam ~5 cm below the skull-centre 'head' landmark, so the jaw bone's heat weights (863 verts, only 18 > 0.5) could not open it; quadruped.split_jaw_weights re-splits the skull weights about that plane."
+ ],
+ "forward_mode": "body",
+ "roll_policy": "lateral",
+ "_note": "v20 (anim-last): copied from the lead's landmarks_lead.json (native prepped-mesh coords, head=-Y, up=+Z); fixes listed in _lead_fixes. forward_mode=body: the head is turned ~20 deg, so the rig's walk/facing axis is pelvis->chest (rig_templates/quadruped.armature_props). roll_policy=lateral: every bone's local X = the body's lateral axis (quadruped.build_bones v20 branch).",
+ "jaw_split": {
+  "hinge": [
+   0.121,
+   -0.752,
+   0.5
+  ],
+  "mouth_tip": [
+   0.205,
+   -0.905,
+   0.515
+  ],
+  "band": 0.03,
+  "hinge_ramp": 0.15,
+  "min_head": 0.25,
+  "max_depth": 0.14
+ }
+}
