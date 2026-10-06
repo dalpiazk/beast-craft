@@ -6,7 +6,10 @@ by ear clipping in its best-fit plane, oriented consistently with the neighbouri
 APPENDS those triangles to the primitive's index buffer. Existing vertices are never moved; the fill
 uses its own copies of the rim vertices (same position and joints/weights -- weighted from their
 neighbours -- flat patch normal, one UV per patch). The skeleton and every animation channel are
-untouched (byte-identical JSON/BIN for them)."""
+untouched (byte-identical JSON/BIN for them). Every modified attribute/index accessor is given a
+freshly appended bufferView, so the binary chunk is repacked at the end (`repack_buffer`) to drop the
+superseded bufferViews it leaves orphaned -- without this, the old, now-unreferenced copies of that
+data stay physically embedded in the output file, roughly doubling its size for no reason."""
 import json
 import os
 import struct
@@ -196,7 +199,43 @@ for name, ai in prim["attributes"].items():
 acc["bufferView"] = add_view(newI.astype("<u2").tobytes(), 34963)
 acc["byteOffset"] = 0
 acc["count"] = int(newI.size)
-js["buffers"][0]["byteLength"] = len(binb2)
+
+
+def repack_buffer():
+    """Rewrite binb2/js["bufferViews"] to hold only bufferViews an accessor or image still
+    references, in a fresh compact layout. add_view() above only ever appends (it never reclaims
+    the bytes of a bufferView a reassigned accessor stops pointing at), so without this pass every
+    attribute/index buffer this script touches is replaced, not removed -- its old bytes stay
+    physically embedded in the file, unreferenced dead weight."""
+    global binb2
+    referenced = sorted({a["bufferView"] for a in js["accessors"] if "bufferView" in a}
+                         | {im["bufferView"] for im in js.get("images", []) if "bufferView" in im})
+    new_bin = bytearray()
+    new_views = []
+    remap = {}
+    for old_idx in referenced:
+        view = js["bufferViews"][old_idx]
+        data = binb2[view["byteOffset"]: view["byteOffset"] + view["byteLength"]]
+        pad_len = (-len(new_bin)) % 4
+        new_bin += bytes(pad_len)
+        new_view = {"buffer": 0, "byteOffset": len(new_bin), "byteLength": len(data)}
+        if "target" in view:
+            new_view["target"] = view["target"]
+        new_bin += bytes(data)
+        remap[old_idx] = len(new_views)
+        new_views.append(new_view)
+    js["bufferViews"] = new_views
+    for a in js["accessors"]:
+        if "bufferView" in a:
+            a["bufferView"] = remap[a["bufferView"]]
+    for im in js.get("images", []):
+        if "bufferView" in im:
+            im["bufferView"] = remap[im["bufferView"]]
+    binb2 = bytes(new_bin)
+    js["buffers"][0]["byteLength"] = len(binb2)
+
+
+repack_buffer()
 jb = json.dumps(js, separators=(",", ":")).encode()
 jb += b" " * ((-len(jb)) % 4)
 out = struct.pack("<III", 0x46546C67, 2, 12 + 8 + len(jb) + 8 + len(binb2))
