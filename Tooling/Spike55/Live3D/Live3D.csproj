@@ -81,6 +81,18 @@
     <None Include="Content\model\phoenix_anim_events.json" Link="Content\model\phoenix_anim_events.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Content\model\thunderbird_anim.glb" Link="Content\model\thunderbird_anim.glb" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Content\model\thunderbird_anim_events.json" Link="Content\model\thunderbird_anim_events.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- v20 (Tooling/Animation/README.md): Frost Wyrm (quadruped template), Treant (new biped_arms
+         template, then producer-approved mesh surgery, see Tooling/Animation/meshfix/) and Leviathan
+         (new serpent template, slither locomotion). Same pilot-model + sidecar convention as above.
+         phoenix_anim.glb above is also replaced here with the talon-hole-filled GLB (animation data
+         unchanged; see Tooling/ArtLab/provenance/meshy-01a10d81-69f1-725f-9860-2c1750478fcb.md's
+         2026-10-06 note). -->
+    <None Include="Content\model\frost_wyrm_anim.glb" Link="Content\model\frost_wyrm_anim.glb" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\model\frost_wyrm_anim_events.json" Link="Content\model\frost_wyrm_anim_events.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\model\treant_anim.glb" Link="Content\model\treant_anim.glb" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\model\treant_anim_events.json" Link="Content\model\treant_anim_events.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\model\leviathan_anim.glb" Link="Content\model\leviathan_anim.glb" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\model\leviathan_anim_events.json" Link="Content\model\leviathan_anim_events.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
