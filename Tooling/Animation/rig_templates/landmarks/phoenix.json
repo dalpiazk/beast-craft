@@ -1,0 +1,195 @@
+{
+ "legs": [
+  {
+   "side": "BL",
+   "is_front": false,
+   "chain": [
+    [
+     -0.24,
+     0.05,
+     0.42
+    ],
+    [
+     -0.27,
+     -0.05,
+     0.28
+    ],
+    [
+     -0.29,
+     0.0,
+     0.12
+    ],
+    [
+     -0.31,
+     -0.06,
+     0.02
+    ]
+   ],
+   "toe_tip": [
+    -0.335,
+    -0.16,
+    0.025
+   ]
+  },
+  {
+   "side": "BR",
+   "is_front": false,
+   "chain": [
+    [
+     0.02,
+     0.05,
+     0.42
+    ],
+    [
+     0.04,
+     -0.05,
+     0.28
+    ],
+    [
+     0.05,
+     0.0,
+     0.12
+    ],
+    [
+     0.05,
+     -0.06,
+     0.02
+    ]
+   ],
+   "toe_tip": [
+    0.03,
+    -0.16,
+    0.025
+   ]
+  }
+ ],
+ "spine": {
+  "pelvis": [
+   -0.11,
+   -0.05,
+   0.4
+  ],
+  "spine_01": [
+   -0.11,
+   -0.09,
+   0.62
+  ],
+  "chest": [
+   -0.1,
+   -0.12,
+   0.8
+  ],
+  "neck_base": [
+   -0.07,
+   -0.15,
+   0.92
+  ],
+  "neck_mid": [
+   -0.04,
+   -0.18,
+   0.99
+  ],
+  "head": [
+   0.0,
+   -0.2,
+   1.06
+  ],
+  "head_top": [
+   0.0,
+   -0.16,
+   1.39
+  ],
+  "snout_tip": [
+   -0.06,
+   -0.42,
+   0.86
+  ],
+  "jaw_tip": [
+   -0.06,
+   -0.38,
+   0.82
+  ]
+ },
+ "tail": [
+  [
+   -0.08,
+   0.1,
+   0.35
+  ],
+  [
+   0.1,
+   0.2,
+   0.22
+  ],
+  [
+   0.3,
+   0.3,
+   0.14
+  ],
+  [
+   0.5,
+   0.36,
+   0.1
+  ]
+ ],
+ "wing_l": [
+  [
+   -0.33,
+   -0.05,
+   0.64
+  ],
+  [
+   -0.57,
+   0.0,
+   0.73
+  ],
+  [
+   -0.63,
+   0.05,
+   0.99
+  ]
+ ],
+ "wing_r": [
+  [
+   0.13,
+   -0.05,
+   0.64
+  ],
+  [
+   0.48,
+   0.05,
+   0.69
+  ],
+  [
+   0.64,
+   0.1,
+   1.05
+  ]
+ ],
+ "crest": {
+  "base": [
+   0.05,
+   0.08,
+   1.45
+  ],
+  "tip": [
+   0.12,
+   0.15,
+   1.86
+  ]
+ },
+ "notes": "Upright standing bird: torso is near-vertical (pelvis Z0.40 -> neck Z0.92), body centred at X~-0.10 (not 0). Two taloned legs; thigh runs forward-down to a hidden knee, shin back to the ankle, short tarsus; toes point forward (-Y). Head looks slightly down-forward, beak below head centre. Tall flame crest above the head: rigid-ish to head, could get 1-2 soft bones for flicker but keep budget. Flame tail fans low behind and curls toward +X; it touches the ground near the feet - keep its tip near ground in walk. Wings half-spread, partly folded: left wing smaller in silhouette than right.",
+ "_lead_fixes": [
+  "crest.base [0.0,-0.16,1.39] -> [0.05,0.08,1.45]; crest.tip [0.1,-0.05,1.89] -> [0.12,0.15,1.86]: the given tip sat 0.14 outside the mesh, in front of the real flame crest (left calib view + x=0.05/0.10 YZ sections show the crest tip at Y+0.15..+0.20).",
+  "legs[BL].toe_tip [-0.31, -0.25, 0.0] -> [-0.335, -0.16, 0.025]: the given tip was ~0.08 outside the mesh (beyond the talon, at Z 0); snapping it back skewed BR's toe 49 deg off forward (verify.py foot_orientation FAIL). New point = the middle toe's tip region measured from the mesh (forward-most vertices within 0.035 of the foot's X).",
+  "legs[BR].toe_tip [0.05, -0.25, 0.0] -> [0.03, -0.16, 0.025]: the given tip was ~0.08 outside the mesh (beyond the talon, at Z 0); snapping it back skewed BR's toe 49 deg off forward (verify.py foot_orientation FAIL). New point = the middle toe's tip region measured from the mesh (forward-most vertices within 0.035 of the foot's X)."
+ ],
+ "locomotion": "hover",
+ "hover_offset": 0.10,
+ "root_at_ground": true,
+ "wing_seam_smooth": {"rings": 3, "iters": 6, "whole": true},
+ "_hover_note": "Producer change (v19 round 2): the Phoenix flies like the Thunderbird -- hover flier, legs tucked, no walking. root_at_ground keeps its root bone where the walking rig had it (bones unchanged); hover_offset (normalised/engine units) lifts it so the hanging flame tail clears the ground by about the Thunderbird's margin; wing_seam_smooth ramps the wing-card seams that tore once the wings really flap (winged_biped.smooth_wing_seam).",
+ "outline_mask_zero": [],
+ "_note": "Lead hand-placed landmarks, NATIVE prepped-mesh coords (head=-Y, up=+Z, lowest point Z=0, L=-X, R=+X), read off <beast>_calib/{front,left,bottom}.png via calib.json. Bipeds: two hind legs only (BL/BR). Leg chain = hip, knee, ankle, foot; toe_tip forward. 'snout_tip' = beak tip. Wings = [root, mid, tip].",
+ "_source": "lead hand-placed landmarks, scratchpad/anim-birds/landmarks_lead.json (2026-10-05), with the _lead_fixes listed"
+}

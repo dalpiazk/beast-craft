@@ -46,8 +46,8 @@ module-level constant -- see that module's docstring. The weighting-fixup calls 
 
 Run headless:
   blender -b --python rig_creature.py -- --glb PREPPED.glb --out OUTDIR [--target-height 2.0]
-                                           [--creature griffin|golem|kirin|tarasque|basilisk]
-                                           [--template winged_quadruped|quadruped]
+                                           [--creature griffin|golem|kirin|tarasque|basilisk|phoenix|thunderbird]
+                                           [--template winged_quadruped|quadruped|winged_biped]
 """
 import bpy
 import bmesh
@@ -66,13 +66,18 @@ GLB = args["glb"]
 OUT = args["out"]
 TARGET_HEIGHT = float(args.get("target-height", 2.0))
 CREATURE = args.get("creature", "griffin")
-TEMPLATE_NAME = args.get("template") or ("winged_quadruped" if CREATURE == "griffin" else "quadruped")
+# v19: birds (upright/hovering bipeds with wings) use rig_templates/winged_biped.py.
+BIRD_CREATURES = ("phoenix", "thunderbird")
+TEMPLATE_NAME = args.get("template") or ("winged_quadruped" if CREATURE == "griffin" else
+                                         "winged_biped" if CREATURE in BIRD_CREATURES else "quadruped")
 os.makedirs(OUT, exist_ok=True)
 
 if TEMPLATE_NAME == "winged_quadruped":
     import winged_quadruped as template
 elif TEMPLATE_NAME == "quadruped":
     import quadruped as template
+elif TEMPLATE_NAME == "winged_biped":
+    import winged_biped as template
 else:
     raise SystemExit(f"rig_creature.py: unknown --template {TEMPLATE_NAME!r} (expected "
                       f"'winged_quadruped' or 'quadruped')")
@@ -157,6 +162,15 @@ bpy.context.view_layer.objects.active = arm_obj
 bpy.ops.object.mode_set(mode="EDIT")
 bone_names, bone_roles = template.build_bones(arm_data.edit_bones, lm, H)
 bpy.ops.object.mode_set(mode="OBJECT")
+# v19 (winged_biped): per-creature facts the later stages read off the armature instead of
+# re-deriving (forward axis, locomotion mode, hover offset, outline-mask joints) -- see
+# winged_biped.armature_props. Other templates don't define it (their rigs are unchanged).
+if hasattr(template, "armature_props"):
+    for _k, _v in template.armature_props(lm).items():
+        arm_data[_k] = _v
+    report["armature_props"] = template.armature_props(lm)
+if hasattr(template, "dump_axes"):
+    report["bone_axes"] = template.dump_axes(arm_obj)
 report["bone_count"] = len(bone_names)
 report["bone_names"] = bone_names
 report["bone_roles"] = bone_roles
@@ -278,6 +292,26 @@ if hasattr(template, "fix_sole_weights"):
     sole_fixed = template.fix_sole_weights(obj, lm["legs"], bone_roles)
     report["weighting"]["sole_weights_moved_to_foot"] = sole_fixed
     print(f"SOLE WEIGHTS: {sole_fixed} vertices below the ankle had thigh/shin weight moved to the foot")
+# v19 (birds): wing feather cards move only with their own wing chain -- see
+# winged_biped.fix_wing_card_weights.
+if hasattr(template, "fix_beak_bleed"):
+    beak_bleed = template.fix_beak_bleed(obj, lm)
+    report["weighting"]["beak_jaw_bleed_fixed"] = beak_bleed
+    print(f"BEAK/JAW BLEED: {beak_bleed} skull vertices behind the beak hinge moved to head")
+if hasattr(template, "fix_tail_leg_bleed"):
+    tail_leg = template.fix_tail_leg_bleed(obj, bone_roles, lm)
+    report["weighting"]["tail_leg_bleed_fixed"] = tail_leg
+    print(f"TAIL/LEG BLEED: {tail_leg} vertices nearer the tail than their leg moved to the tail")
+if hasattr(template, "fix_wing_card_weights"):
+    wing_cards = template.fix_wing_card_weights(obj, bone_roles, lm, H)
+    report["weighting"]["wing_card_weights_fixed"] = wing_cards
+    print(f"WING CARD WEIGHTS: {wing_cards} wing-majority vertices stripped of non-wing weight")
+if hasattr(template, "smooth_wing_seam") and lm.get("wing_seam_smooth"):
+    # v19 round 2 (Phoenix, opt-in per landmark file): ramp the wing-card seams -- see
+    # winged_biped.smooth_wing_seam.
+    seam = template.smooth_wing_seam(obj, bone_roles, lm, **lm["wing_seam_smooth"])
+    report["weighting"]["wing_seam_smoothed_vertices"] = seam
+    print(f"WING SEAM SMOOTH: {seam} vertices along the wing-card seams ramped")
 common.normalize_weights(obj)
 report["weighting"]["post_smooth_leg_restriction_removed"] = removed_post_smooth
 report["weighting"]["post_smooth_hip_gradient_cross_leg_removed"] = cross_leg_removed_post_smooth
@@ -335,6 +369,8 @@ if CREATURE != "griffin":
     if root_stripped:
         common.normalize_weights(obj)
     report["weighting"]["root_weight_stripped_vertices"] = root_stripped
+    if hasattr(template, "fill_unweighted"):
+        report["weighting"]["unweighted_filled_from_neighbours"] = template.fill_unweighted(obj)
     print(f"ROOT WEIGHT STRIP: {root_stripped} vertex-group memberships removed from 'root'")
 
 worst, avg = common.max_influences_per_vertex(obj)
@@ -648,6 +684,14 @@ else:
     tail_bone_names = sorted(n for n in bone_names if n.startswith("tail_"))
     for i, tb in enumerate(tail_bone_names):
         set_pose_euler(tb, deg_z=(18 if i % 2 == 0 else -14))
+    if TEMPLATE_NAME == "winged_biped":
+        # v19: birds also exercise the wings (a big flap + sweep) and the crest in the smoke test.
+        # winged_biped's mirrored wing roll makes +deg_z raise the tip on BOTH sides.
+        for _ws in ("L", "R"):
+            set_pose_euler(f"wing_{_ws}_01", deg_z=35, deg_x=10)
+            set_pose_euler(f"wing_{_ws}_02", deg_z=20)
+        set_pose_euler("crest_01", deg_x=15)
+        set_pose_euler("crest_02", deg_x=20)
     bpy.context.view_layer.update()
 
     scene.frame_set(1)

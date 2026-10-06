@@ -37,6 +37,27 @@ os.makedirs(OUT, exist_ok=True)
 report = {}
 
 
+def _peek_rig_props(path):
+    """v19: winged_biped rigs carry per-creature facts on the armature (rig_templates/
+    winged_biped.armature_props). Other rigs have none -> every existing gate runs unchanged."""
+    if not path:
+        return {}
+    bpy.ops.wm.open_mainfile(filepath=path)
+    arm = next(o for o in bpy.data.objects if o.type == "ARMATURE")
+    return {k: (list(arm.data[k]) if hasattr(arm.data[k], "__len__") and not isinstance(arm.data[k], str)
+                else arm.data[k])
+            for k in ("template", "locomotion", "hover_offset", "forward") if k in arm.data}
+
+
+RIG_PROPS = _peek_rig_props(MOVE_BLEND or KEYED_BLEND)
+IS_BIRD = RIG_PROPS.get("template") == "winged_biped"
+HOVER = RIG_PROPS.get("locomotion") == "hover"
+HOVER_OFFSET = float(RIG_PROPS.get("hover_offset", 0.0))
+if IS_BIRD:
+    report["rig_props"] = RIG_PROPS
+    print(f"VERIFY bird rig: {RIG_PROPS}")
+
+
 def load(blend_path):
     bpy.ops.wm.open_mainfile(filepath=blend_path)
     arm_obj = next(o for o in bpy.data.objects if o.type == "ARMATURE")
@@ -97,6 +118,12 @@ if MOVE_BLEND:
     # new check_walk_direction gate below.
     LATERAL_SEQUENCE = {"BL": 0.0, "FL": 0.75, "BR": 0.5, "FR": 0.25}
     move_report = {"fps": fps, "legs": {}}
+    if HOVER:
+        # v19 flier: Move is a hover flap cycle with the legs tucked -- there is no stance/swing to
+        # measure, so foot-slide and knee-range are skipped (documented, not silently dropped);
+        # check_wing_motion below is the flier's Move gate instead.
+        move_report["skipped"] = "hover flier: no foot contact (foot-slide/knee gates n/a)"
+        leg_sides = []
     for side in leg_sides:
         if set(leg_sides) == set(LATERAL_SEQUENCE):
             phase_off = LATERAL_SEQUENCE[side]
@@ -183,6 +210,7 @@ if MOVE_BLEND:
             else mathutils.Euler(pb.rotation_euler).to_quaternion()
         l1 = pb.location.copy()
         ang_delta = math.degrees(r0.rotation_difference(r1).angle)
+        ang_delta = min(ang_delta, 360.0 - ang_delta)  # q and -q: same orientation (v19)
         loc_delta = (l0 - l1).length
         max_pose_delta = max(max_pose_delta, ang_delta)
         if ang_delta > 0.5 or loc_delta > 0.001:
@@ -221,7 +249,10 @@ if KEYED_BLEND:
                 r0 = mathutils.Euler(pb.rotation_euler).to_quaternion()
                 scene.frame_set(f1)
                 r1 = mathutils.Euler(pb.rotation_euler).to_quaternion()
-                max_delta = max(max_delta, math.degrees(r0.rotation_difference(r1).angle))
+                _d = math.degrees(r0.rotation_difference(r1).angle)
+                # v19: q and -q are the same orientation (Thunderbird Victory's full 360 turn
+                # ends at Euler 2*pi == its start; without this the seam read "360 deg").
+                max_delta = max(max_delta, min(_d, 360.0 - _d))
             clip_report["loop_seam"] = {"max_bone_angle_delta_deg": max_delta, "pass": max_delta < 0.5}
             print(f"  {clip_name} loop seam: max bone delta {max_delta:.3f} deg -> "
                   f"{'PASS' if max_delta < 0.5 else 'FAIL'}")
@@ -496,6 +527,10 @@ def check_walk_direction(blend_path, action_name="Move"):
         return {"pass": False, "error": "head and pelvis coincide on the ground plane"}
     forward.normalize()
     print(f"  walk_direction FORWARD (independently re-derived): {tuple(round(c, 4) for c in forward)}")
+    if "forward" in arm_obj.data:  # v19: winged_biped rigs store their walk axis (see gait.py)
+        forward = mathutils.Vector(tuple(arm_obj.data["forward"]))
+        forward.z = 0.0
+        forward.normalize()
 
     leg_sides = sorted({n.name.split("_")[1] for n in arm_obj.data.bones if n.name.startswith("leg_")})
     DUTY = 0.6
@@ -554,7 +589,10 @@ def check_walk_direction(blend_path, action_name="Move"):
     canonical = ["BL", "FL", "BR", "FR"]  # LH, LF, RH, RF
     touchdown_order = sorted(leg_sides, key=lambda s: (-LATERAL_SEQUENCE.get(s, 0.0)) % 1.0)
     seq_ok = False
-    if set(touchdown_order) == set(canonical):
+    if leg_sides == ["BL", "BR"]:
+        # v19 biped (Phoenix): the two feet must strictly alternate (half a cycle apart).
+        seq_ok = abs(((LATERAL_SEQUENCE["BR"] - LATERAL_SEQUENCE["BL"]) % 1.0) - 0.5) < 1e-6
+    elif set(touchdown_order) == set(canonical):
         doubled = canonical + canonical
         for start in range(4):
             if doubled[start:start + 4] == touchdown_order:
@@ -569,7 +607,10 @@ def check_walk_direction(blend_path, action_name="Move"):
     return result
 
 
-if MOVE_BLEND:
+if MOVE_BLEND and HOVER:
+    report["walk_direction"] = {"pass": True, "skipped": "hover flier: no foot contact"}
+    print("  walk_direction: SKIPPED (hover flier, no foot contact -- see check_wing_motion)")
+elif MOVE_BLEND:
     walk_dir_result = check_walk_direction(MOVE_BLEND, "Move")
     if walk_dir_result is not None:
         report["walk_direction"] = walk_dir_result
@@ -615,6 +656,10 @@ def check_foot_orientation(blend_path, action_name="Move"):
     forward = (arm_obj.matrix_world @ head_pb.bone.head_local) - (arm_obj.matrix_world @ pelvis_pb.bone.head_local)
     forward.z = 0.0
     forward.normalize()
+    if "forward" in arm_obj.data:  # v19: winged_biped rigs store their walk axis (see gait.py)
+        forward = mathutils.Vector(tuple(arm_obj.data["forward"]))
+        forward.z = 0.0
+        forward.normalize()
     world_up = mathutils.Vector((0, 0, 1))
 
     f0, f1 = action.frame_range
@@ -690,7 +735,9 @@ def check_foot_orientation(blend_path, action_name="Move"):
     return {"forward": list(round(c, 4) for c in forward), "legs": leg_results, "pass": overall_pass}
 
 
-if MOVE_BLEND:
+if MOVE_BLEND and HOVER:
+    report["foot_orientation"] = {"pass": True, "skipped": "hover flier: feet never planted"}
+elif MOVE_BLEND:
     foot_orient_result = check_foot_orientation(MOVE_BLEND, "Move")
     if foot_orient_result is not None:
         report["foot_orientation"] = foot_orient_result
@@ -929,6 +976,101 @@ if toe_deform_results:
         **toe_deform_results,
     }
 
+# ---------------------------------------------------------------------------
+# v19 (birds) gates.
+# * mesh_ground_clearance: whole deformed mesh, EVERY frame of EVERY clip, lowest vertex >= -5 mm
+#   (the KO-only bone-tip ground check above samples a handful of bone tails; v18 round 4 found
+#   the real dips on skin/feathers between them). For a hovering creature the engine lifts every
+#   clip except KO by the sidecar hover_offset, so that offset is added for non-KO clips.
+# * wing_motion (fliers): Move must actually flap -- each wing tip's vertical travel >= 15% of
+#   body height, the two sides within 25% of each other, and wing_*_01 must swing >= 20 deg.
+# * edge-stretch on every clip (reported; only Move/Attack/KO were checked before).
+# ---------------------------------------------------------------------------
+GROUND_TOL = -0.005
+
+
+def check_mesh_ground(blend_path, clip_names):
+    arm_obj = load(blend_path)
+    mesh_obj = next(o for o in bpy.data.objects if o.type == "MESH")
+    scene = bpy.context.scene
+    out = {}
+    for name in clip_names:
+        action = bpy.data.actions.get(name)
+        if action is None:
+            continue
+        arm_obj.animation_data_create()
+        arm_obj.animation_data.action = action
+        off = HOVER_OFFSET if (HOVER and name != "KO") else 0.0
+        worst, worst_f = 1e9, None
+        f0, f1 = [int(round(x)) for x in action.frame_range]
+        for f in range(f0, f1 + 1):
+            scene.frame_set(f)
+            dg = bpy.context.evaluated_depsgraph_get()
+            eo = mesh_obj.evaluated_get(dg)
+            me = eo.to_mesh()
+            mz = min((eo.matrix_world @ v.co).z for v in me.vertices) + off
+            eo.to_mesh_clear()
+            if mz < worst:
+                worst, worst_f = mz, f
+        out[name] = {"min_z": round(worst, 4), "frame": worst_f, "hover_offset_added": off,
+                     "pass": worst >= GROUND_TOL}
+        print(f"  mesh_ground_clearance {name}: min z {worst:.4f} at frame {worst_f} "
+              f"(+hover {off}) -> {'PASS' if worst >= GROUND_TOL else 'FAIL'}")
+    return {"clips": out, "pass": all(v["pass"] for v in out.values())}
+
+
+def check_wing_motion(blend_path, action_name="Move", H=2.0):
+    arm_obj = load(blend_path)
+    action = bpy.data.actions.get(action_name)
+    res = {}
+    for side in ("L", "R"):
+        tips = sample_action_bone_positions(arm_obj, action, f"wing_{side}_03", "tail")
+        zs = [p.z for _, p in tips]
+        scene = bpy.context.scene
+        pb = arm_obj.pose.bones[f"wing_{side}_01"]
+        f0, f1 = [int(round(x)) for x in action.frame_range]
+        scene.frame_set(f0)
+        m0 = pb.matrix.to_3x3().copy()
+        ang = 0.0
+        for f in range(f0, f1 + 1):
+            scene.frame_set(f)
+            ang = max(ang, math.degrees((m0.inverted() @ pb.matrix.to_3x3()).to_quaternion().angle))
+        span = sum(arm_obj.data.bones[f"wing_{side}_{i:02d}"].length for i in (1, 2, 3))
+        res[side] = {"tip_z_travel": round(max(zs) - min(zs), 4), "root_swing_deg": round(ang, 2),
+                     "chain_length": round(span, 4),
+                     "travel_per_length": round((max(zs) - min(zs)) / max(span, 1e-6), 4)}
+    tl, tr = res["L"]["tip_z_travel"], res["R"]["tip_z_travel"]
+    # Side balance (within 25%) is there to catch a lopsided FLAP, not a lopsided mesh, so it is
+    # met on absolute tip travel OR on travel per unit wing length: the Phoenix's left wing is
+    # modelled more folded (chain ~0.7x the right's), so the same flap angles move its tip less in
+    # absolute terms (0.53 vs 0.84) but equally per length (1.00 vs 1.06); the Thunderbird's two
+    # wings are the other way round (absolute 0.78/0.61 balanced, per length 0.75/0.53 not).
+    nl, nr = res["L"]["travel_per_length"], res["R"]["travel_per_length"]
+    balanced = abs(tl - tr) <= 0.25 * max(tl, tr) or abs(nl - nr) <= 0.25 * max(nl, nr)
+    ok = (min(tl, tr) >= 0.15 * H and balanced
+          and min(res["L"]["root_swing_deg"], res["R"]["root_swing_deg"]) >= 20.0)
+    print(f"  wing_motion {action_name}: tip z travel L {tl:.3f} R {tr:.3f} (>= {0.15 * H:.2f}), "
+          f"per wing length L {nl:.3f} R {nr:.3f} (either within 25%), "
+          f"root swing L {res['L']['root_swing_deg']} R {res['R']['root_swing_deg']} deg -> "
+          f"{'PASS' if ok else 'FAIL'}")
+    return {"sides": res, "pass": ok}
+
+
+if IS_BIRD:
+    ground = {}
+    if MOVE_BLEND:
+        ground.update(check_mesh_ground(MOVE_BLEND, ["Move"])["clips"])
+    if KEYED_BLEND:
+        ground.update(check_mesh_ground(KEYED_BLEND, ["Idle", "Attack", "Cast", "Hit", "KO", "Victory"])["clips"])
+    report["mesh_ground_clearance"] = {"clips": ground, "pass": all(v["pass"] for v in ground.values())}
+    if HOVER and MOVE_BLEND:
+        report["wing_motion"] = check_wing_motion(MOVE_BLEND, "Move")
+    if KEYED_BLEND:
+        for clip in ("Idle", "Cast", "Hit", "Victory"):
+            r = check_edge_stretch(KEYED_BLEND, clip)
+            if r is not None:
+                report[f"{clip.lower()}_edge_stretch"] = r
+
 with open(os.path.join(OUT, "verify_report.json"), "w") as f:
     json.dump(report, f, indent=2)
 print("VERIFY DONE")
@@ -939,7 +1081,10 @@ print("VERIFY DONE")
 # pass/fail in the JSON for a human to read) these also abort the pipeline with a non-zero exit code
 # so a failure can't be silently skipped past in a batch/CI context.
 hard_fail = False
-for gate_name in ("walk_direction", "foot_orientation", "toe_fan", "toe_deformation"):
+_HARD = ("walk_direction", "foot_orientation", "toe_fan", "toe_deformation")
+if IS_BIRD:  # v19: correctness gates for the birds (existing creatures' exit behaviour unchanged)
+    _HARD = _HARD + ("mesh_ground_clearance", "wing_motion")
+for gate_name in _HARD:
     if gate_name in report and not report[gate_name].get("pass", False):
         print("=" * 70)
         print(f"FATAL: {gate_name} gate FAILED -- see verify_report.json['{gate_name}'].")

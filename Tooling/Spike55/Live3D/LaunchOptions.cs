@@ -78,6 +78,11 @@ namespace BeastCraft.Spike55.Live3D
         // the subject nicely framed but means it never visibly "sinks" toward a ground reference
         // as the body lowers, making a lying-down pose hard to confirm from that angle alone.
         public bool PilotTopCamera;
+        // v19 (birds): a head-on camera (the beast's own forward faces the camera), low tilt -- the
+        // battle camera sees beasts from behind/side, so a face check (e.g. both eyes) needs this.
+        // Value = camera yaw in degrees (--pilot-front-camera = -90, measured: straight at the face;
+        // +90 shows the back).
+        public float? PilotFrontCameraYaw;
 
         // v18 (wingless quadrupeds -- Golem/Kirin/Tarasque/Basilisk): --pilot-sequence was hard-coded
         // to "griffin_anim.glb"/"griffin_anim_events.json" (see Game1.LoadContent). Rather than fork
@@ -159,6 +164,12 @@ namespace BeastCraft.Spike55.Live3D
                         break;
                     case "--pilot-top-camera":
                         o.PilotTopCamera = true;
+                        break;
+                    case "--pilot-front-camera":
+                        o.PilotFrontCameraYaw = -90f;
+                        break;
+                    case "--pilot-camera-yaw":
+                        o.PilotFrontCameraYaw = float.Parse(args[++i], CultureInfo.InvariantCulture);
                         break;
                     case "--pilot-model":
                         o.PilotModel = args[++i];

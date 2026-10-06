@@ -17,6 +17,10 @@ constant), so it passed. This gate measures MOTION and MATCH instead:
   * per clip, per leg, the thigh and shin rotation RANGE (max deformation angle vs the clip's first
     sampled frame) measured in the GLB must match the truth's range to <= `max_ang_err_deg`;
   * Move: each leg's thigh range + shin range must be >= `move_min_leg_range_deg` in the GLB.
+  * v19, fliers (`move_mode="hover"`, the Thunderbird): a hovering Move has no stepping legs, so
+    the leg check above is replaced by a WING-motion check -- each wing's wing_*_01 + wing_*_02
+    rotation range in the GLB must be >= `move_min_wing_range_deg` and match Blender's range
+    (same <= max_ang_err_deg tolerance) -- the flier equivalent of "the legs actually step".
 
 Coordinates: glTF is Y-up; Blender is Z-up. The Blender glTF exporter maps (x, y, z)_blender ->
 (x, z, -y)_gltf, so C (gltf -> blender) = [[1,0,0],[0,0,-1],[0,1,0]].
@@ -169,7 +173,7 @@ def _rot_angle(m3):
 
 
 def run_gate(glb_path, truth, fps, max_ang_err_deg=2.0, max_pos_err=0.01,
-             move_min_leg_range_deg=15.0):
+             move_min_leg_range_deg=15.0, move_mode="walk", move_min_wing_range_deg=25.0):
     """truth: {"rest": {bone: 4x4}, "clips": {clip: {"frame_start": f0, "frames": {f: {bone: 4x4}}}}}
     (Blender world matrices, lists). Returns (passed, report)."""
     g = GlbPose(glb_path)
@@ -204,7 +208,9 @@ def run_gate(glb_path, truth, fps, max_ang_err_deg=2.0, max_pos_err=0.01,
                 worst_pos = max(worst_pos, pos)
         leg_ranges = {}
         for b in bones:
-            if not b.startswith("leg_") or not (b.endswith("_thigh") or b.endswith("_shin")):
+            is_leg = b.startswith("leg_") and (b.endswith("_thigh") or b.endswith("_shin"))
+            is_wing = move_mode == "hover" and b.startswith("wing_") and b[-3:] in ("_01", "_02")
+            if not (is_leg or is_wing):
                 continue
             rg = max(_rot_angle(m @ d_g[b][0].T) for m in d_g[b])
             rt = max(_rot_angle(m @ d_t[b][0].T) for m in d_t[b])
@@ -217,8 +223,14 @@ def run_gate(glb_path, truth, fps, max_ang_err_deg=2.0, max_pos_err=0.01,
         if worst_pos > max_pos_err:
             report["failures"].append(f"{clip}: max bone position error {worst_pos:.4f} "
                                       f"(limit {max_pos_err})")
-        if clip == "Move":
-            sides = sorted({b.split("_")[1] for b in leg_ranges})
+        if clip == "Move" and move_mode == "hover":
+            for s in ("L", "R"):
+                tot = (leg_ranges.get(f"wing_{s}_01", (0, 0))[0] + leg_ranges.get(f"wing_{s}_02", (0, 0))[0])
+                if tot < move_min_wing_range_deg:
+                    report["failures"].append(f"Move: wing {s} 01+02 range {tot:.1f} deg < "
+                                              f"{move_min_wing_range_deg} in the GLB (wings not flapping)")
+        elif clip == "Move":
+            sides = sorted({b.split("_")[1] for b in leg_ranges if b.startswith("leg_")})
             for s in sides:
                 tot = leg_ranges.get(f"leg_{s}_thigh", (0, 0))[0] + leg_ranges.get(f"leg_{s}_shin", (0, 0))[0]
                 if tot < move_min_leg_range_deg:
@@ -239,7 +251,8 @@ if __name__ == "__main__":
     _truth["clips"] = {c: {"frame_start": d["frame_start"],
                            "frames": {float(f): p for f, p in d["frames"].items()}}
                        for c, d in _truth["clips"].items()}
-    ok, rep = run_gate(sys.argv[1], _truth, _truth.get("fps", 24))
+    ok, rep = run_gate(sys.argv[1], _truth, _truth.get("fps", 24),
+                       move_mode=_truth.get("move_mode", "walk"))
     for c, r in rep["clips"].items():
         print(f"{c:8s} max_rot_err={r['max_rot_err_deg']:7.2f} deg  max_pos_err={r['max_pos_err']:.4f}")
     print("PASS" if ok else "FAIL:")

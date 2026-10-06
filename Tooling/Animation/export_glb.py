@@ -69,6 +69,13 @@ def capture_truth(action, step=2):
 
 TRUTH = {"rest": {b.name: _m(arm_obj.matrix_world @ b.matrix_local) for b in arm_obj.data.bones},
          "clips": {"Move": capture_truth(move_action)}}
+# v19 (birds): per-creature facts stored on the armature by rig_templates/winged_biped.py (absent
+# on every other rig, which keeps its exact previous behaviour): the flier gate mode, the engine
+# hover offset and extra outline-mask joints, both forwarded to the events sidecar below.
+MOVE_MODE = "hover" if arm_obj.data.get("locomotion") == "hover" else "walk"
+HOVER_OFFSET = float(arm_obj.data.get("hover_offset", 0.0))
+OUTLINE_MASK_ZERO = list(arm_obj.data.get("outline_mask_zero", []))
+TRUTH["move_mode"] = MOVE_MODE
 
 
 def quaternion_fcurves_to_euler(action):
@@ -219,8 +226,15 @@ if os.path.isfile(markers_path):
     event_markers = markers_sidecar_src.get("markers", {})
     clip_loop = markers_sidecar_src.get("loop", {})
     sidecar_path = os.path.splitext(out_path)[0] + "_events.json"
+    sidecar = {"fps": 24, "markers": event_markers, "loop": clip_loop}
+    if HOVER_OFFSET > 0:
+        # v19: Live3D lifts the model by `offset` (glTF units) in every clip except those listed
+        # (KO bakes its own fall from that height to the ground), blended across crossfades.
+        sidecar["hover"] = {"offset": HOVER_OFFSET, "exempt": ["KO"]}
+    if OUTLINE_MASK_ZERO:
+        sidecar["outline_mask_zero"] = OUTLINE_MASK_ZERO
     with open(sidecar_path, "w") as f:
-        json.dump({"fps": 24, "markers": event_markers, "loop": clip_loop}, f, indent=2)
+        json.dump(sidecar, f, indent=2)
     print(f"EVENT MARKERS SIDECAR: {sidecar_path} -- markers={json.dumps(event_markers)} "
           f"loop={json.dumps(clip_loop)}")
 else:
@@ -229,7 +243,7 @@ else:
 # v18 round 5: hard gate on the GLB itself -- see glb_gate.py. Fails the export loudly.
 with open(os.path.join(OUT, "glb_gate_truth.json"), "w") as f:
     json.dump({"fps": FPS, **TRUTH}, f)  # lets `python glb_gate.py GLB TRUTH` re-run the gate standalone
-gate_pass, gate_report = glb_gate.run_gate(out_path, TRUTH, FPS)
+gate_pass, gate_report = glb_gate.run_gate(out_path, TRUTH, FPS, move_mode=MOVE_MODE)
 with open(os.path.join(OUT, "glb_gate_report.json"), "w") as f:
     json.dump(gate_report, f, indent=2)
 for _clip, _r in gate_report["clips"].items():

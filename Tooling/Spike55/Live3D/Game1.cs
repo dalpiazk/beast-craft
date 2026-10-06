@@ -92,6 +92,13 @@ namespace BeastCraft.Spike55.Live3D
         // (true), Attack/Hit/Cast/KO clamp to their last key (false). Missing/unparseable defaults to
         // true per clip (the old, pre-round-16 always-wrap behaviour), via LoopFor's lookup below.
         private Dictionary<string, bool> _pilotClipLoop;
+        // v19 (birds): the events sidecar's optional "hover" block -- a flier (Thunderbird) floats
+        // `offset` glTF units above the board in every clip except the exempt ones (KO bakes its own
+        // fall to the ground). Zero offset / no block = every existing model, unchanged.
+        private float _pilotHoverOffset;
+        private HashSet<string> _pilotHoverExempt = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        // v19: the sidecar's optional "outline_mask_zero" joint list (see BuildBoneOutlineMask).
+        private HashSet<string> _pilotOutlineMaskZero = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         // Crossing-detection state for --pilot-sequence logging (see LogPilotEventMarkerCrossings):
         // the previous captured frame's (clip, time-within-clip), so a marker is logged exactly once,
         // the first captured frame whose time has reached or passed it.
@@ -356,6 +363,7 @@ namespace BeastCraft.Spike55.Live3D
                 string eventsSidecarPath = Path.Combine(contentRoot, "model", _options.PilotModel + "_anim_events.json");
                 _pilotEventMarkers = LoadPilotEventMarkers(eventsSidecarPath);
                 _pilotClipLoop = LoadPilotClipLoop(eventsSidecarPath);
+                LoadPilotHoverAndOutline(eventsSidecarPath);
             }
 
             _bodyMesh = GpuMesh.Build(GraphicsDevice, _bodyModel);
@@ -405,7 +413,7 @@ namespace BeastCraft.Spike55.Live3D
             _toonEffect.Parameters["HighlightBoost"].SetValue(new XnaVector3(1.03f, 1.0f, 0.96f));
             _toonEffect.Parameters["OutlineThickness"].SetValue(0.012f);
             _toonEffect.Parameters["OutlineColor"].SetValue(new XnaVector3(0x2E / 255f, 0x2A / 255f, 0x45 / 255f));
-            _toonEffect.Parameters["BoneOutlineMask"].SetValue(BuildBoneOutlineMask(_bodyModel));
+            _toonEffect.Parameters["BoneOutlineMask"].SetValue(BuildBoneOutlineMask(_bodyModel, _pilotOutlineMaskZero));
             _paramViewProjection = _toonEffect.Parameters["ViewProjection"];
             _paramTintMultiply = _toonEffect.Parameters["TintMultiply"];
             _paramBaseTexture = _toonEffect.Parameters["BaseTexture"];
@@ -815,6 +823,12 @@ namespace BeastCraft.Spike55.Live3D
             // splayed out to the sides correctly when seen from directly overhead).
             float tiltDeg = _options.PilotTopCamera ? 89.9f : _options.PilotSideCamera ? 10f : CameraTiltDeg;
             float yawDeg = _options.PilotSideCamera ? 0f : CameraYawDeg;
+            if (_options.PilotFrontCameraYaw.HasValue)
+            {
+                // v19: --pilot-front-camera / --pilot-camera-yaw N (see LaunchOptions) -- low tilt.
+                tiltDeg = 12f;
+                yawDeg = _options.PilotFrontCameraYaw.Value;
+            }
             float tilt = MathHelper.ToRadians(tiltDeg);
             float yaw = MathHelper.ToRadians(yawDeg);
             // Horizontal (XZ-plane) magnitude of the tilt direction, then rotated by `yaw` around world Y
@@ -918,7 +932,7 @@ namespace BeastCraft.Spike55.Live3D
             // proportioned creature (e.g. Golem, wide/low rather than tall) gets a margin sized to
             // ITS own height, not the Griffin's. Every creature in this pipeline shares the same
             // 2.0-unit normalised-height convention, so this is unchanged (2.2f) for the Griffin.
-            float instanceHeightMargin = _bodyModelHeight + 0.2f;
+            float instanceHeightMargin = _bodyModelHeight + 0.2f + _pilotHoverOffset; // v19: a hovering model sits higher
             var samples = new List<(XnaVector3, float)>();
             foreach (var inst in _instances)
                 samples.Add((new XnaVector3(inst.World.M41, inst.World.M42, inst.World.M43), instanceHeightMargin));
@@ -1209,7 +1223,7 @@ namespace BeastCraft.Spike55.Live3D
         /// skin-joint slot, same order as Bones[]/model.Joints -- any slot beyond model.Joints.Length
         /// (padding up to BeastInstance.MaxBones) stays at the harmless default, 1.0, since nothing ever
         /// indexes it.</summary>
-        private static float[] BuildBoneOutlineMask(GltfSkinnedModel model)
+        private static float[] BuildBoneOutlineMask(GltfSkinnedModel model, HashSet<string> extraZero = null)
         {
             var mask = new float[BeastInstance.MaxBones];
             for (int i = 0; i < mask.Length; i++)
@@ -1221,7 +1235,9 @@ namespace BeastCraft.Spike55.Live3D
                               name.StartsWith("wing_R_", StringComparison.OrdinalIgnoreCase);
                 bool isScapula = name.StartsWith("scapula_", StringComparison.OrdinalIgnoreCase);
                 bool isTailTuft = string.Equals(name, "tail_04", StringComparison.OrdinalIgnoreCase);
-                if (isWing || isScapula || isTailTuft)
+                // v19: per-model extra joints from the events sidecar's "outline_mask_zero".
+                bool isExtra = extraZero != null && extraZero.Contains(name);
+                if (isWing || isScapula || isTailTuft || isExtra)
                     mask[j] = 0f;
             }
             return mask;
@@ -1288,6 +1304,38 @@ namespace BeastCraft.Spike55.Live3D
             }
             return result;
         }
+
+        /// <summary>v19 (birds): reads the events sidecar's optional "hover" block ({"offset": float,
+        /// "exempt": [clip names]}) and "outline_mask_zero" joint list. Same tolerance as the other
+        /// sidecar readers: missing/bad data just leaves the defaults (no hover, no extra mask).</summary>
+        private void LoadPilotHoverAndOutline(string path)
+        {
+            if (!File.Exists(path))
+                return;
+            try
+            {
+                using var doc = JsonDocument.Parse(File.ReadAllText(path));
+                if (doc.RootElement.TryGetProperty("hover", out var hoverEl))
+                {
+                    if (hoverEl.TryGetProperty("offset", out var off))
+                        _pilotHoverOffset = off.GetSingle();
+                    if (hoverEl.TryGetProperty("exempt", out var ex))
+                        foreach (var c in ex.EnumerateArray())
+                            _pilotHoverExempt.Add(c.GetString());
+                }
+                if (doc.RootElement.TryGetProperty("outline_mask_zero", out var maskEl))
+                    foreach (var j in maskEl.EnumerateArray())
+                        _pilotOutlineMaskZero.Add(j.GetString());
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[pilot] warning: failed to load hover/outline data from {path}: {ex.Message}");
+            }
+        }
+
+        /// <summary>v19: this clip's hover lift (glTF units, model-space up).</summary>
+        private float HoverFor(AnimatedPose.Clip clip) =>
+            _pilotHoverOffset > 0f && !_pilotHoverExempt.Contains(clip.ToString()) ? _pilotHoverOffset : 0f;
 
         /// <summary>Whether `clip`'s time should wrap (true) or clamp to its last keyframe (false) --
         /// looks up _pilotClipLoop by clip name, defaulting to true (wrap, the original behaviour) for
@@ -1402,11 +1450,16 @@ namespace BeastCraft.Spike55.Live3D
             AnimatedPose.ComputeWorldMatricesBlended(_bodyModel, clipFrom, tFrom, clipTo, tTo, blend,
                 inst.NodeWorldScratch, LoopFor(clipFrom), LoopFor(clipTo));
 
-            ApplySpringJoint(ref inst.TailSpring, _springTail, inst.NodeWorldScratch, inst.World, dt);
-            ApplySpringJoint(ref inst.WingLSpring, _springWingL, inst.NodeWorldScratch, inst.World, dt);
-            ApplySpringJoint(ref inst.WingRSpring, _springWingR, inst.NodeWorldScratch, inst.World, dt);
+            // v19: hover lift, blended across a crossfade exactly like the pose (KO is exempt and bakes
+            // its own fall from the same height, so Idle->KO stays continuous).
+            float hover = HoverFor(clipFrom) * (1f - blend) + HoverFor(clipTo) * blend;
+            var world = hover != 0f ? NumMatrix.CreateTranslation(0f, hover, 0f) * inst.World : inst.World;
 
-            AnimatedPose.ComputeSkinMatrices(_bodyModel, inst.NodeWorldScratch, inst.World, inst.SkinScratch);
+            ApplySpringJoint(ref inst.TailSpring, _springTail, inst.NodeWorldScratch, world, dt);
+            ApplySpringJoint(ref inst.WingLSpring, _springWingL, inst.NodeWorldScratch, world, dt);
+            ApplySpringJoint(ref inst.WingRSpring, _springWingR, inst.NodeWorldScratch, world, dt);
+
+            AnimatedPose.ComputeSkinMatrices(_bodyModel, inst.NodeWorldScratch, world, inst.SkinScratch);
             for (int j = 0; j < inst.SkinScratch.Length && j < BeastInstance.MaxBones; j++)
                 inst.BonePalette[j] = ToXna(inst.SkinScratch[j]);
 

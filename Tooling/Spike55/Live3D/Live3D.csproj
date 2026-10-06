@@ -73,6 +73,14 @@
     <None Include="Content\model\tarasque_anim_events.json" Link="Content\model\tarasque_anim_events.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Content\model\basilisk_anim.glb" Link="Content\model\basilisk_anim.glb" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Content\model\basilisk_anim_events.json" Link="Content\model\basilisk_anim_events.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- v19 birds (Tooling/Animation/README.md): Phoenix and Thunderbird, both hovering fliers,
+         rigged and animated through the new winged_biped template. Same pilot-model + sidecar
+         convention as the v18 quadrupeds above; the events sidecar also carries the "hover" block
+         (lift offset blended across crossfades, KO exempt) that LaunchOptions/Game1 read. -->
+    <None Include="Content\model\phoenix_anim.glb" Link="Content\model\phoenix_anim.glb" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\model\phoenix_anim_events.json" Link="Content\model\phoenix_anim_events.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\model\thunderbird_anim.glb" Link="Content\model\thunderbird_anim.glb" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\model\thunderbird_anim_events.json" Link="Content\model\thunderbird_anim_events.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

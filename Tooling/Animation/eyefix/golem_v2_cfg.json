@@ -1,0 +1,153 @@
+{
+ "_comment": "Golem v2 eye repair: erase both stray eye prints then stamp a mirrored pair back on, symmetric about the sagittal plane. glb/out are placeholders -- override at the command line (see README.md), since the source GLB this was run against (the pre-rig golem_anim.glb) is produced locally by the animation pipeline, not committed in this form.",
+ "glb": "GOLEM_ANIM.glb",
+ "out": "out/golem",
+ "plane": {
+  "n": [
+   0.9974873642595198,
+   -0.07084460559983412,
+   0.0
+  ],
+  "d": 0.10125
+ },
+ "ops": [
+  {
+   "name": "erase_outer",
+   "mirror": false,
+   "src_ray_origin": [
+    0.276,
+    -3,
+    1.246
+   ],
+   "src_ray_dir": [
+    0,
+    1,
+    0
+   ],
+   "target_side": 1,
+   "ortho_scale": 0.4,
+   "res": 2048,
+   "nudge": [
+    0.0,
+    0.2
+   ],
+   "nudge_scale": 2.0,
+   "mask_c": [
+    -0.006,
+    -0.094
+   ],
+   "mask_r": [
+    0.05,
+    0.045
+   ],
+   "feather": 0.3,
+   "occ_tol": 0.01,
+   "two_sided": true
+  },
+  {
+   "name": "erase_inner",
+   "src_ray_origin": [
+    -0.098,
+    -3,
+    1.251
+   ],
+   "src_ray_dir": [
+    0,
+    1,
+    0
+   ],
+   "target_side": 1,
+   "ortho_scale": 0.3,
+   "res": 2048,
+   "nudge": [
+    0.16,
+    0.16
+   ],
+   "nudge_scale": 2.0,
+   "mask_c": [
+    -0.08,
+    -0.08
+   ],
+   "mask_r": [
+    0.05,
+    0.05
+   ],
+   "feather": 0.35,
+   "occ_tol": 0.01,
+   "two_sided": true
+  },
+  {
+   "name": "stamp_right",
+   "mirror": false,
+   "src_ray_origin": [
+    0.276,
+    -3,
+    1.246
+   ],
+   "src_ray_dir": [
+    0,
+    1,
+    0
+   ],
+   "cam_dir": [
+    -0.2,
+    0.97,
+    -0.1
+   ],
+   "target_side": 1,
+   "target_sd": 0.0844,
+   "target_z": 1.248,
+   "target_x0": 0.1,
+   "ortho_scale": 0.3,
+   "res": 2048,
+   "mask_r": [
+    0.06,
+    0.06
+   ],
+   "feather": 0.4,
+   "occ_tol": 0.01,
+   "two_sided": true,
+   "nudge_extra": [
+    0,
+    -0.012
+   ]
+  },
+  {
+   "name": "stamp_left",
+   "mirror": true,
+   "src_ray_origin": [
+    0.276,
+    -3,
+    1.246
+   ],
+   "src_ray_dir": [
+    0,
+    1,
+    0
+   ],
+   "cam_dir": [
+    -0.2,
+    0.97,
+    -0.1
+   ],
+   "target_side": -1,
+   "target_sd": -0.0844,
+   "target_z": 1.248,
+   "target_x0": -0.06,
+   "ortho_scale": 0.3,
+   "res": 2048,
+   "mask_r": [
+    0.06,
+    0.06
+   ],
+   "feather": 0.4,
+   "occ_tol": 0.01,
+   "two_sided": true,
+   "nudge_extra": [
+    0,
+    -0.012
+   ]
+  }
+ ],
+ "pad": 2.5
+}

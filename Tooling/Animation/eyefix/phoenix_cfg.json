@@ -1,0 +1,58 @@
+{
+ "_comment": "Phoenix eye repair: one op, mirrors the visible (left) eye's camera-projected render onto the hidden side. glb/out are placeholders -- override at the command line (see README.md), since the prepped GLB this was run against lives outside the repo (Tooling/Animation's prep_mesh.py output, scratch).",
+ "glb": "PHOENIX_PREPPED.glb",
+ "out": "out/phoenix",
+ "plane": {
+  "n": [
+   0.9859231766199597,
+   -0.16719895275870567,
+   0.0
+  ],
+  "d": 0.0225
+ },
+ "ops": [
+  {
+   "src_ray_origin": [
+    1.0,
+    -0.319,
+    0.944
+   ],
+   "src_ray_dir": [
+    -1,
+    0,
+    0
+   ],
+   "target_side": -1,
+   "cam_dir": [
+    -0.72,
+    0.62,
+    0.05
+   ],
+   "ortho_scale": 0.35,
+   "res": 2048,
+   "mask_r": [
+    0.125,
+    0.105
+   ],
+   "mask_c": [
+    0.0,
+    0.005
+   ],
+   "feather": 0.4,
+   "nudge": [
+    0.0,
+    -0.028
+   ],
+   "nudge_scale": 1.0,
+   "face_ramp": [
+    -0.1,
+    0.1
+   ],
+   "occ_tol": 0.02,
+   "protect_gr": [
+    0.42,
+    0.56
+   ]
+  }
+ ]
+}

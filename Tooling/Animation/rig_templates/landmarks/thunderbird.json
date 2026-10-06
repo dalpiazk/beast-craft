@@ -1,0 +1,184 @@
+{
+ "legs": [
+  {
+   "side": "BL",
+   "is_front": false,
+   "chain": [
+    [
+     -0.04,
+     0.05,
+     0.66
+    ],
+    [
+     -0.03,
+     -0.02,
+     0.62
+    ],
+    [
+     -0.02,
+     0.0,
+     0.57
+    ],
+    [
+     -0.02,
+     -0.01,
+     0.53
+    ]
+   ],
+   "toe_tip": [
+    -0.02,
+    -0.05,
+    0.52
+   ]
+  },
+  {
+   "side": "BR",
+   "is_front": false,
+   "chain": [
+    [
+     0.07,
+     0.05,
+     0.66
+    ],
+    [
+     0.07,
+     -0.02,
+     0.62
+    ],
+    [
+     0.065,
+     0.0,
+     0.57
+    ],
+    [
+     0.065,
+     -0.01,
+     0.53
+    ]
+   ],
+   "toe_tip": [
+    0.065,
+    -0.05,
+    0.52
+   ]
+  }
+ ],
+ "spine": {
+  "pelvis": [
+   0.0,
+   0.09,
+   0.67
+  ],
+  "spine_01": [
+   0.0,
+   0.02,
+   0.73
+  ],
+  "chest": [
+   0.0,
+   -0.04,
+   0.8
+  ],
+  "neck_base": [
+   0.0,
+   -0.13,
+   0.82
+  ],
+  "neck_mid": [
+   0.0,
+   -0.17,
+   0.84
+  ],
+  "head": [
+   0.0,
+   -0.22,
+   0.86
+  ],
+  "head_top": [
+   0.0,
+   -0.2,
+   1.02
+  ],
+  "snout_tip": [
+   0.0,
+   -0.34,
+   0.78
+  ],
+  "jaw_tip": [
+   0.0,
+   -0.31,
+   0.75
+  ]
+ },
+ "tail": [
+  [
+   0.02,
+   0.11,
+   0.63
+  ],
+  [
+   0.02,
+   0.13,
+   0.47
+  ],
+  [
+   0.02,
+   0.2,
+   0.29
+  ],
+  [
+   0.02,
+   0.18,
+   0.14
+  ],
+  [
+   0.02,
+   0.13,
+   0.0
+  ]
+ ],
+ "wing_l": [
+  [
+   -0.11,
+   -0.05,
+   0.95
+  ],
+  [
+   -0.37,
+   0.05,
+   1.26
+  ],
+  [
+   -0.79,
+   0.1,
+   1.68
+  ]
+ ],
+ "wing_r": [
+  [
+   0.1,
+   -0.05,
+   0.95
+  ],
+  [
+   0.39,
+   0.05,
+   1.32
+  ],
+  [
+   0.63,
+   0.1,
+   1.88
+  ]
+ ],
+ "notes": "HOVERING pose, never stands: body upright, legs tucked under (keep them nearly static, small dangle only). Wings raised in a V - the main animated parts: wing flap is the 'walk' (hover-move = flap cycle + gentle body bob/forward lean; no foot contact, so walk_direction/foot gates must be adapted or skipped and documented). Long tail feathers hang straight down to Z=0 (lowest point) - 4 tail bones, sway as follow-through. Head small, looks forward. In-engine it should float with its tail tip a little above the ground (hover offset in the sidecar).",
+ "_lead_fixes": [
+  "spine.pelvis [0.0,0.07,0.62] -> [0.0,0.09,0.67]: the given point sat on the belly surface (outside the mesh); x=0 YZ section: torso spans Y+0.02..+0.16 at Z0.67.",
+  "tail[0] [0.02,0.07,0.62] -> [0.02,0.11,0.63]: same reason (outside the mesh), moved to follow the pelvis."
+ ],
+ "locomotion": "hover",
+ "hover_offset": 0.12,
+ "outline_mask_zero": [],
+ "_note": "Lead hand-placed landmarks, NATIVE prepped-mesh coords (head=-Y, up=+Z, lowest point Z=0, L=-X, R=+X), read off <beast>_calib/{front,left,bottom}.png via calib.json. Bipeds: two hind legs only (BL/BR). Leg chain = hip, knee, ankle, foot; toe_tip forward. 'snout_tip' = beak tip. Wings = [root, mid, tip].",
+ "_source": "lead hand-placed landmarks, scratchpad/anim-birds/landmarks_lead.json (2026-10-05), with the _lead_fixes listed"
+}
