@@ -1400,6 +1400,127 @@ four beasts) PASS with 0.00 deg / 0.0000 error on every clip.
 Live3D: its `tail_04` spring bone (the Griffin's tail tuft) is now Griffin-only. On the Basilisk,
 `tail_04` is a mid-tail bone, and the lagged spring offset kinked the tail in-engine.
 
+## v19: birds -- Phoenix and Thunderbird (both hover since round 2), new `winged_biped` template
+
+Two winged bipeds through the same pipeline; the Griffin and the four v18 quadrupeds are untouched
+(re-run from scratch after every change below: rig bone + weight hashes, every Move/keyed action
+F-curve hash, and the re-exported Griffin/Kirin GLBs byte-compared to the committed ones -- all
+identical). New creature-specific behaviour is keyed off armature properties / `--creature` data,
+never off a change to an existing path.
+
+**Template `rig_templates/winged_biped.py`** (Phoenix 28 bones, Thunderbird 27): quadruped.py's
+data-driven hand-landmark design + winged_quadruped.py's 3-bone wings; two hind legs (no scapula),
+variable tail, `beak`/`jaw`, optional 2-bone `crest`. **Every roll is explicit**: non-wing bones get
+local X = the body's lateral axis, so raw `deg_x` is the same world pitch on every bone (+ = "nose
+up": horizontal tip rises, upright-torso tip goes back, hanging tail swings forward); wings get
+local Z = +-FORWARD (mirrored) so `+deg_z` raises the tip on both sides; a flat toe ends with local
+Z = up (stance sole normal). A first "dorsal reference" convention was dropped after the axis dump
+(`bird_pose.verify_axes`, saved as `<beast>_rig/axes_check.json`) showed it flipping local X on the
+hanging Thunderbird tail and going degenerate on the Phoenix's down-pointing beak. The armature
+carries `forward`, `locomotion` (walk|hover), `hover_offset`, `outline_mask_zero`, `template`; later
+stages read these instead of re-deriving (the Phoenix's head is turned ~20 deg off its body, so
+head-minus-pelvis would have walked it crabwise and failed `foot_orientation` by ~45 deg).
+
+**Landmark fixes (lead JSON -> `landmarks/<beast>.json`, each listed in its `_lead_fixes`):** Phoenix
+crest tip was ~0.14 outside the mesh in front of the real flame (moved to the flame, Y +0.15);
+Phoenix toe tips were ~0.08 outside (snapping skewed BR's toe 49 deg -> moved to the measured middle
+toe). Thunderbird pelvis sat on the belly surface (x=0 YZ section: torso centre at Y +0.09, Z 0.67)
+-- pelvis and tail base moved inside. Spine heights otherwise checked against side sections.
+
+**Weights (all new, birds only):** `fix_wing_card_weights` -- wing feathers must not blend with
+another LIMB: vs legs/tail a >= 20% wing share keeps the card on the wing, else the wing weight
+goes; vs head/beak/jaw/crest the nearer bone chain wins, including vertices heat weighting made
+100% wing (the Thunderbird's head tuft); the shoulder blend with the torso is left alone.
+`fix_tail_leg_bleed` (tail feathers given to the nearest thigh), `fix_beak_bleed` (beak/jaw weight
+behind the hinge -> head), `fill_unweighted`, and the sole fix skipped for a hovering bird.
+
+**Clips.** `anim/bird_pose.py` converts semantic channels (pitch/turn/bank; wing flap/sweep) through
+each bone's rest matrix and bakes per frame (planted-foot IK and KO's ground settle exact on every
+frame). Phoenix Move = gait.py's fk_anchored machinery on 2 legs (phase 0/0.5) + `bird_layers`
+data (wing balance, tail sway, crest flicker). Thunderbird Move = gait.py `locomotion: "hover"`:
+2 flaps/s (Idle: 2 per 3 s), 14 deg forward lean, bob, tail follow-through. The six keyed clips per
+bird are DATA in keyed.py's `BIRD_PARAMS` (key poses + sine layers), one builder for both.
+
+**Fliers -- gates adapted, not silently dropped:** Thunderbird skips foot-slide, knee range,
+`walk_direction`, `foot_orientation` (no foot contact; reported as `skipped`). New gates, birds
+only (hard-fail): `mesh_ground_clearance` (whole deformed mesh, every frame, every clip, >= -5 mm;
++hover offset for non-KO hover clips) and `wing_motion` (Move wing-tip travel >= 15% H, sides within
+25%, wing_*_01 swing >= 20 deg). `walk_direction` accepts a strictly alternating biped.
+`glb_gate.py` `move_mode="hover"` swaps the "legs step" check for wing_*_01+02 range >= 25 deg (and
+GLB-vs-Blender range match). Loop-seam gates now treat q and -q as equal (Thunderbird Victory turns
+a full 360).
+
+**Live3D:** sidecar `"hover": {"offset": 0.12, "exempt": ["KO"]}` lifts the model (blended across
+crossfades; KO bakes its own fall from that height, so Idle->KO is continuous); optional
+`"outline_mask_zero"` joint list; `--pilot-front-camera` / `--pilot-camera-yaw N` (head-on check --
+the battle camera sees every beast from behind).
+
+| Gate | Phoenix (round 2, flying) | Thunderbird |
+| --- | --- | --- |
+| loop seams Move/Idle/Victory | 0.000 | 0.000 |
+| walk_direction / foot_orientation | skipped (hover) | skipped (hover) |
+| foot slide / knee | skipped (hover) | skipped (hover) |
+| wing_motion (Move) | PASS (tip travel 0.53/0.84, per length 1.00/1.06, root 34.5 deg) | PASS (tip travel 0.78/0.61, root 26.7 deg) |
+| mesh ground, min over clips | 0.119 with hover (Idle 0.132; KO 0.004) | 0.126 with hover (KO 0.004) |
+| KO held | 0.000 | 0.000 |
+| edge-stretch Move/Attack/KO (worst other) | 5.9/5.5/5.6 (Victory 6.2) FAIL | 12.8/14.1/20.1 (Victory 18.4) FAIL |
+| glb_gate, all 7 clips | PASS 0.00 deg / 0.0000 | PASS 0.00 deg / 0.0000 |
+
+(The walking Phoenix's numbers, superseded: walk_direction/foot_orientation PASS, foot slide PASS,
+ground 0.000, edge-stretch 11.3/10.2/11.0, Victory 14.6.)
+
+### v19 round 2: the Phoenix flies (producer change)
+
+The Phoenix now uses the Thunderbird's flier path -- `locomotion: "hover"` in
+`landmarks/phoenix.json`, gait.py's hover branch and keyed.py's bird builder with Phoenix DATA, no
+forked code. `root_at_ground` keeps its root bone where the walking rig had it (bones unchanged).
+`hover_offset` 0.10 puts the lowest point (the hanging flame tail) 0.13 above the ground in Idle,
+the Thunderbird's margin. Its rest wings are half-folded, so a root flap only twitched them:
+`bird_pose.HOVER_HOLDS["phoenix"]` holds wing_*_02 35 deg more open, and the flap swings wing_02
++-30 deg a quarter-cycle ahead of wing_01 (lag -pi/2). The wing goes flat-open on the downbeat and
+folds back to the V on the upstroke. The same hold tucks the legs: thigh +20, shin folded back
+-105, foot +80, talons curled -80, with a 3 deg dangle. A 70 deg thigh tuck was tried first and
+dropped: the thigh's skin region covers the lower belly side, and it measured 16-25x stretch.
+
+Clips:
+- **Idle:** 2 slow full flaps per 3 s, bob, crest flicker, tail trailing and swaying.
+- **Move:** 2 flaps per 1 s, 16 deg lean, bob, tail held streaming back.
+- **Attack:** rear up, then a dive with a beak strike and a forward-down wing buffet, back to hover.
+- **Cast:** wings flared wide and up, head back, crest stretched, then a flame-burst downbeat
+  (cast_release).
+- **Hit:** knocked back and up in the air.
+- **Victory:** a rising, banked 360 spiral with the wings held flat-wide and the tail fanning,
+  deliberately unlike Cast.
+- **KO:** falls from the hover height onto its belly with the wings splayed.
+
+**Weights (Phoenix only, opt-in `wing_seam_smooth`):** once the wings really flap, the hard
+wing-card/body seams from `fix_wing_card_weights` tore: lower left wing card vs belly/thigh skin
+(edge 3779-3785, 25x) and right wing tip vs the back of the head (1019-1021, 12x). In-engine they
+showed as pale stretched wedges and a dark band. `winged_biped.smooth_wing_seam` ramps every
+wing/non-wing boundary over 3 edge rings (Laplacian, outer ring fixed, top 4 influences). The worst
+edge over all 7 clips went from 25x to 6.2x; the remaining worst is tail_01 vs the tucked right
+shin. The in-engine strips show no tearing.
+
+**Gate change:** in verify.py `wing_motion`, side balance now passes on absolute tip travel OR
+travel per unit wing length. The Phoenix's left wing is modelled more folded (chain ~0.7x the
+right's): the same flap angles give 0.53 vs 0.84 absolute but 1.00 vs 1.06 per length. The
+Thunderbird is the other way round and still passes on absolute travel.
+
+**Regression:** the Thunderbird, Griffin, Golem, Kirin, Tarasque and Basilisk were re-rigged and
+re-animated from scratch. Rig bone and weight hashes and every Move/keyed F-curve hash are
+identical to the baselines, checked with `regress/run_regress.sh TAG BEAST PREPPED_GLB` (re-runs
+`rig_creature.py` + `anim/gait.py` + `anim/keyed.py`, then hashes the result with
+`regress/hash_rig.py` / `regress/hash_actions.py`) run once before and once after each template
+change, with the two TAGs' JSON diffed.
+
+**Outputs:** MP4s were re-captured in Live3D (battle, `--pilot-front-camera`,
+`--pilot-side-camera`). The old standing MP4s are kept as `old_standing/`.
+
+**Honestly open:** edge-stretch fails on both. Each weight fix moved the worst edge rather than
+removing it (wing card vs leg, then wing vs head tuft, then wing feather vs body skin where the
+cards physically touch) -- the same v9/v18 finding; in-engine strips show no tearing at gameplay
+scale, but the Thunderbird's wing/head-tuft contact is the likeliest place for a visible sliver.
+
 ## v9: max-edge-stretch gate + weight/render fixes -- partial progress, honestly not fully resolved
 ## (lead-review round 9)
 

@@ -1665,7 +1665,345 @@ def build_creature_clips(creature):
     print(f"SAVED {blend_out}")
 
 
+# ---------------------------------------------------------------------------
+# v19: birds (rig_templates/winged_biped.py) -- Phoenix (stands, planted feet) and Thunderbird
+# (hovers, never stands). Same six clips. Every clip is DATA below (BIRD_CLIPS): sparse key poses
+# in anim/bird_pose.py's semantic channels (pitch/turn/bank, wing flap/sweep), optional extra key
+# tracks, and continuous sine layers (a hovering flap, breathing, crest flicker). One builder
+# (build_bird_clips) bakes any of them per frame -- per-frame so the planted-foot IK (Phoenix) and
+# KO's ground settle are exact on every frame (v18 round 4's lesson: Bezier between IK poses is not
+# itself IK-consistent). Root channels: x/y/z world offsets, "f" = distance along FORWARD,
+# pitch/turn/bank about the root's head. Pose keys starting "_" are builder directives.
+# ---------------------------------------------------------------------------
+def _W(flap=0.0, sweep=0.0, f2=0.0, s2=0.0, f3=0.0):
+    """Both wings, mirrored: wing_*_01 flap/sweep, wing_*_02 flap/sweep, wing_*_03 flap."""
+    out = {}
+    for s in ("L", "R"):
+        out[f"wing_{s}_01"] = {"flap": flap, "sweep": sweep}
+        out[f"wing_{s}_02"] = {"flap": f2, "sweep": s2}
+        out[f"wing_{s}_03"] = {"flap": f3}
+    return out
+
+
+def _P(*dicts, **bones):
+    """Merge pose dicts; keyword bones given as (pitch, turn, bank) tuples or channel dicts."""
+    out = {}
+    for d in dicts:
+        for k, v in d.items():
+            out[k] = v
+    for k, v in bones.items():
+        if k == "jaw" or k.startswith("_") or isinstance(v, dict):
+            out[k] = v
+        else:
+            out[k] = dict(zip(("pitch", "turn", "bank"), v))
+    return out
+
+
+_TB_TAIL_SWAY = [("b", "tail_01", "pitch", 2.5, 2, -1.2), ("b", "tail_02", "pitch", 3.5, 2, -1.8),
+                 ("b", "tail_03", "pitch", 4.5, 2, -2.4), ("b", "tail_04", "pitch", 5.5, 2, -3.0),
+                 ("b", "tail_03", "turn", 3.0, 1, 0.3), ("b", "tail_04", "turn", 5.0, 1, -0.5),
+                 ("b", "leg_BL_thigh", "pitch", 3.0, 2, -0.5), ("b", "leg_BR_thigh", "pitch", 3.0, 2, -0.5)]
+_TB_LEGS = ("BL", "BR")
+# Phoenix hover follow-through: flame tail trailing and swaying, crest flicker, a small leg dangle.
+_PH_SWAY = [("b", "tail_01", "pitch", 3.0, 2, -1.2), ("b", "tail_02", "pitch", 4.0, 2, -1.8),
+            ("b", "tail_03", "pitch", 5.0, 2, -2.4), ("b", "tail_01", "turn", 5.0, 1, 0.4),
+            ("b", "tail_02", "turn", 7.0, 1, -0.2), ("b", "tail_03", "turn", 9.0, 1, -0.8),
+            ("b", "leg_BL_thigh", "pitch", 3.0, 2, -0.5), ("b", "leg_BR_thigh", "pitch", 3.0, 2, -0.5),
+            ("b", "crest_01", "pitch", 3.0, 2, 0.0), ("b", "crest_02", "pitch", 7.0, 3, 0.5),
+            ("b", "crest_02", "turn", 5.0, 2, 1.0)]
+
+BIRD_PARAMS = {
+    # v19 round 2 (producer change): the Phoenix flies like the Thunderbird -- the same hover
+    # builder path, Phoenix data. `hold` = bird_pose.HOVER_HOLDS (legs tucked, half-folded wings
+    # held more open), added to every clip incl. KO. Flap: wing_*_02 swings a quarter-cycle ahead of
+    # wing_*_01 (lag -pi/2) so the wing spreads flat on the downbeat and folds on the upstroke.
+    "phoenix": dict(
+        hover=True, planted=False, hold="phoenix",
+        clips={
+            "Idle": dict(seconds=3.0, keys=[(0.0, {}), (1.0, {})],
+                         flap=dict(cycles=2, amps=(32.0, 30.0, 8.0), lags=(0.0, -1.57, -1.0),
+                                   sweep=4.0),
+                         bob=(0.03, 0.025, 2), layers=_PH_SWAY + [
+                             ("b", "head", "turn", 5.0, 1, 0.8), ("b", "head", "pitch", -1.5, 2, 0.0),
+                             ("b", "spine_02", "pitch", 1.5, 2, -1.0)]),
+            # Airborne lunge/dive: rear up and back (wings raised and folding, beak open), dive
+            # forward-down onto the beak strike with the wings buffeting forward-down, recover to
+            # the hover.
+            "Attack": dict(seconds=1.05, sharp=2,
+                           flap=dict(cycles=2, amps=(8.0, 6.0, 3.0), lags=(0.0, -1.57, -1.0)),
+                           layers=_PH_SWAY, keys=[
+                (0.0, {}),
+                (0.30, _P(_W(32, -15, 28, 0, 8), spine_02=(6, 0, 0), neck_01=(8, 0, 0),
+                          head=(8, 0, 0), tail_01=(-10, 0, 0), jaw=-16,
+                          _root={"z": 0.09, "f": -0.06, "pitch": 12})),
+                (0.48, _P(_W(-32, 35, -25, 10, -8), spine_02=(-6, 0, 0), neck_01=(4, 0, 0),
+                          head=(-8, 0, 0), tail_01=(-25, 0, 0), tail_02=(-10, 0, 0), jaw=3,
+                          _root={"z": -0.03, "f": 0.24, "pitch": -32})),
+                (0.66, _P(_W(-14, 18, -12, 4), neck_01=(4, 0, 0), head=(-4, 0, 0),
+                          tail_01=(-15, 0, 0), _root={"z": -0.01, "f": 0.16, "pitch": -20})),
+                (1.0, {})]),
+            # Wings flare wide and UP, head thrown back, beak open, crest rises; then one
+            # flame-burst downbeat (cast_release) that pops the body up with the tail flaring.
+            "Cast": dict(seconds=1.2, sharp=2, marker=(2, "cast_release"),
+                         flap=dict(cycles=2, amps=(4.0, 3.0, 2.0), lags=(0.0, -1.57, -1.0)),
+                         layers=_PH_SWAY + [("b", "crest_02", "pitch", 5.0, 4, 0.0)], keys=[
+                (0.0, {}),
+                (0.40, _P(_W(48, -6, -15, 0, -6), spine_01=(4, 0, 0), spine_02=(7, 0, 0),
+                          neck_01=(6, 0, 0), head=(14, 0, 0), jaw=-18,
+                          crest_01={"pitch": -8, "sy": 1.25}, crest_02={"pitch": 6, "sy": 1.2},
+                          _root={"z": 0.05})),
+                (0.52, _P(_W(-42, 12, -30, 0, -10), spine_02=(-4, 0, 0), head=(-6, 0, 0),
+                          jaw=-22, crest_01={"pitch": -4, "sy": 1.3}, crest_02={"sy": 1.25},
+                          tail_01=(-20, 0, 0), tail_02=(-12, 0, 0), _root={"z": 0.13})),
+                (0.72, _P(_W(-22, 6, -12, 0, -6), head=(-3, 0, 0), jaw=-8,
+                          crest_01={"sy": 1.1}, tail_01=(-8, 0, 0), _root={"z": 0.10})),
+                (1.0, {})]),
+            # Knocked back in the air: shoved backward and up, body pitched back, wings flung up.
+            "Hit": dict(seconds=0.5, sharp=1, marker=(1, "hit_react"),
+                        flap=dict(cycles=1, amps=(10.0, 8.0, 4.0), lags=(0.0, -1.57, -1.0)),
+                        layers=_PH_SWAY, keys=[
+                (0.0, {}),
+                (0.22, _P(_W(30, -25, 20), head=(-12, 0, 0), neck_01=(-6, 0, 0),
+                          crest_02=(14, 0, 0), leg_BL_thigh=(-20, 0, 0), leg_BR_thigh=(-20, 0, 0),
+                          tail_01=(12, 0, 0), jaw=-10,
+                          _root={"f": -0.15, "z": 0.12, "pitch": 20, "bank": 6})),
+                (0.45, _P(_W(12, -10, 8), head=(-6, 0, 0), leg_BL_thigh=(-8, 0, 0),
+                          leg_BR_thigh=(-8, 0, 0), _root={"f": -0.10, "z": 0.08, "pitch": 10})),
+                (1.0, {})]),
+            # Rising SPIRAL (deliberately unlike Cast's stationary wings-up flare): climbs high
+            # while turning a full 360 banked into the turn, wings held spread flat and wide, the
+            # flame tail fanning side to side; settles back to the start pose (loops).
+            "Victory": dict(seconds=2.0,
+                            flap=dict(cycles=4, amps=(14.0, 8.0, 4.0), lags=(0.0, -1.57, -1.0)),
+                            layers=[("b", "tail_01", "turn", 14.0, 3, 0.0),
+                                    ("b", "tail_02", "turn", 18.0, 3, -0.6),
+                                    ("b", "tail_03", "turn", 22.0, 3, -1.2),
+                                    ("b", "crest_02", "pitch", 8.0, 4, 0.0),
+                                    ("b", "crest_02", "turn", 6.0, 2, 0.5)], keys=[
+                (0.0, {}),
+                (0.2, _P(_W(4, 0, -28, 0, -8), head=(6, 0, 0), jaw=-10, tail_01=(-25, 0, 0),
+                         tail_02=(-10, 0, 0), _root={"z": 0.14, "bank": -18, "pitch": -8})),
+                (0.5, _P(_W(6, 0, -30, 0, -8), head=(8, 0, 0), jaw=-12, tail_01=(-30, 0, 0),
+                         tail_02=(-12, 0, 0), _root={"z": 0.30, "bank": -22, "pitch": -8})),
+                (0.8, _P(_W(4, 0, -26, 0, -6), head=(5, 0, 0), jaw=-6, tail_01=(-20, 0, 0),
+                         _root={"z": 0.14, "bank": -14, "pitch": -6})),
+                (1.0, {})],
+                tracks=[[(0.0, {}), (0.12, {}), (0.88, {"_root": {"turn": 360.0}}),
+                         (1.0, {"_root": {"turn": 360.0}})]]),
+            # Falls out of the hover (starts at the hover height the engine stops adding for KO),
+            # flails, pitches nose-down and lies on its belly with the wings splayed out flat.
+            "KO": dict(seconds=1.4, ko=True, impact=0.55, keys=[
+                (0.0, {"_root": {"z": "hover"}}),
+                (0.20, _P(_W(30, -10, 15), head=(10, 0, 0), crest_02=(12, 0, 0),
+                          _root={"z": "hover+0.04", "pitch": 12, "bank": 8})),
+                (0.55, _P(_W(-15, -15, -25, 0, -10), neck_01=(-6, 0, 0), head=(-10, 0, 0),
+                          tail_01=(-25, 0, 0), _root={"pitch": -80})),
+                (0.84, _P(_W(-22, -20, -30, 0, -12), neck_01=(-10, 0, 0), head=(-16, 0, 0),
+                          tail_01=(-30, 0, 0), jaw=-6, _root={"pitch": -84})),
+                (1.0, "same")]),
+        }),
+    "thunderbird": dict(
+        hover=True, planted=False,
+        clips={
+            "Idle": dict(seconds=3.0, keys=[(0.0, {}), (1.0, {})],
+                         flap=dict(cycles=2, amps=(18.0, 10.0, 8.0), sweep=4.0),
+                         bob=(0.03, 0.025, 2), layers=_TB_TAIL_SWAY + [
+                             ("b", "head", "turn", 5.0, 1, 0.8), ("b", "head", "pitch", -1.5, 2, 0.0)]),
+            # Dive-strike: rise and rear back (wings up, talons tucked), then dive forward-down
+            # with the body pitched nose-down, wings swept back and the talons thrown forward.
+            "Attack": dict(seconds=1.05, sharp=2, flap=dict(cycles=2, amps=(9.0, 5.0, 4.0)),
+                           layers=_TB_TAIL_SWAY, keys=[
+                (0.0, {}),
+                (0.30, _P(_W(30, -10, 12), neck_01=(-10, 0, 0), head=(-4, 0, 0),
+                          leg_BL_thigh=(-15, 0, 0), leg_BR_thigh=(-15, 0, 0), jaw=-10,
+                          _root={"z": 0.10, "f": -0.06, "pitch": 14})),
+                (0.48, _P(_W(-15, -35, -10), neck_01=(16, 0, 0), head=(10, 0, 0),
+                          leg_BL_thigh=(70, 0, 0), leg_BR_thigh=(70, 0, 0),
+                          leg_BL_shin=(-15, 0, 0), leg_BR_shin=(-15, 0, 0), jaw=-18,
+                          tail_01=(-10, 0, 0), _root={"z": -0.04, "f": 0.24, "pitch": -35})),
+                (0.66, _P(_W(-5, -20, -4), neck_01=(10, 0, 0), head=(6, 0, 0),
+                          leg_BL_thigh=(50, 0, 0), leg_BR_thigh=(50, 0, 0),
+                          _root={"z": -0.02, "f": 0.20, "pitch": -25})),
+                (1.0, {})]),
+            # Thunder clap: wings drawn up high, then one sharp downbeat (the cast_release marker)
+            # that pops the body upward.
+            "Cast": dict(seconds=1.2, sharp=2, marker=(2, "cast_release"),
+                         flap=dict(cycles=2, amps=(5.0, 3.0, 2.0)), layers=_TB_TAIL_SWAY, keys=[
+                (0.0, {}),
+                (0.38, _P(_W(45, -10, 20, 0, 10), head=(10, 0, 0), _root={"z": 0.05})),
+                (0.50, _P(_W(-40, 12, -25, 0, -15), head=(-6, 0, 0), jaw=-16,
+                          tail_01=(8, 0, 0), tail_02=(6, 0, 0), _root={"z": 0.12})),
+                (0.70, _P(_W(-25, 6, -12, 0, -6), head=(-3, 0, 0), jaw=-8, _root={"z": 0.10})),
+                (1.0, {})]),
+            # Knocked back in the air: shoved backward and up, body pitched back, wings flailing.
+            "Hit": dict(seconds=0.5, sharp=1, marker=(1, "hit_react"),
+                        flap=dict(cycles=1, amps=(10.0, 6.0, 5.0)), layers=_TB_TAIL_SWAY, keys=[
+                (0.0, {}),
+                (0.22, _P(_W(30, -25, 15), head=(-12, 0, 0), leg_BL_thigh=(25, 0, 0),
+                          leg_BR_thigh=(25, 0, 0), tail_01=(-8, 0, 0), jaw=-10,
+                          _root={"f": -0.14, "z": 0.05, "pitch": 22, "bank": 6})),
+                (0.45, _P(_W(12, -10, 6), head=(-6, 0, 0), leg_BL_thigh=(10, 0, 0),
+                          leg_BR_thigh=(10, 0, 0), _root={"f": -0.10, "z": 0.04, "pitch": 12})),
+                (1.0, {})]),
+            # Rising spiral flourish: climbs while turning a full 360 with wings flared, settles
+            # back to the start pose (loops).
+            "Victory": dict(seconds=2.0, flap=dict(cycles=3, amps=(16.0, 10.0, 8.0)),
+                            layers=_TB_TAIL_SWAY, keys=[
+                (0.0, {}),
+                (0.2, _P(_W(30, 0, 15, 0, 6), head=(12, 0, 0), jaw=-12, _root={"z": 0.10})),
+                (0.5, _P(_W(36, 0, 18, 0, 8), head=(14, 0, 0), jaw=-14, _root={"z": 0.18})),
+                (0.8, _P(_W(28, 0, 12), head=(8, 0, 0), jaw=-6, _root={"z": 0.10})),
+                (1.0, {})],
+                tracks=[[(0.0, {}), (0.12, {}), (0.88, {"_root": {"turn": 360.0}}),
+                         (1.0, {"_root": {"turn": 360.0}})]]),
+            # Falls out of the air (starts at the hover height the engine stops adding for KO),
+            # tumbles nose-down and lies belly-down with the wings splayed flat.
+            "KO": dict(seconds=1.4, ko=True, impact=0.55, keys=[
+                (0.0, {"_root": {"z": "hover"}}),
+                (0.20, _P(_W(35, -10, 15), head=(-10, 0, 0), leg_BL_thigh=(20, 0, 0),
+                          leg_BR_thigh=(20, 0, 0), _root={"z": "hover+0.04", "pitch": 15, "bank": 8})),
+                (0.55, _P(_W(-40, -10, -10), neck_01=(20, 0, 0), head=(-5, 0, 0),
+                          _root={"pitch": -80})),
+                (0.84, _P(_W(-48, -12, -12, 0, -5), neck_01=(14, 0, 0), head=(-10, 0, 0),
+                          jaw=-6, _root={"pitch": -84})),
+                (1.0, "same")]),
+        }),
+}
+
+
+def build_bird_clips(creature):
+    import mathutils
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import bird_pose as BP
+
+    BPAR = BIRD_PARAMS[creature]
+    FWD = BP.forward_of(arm_obj)
+    HOVER = float(arm_obj.data.get("hover_offset", 0.0))
+    mesh_obj = next(o for o in bpy.data.objects if o.type == "MESH")
+    LEG_IK = {s: BP.leg_ik_data(arm_obj, s, FWD) for s in leg_sides}
+    # constant per-creature channels on every clip (bird_pose.HOVER_HOLDS; none for the Thunderbird)
+    HOLD = {("b", b, ch): v for _, b, ch, v in BP.HOVER_HOLDS.get(BPAR.get("hold"), [])}
+    EVENT_MARKERS = {}
+    CLIP_LOOP = {"Idle": True, "Move": True, "Attack": False, "Hit": False,
+                 "Cast": False, "KO": False, "Victory": True}
+
+    def conv_pose(p):
+        """BIRD_PARAMS pose -> bird_pose pose (resolves _root f/hover, _lift, jaw)."""
+        out = {"bones": {}, "root": {}, "lift": {}}
+        for k, v in p.items():
+            if k == "_root":
+                for rk, rv in v.items():
+                    if isinstance(rv, str):  # "hover" / "hover+0.04"
+                        rv = HOVER + (float(rv.split("+")[1]) if "+" in rv else 0.0)
+                    if rk == "f":
+                        out["root"]["x"] = out["root"].get("x", 0.0) + FWD.x * rv
+                        out["root"]["y"] = out["root"].get("y", 0.0) + FWD.y * rv
+                    else:
+                        out["root"][rk] = rv
+            elif k == "_lift":
+                out["lift"] = dict(v)
+            elif k == "_free":
+                continue
+            elif k == "jaw":
+                out["jaw"] = v
+            else:
+                out["bones"][k] = dict(v)
+        return out
+
+    def keys_of(raw):
+        res, prev = [], None
+        for i, (f, p) in enumerate(raw):
+            if p == "same":
+                p = prev
+            res.append((f, conv_pose(p), "inout"))
+            prev = p
+        return res
+
+    def eval_min_z():
+        bpy.context.view_layer.update()
+        dg = bpy.context.evaluated_depsgraph_get()
+        eo = mesh_obj.evaluated_get(dg)
+        me = eo.to_mesh()
+        mz = min((eo.matrix_world @ v.co).z for v in me.vertices)
+        eo.to_mesh_clear()
+        return mz
+
+    for clip in ("Idle", "Attack", "Cast", "Hit", "KO", "Victory"):
+        spec = BPAR["clips"][clip]
+        raw = spec["keys"]
+        keys = keys_of(raw)
+        if "sharp" in spec:  # accelerate INTO the strike/impact key (Attack/Hit's sharpening)
+            i = spec["sharp"]
+            keys[i] = (keys[i][0], keys[i][1], "in")
+        if spec.get("ko"):
+            j = min(range(len(keys)), key=lambda k: abs(keys[k][0] - spec["impact"]))
+            keys[j] = (keys[j][0], keys[j][1], "in")
+        tracks = [keys] + [keys_of(t) for t in spec.get("tracks", [])]
+        layers = list(spec.get("layers", []))
+        if "flap" in spec:
+            fl = spec["flap"]
+            layers += BP.wing_layers(fl["cycles"], fl.get("amps", (18.0, 10.0, 8.0)),
+                                     fl.get("lags", (0.0, 0.6, 1.2)), fl.get("sweep", 0.0))
+
+        def chans(t, layers=layers, tracks=tracks, spec=spec):
+            c = BP.add_channels(BP.sample_tracks(tracks, t), BP.sines(layers, t))
+            if HOLD:
+                c = BP.add_channels(c, HOLD)
+            if "bob" in spec:
+                base, amp, cyc = spec["bob"]
+                c[("r", "z")] = c.get(("r", "z"), 0.0) + base + amp * math.sin(2 * math.pi * cyc * t - 1.2)
+            elif "flap" in spec and not spec.get("ko"):
+                # every hovering clip keeps the same baseline lift + a bob phased with its flap
+                fl = spec["flap"]
+                c[("r", "z")] = c.get(("r", "z"), 0.0) + 0.03 + 0.02 * math.sin(
+                    2 * math.pi * fl["cycles"] * t - 1.2)
+            return c
+
+        def post(c, t, spec=spec):
+            if BPAR["planted"] and not spec.get("ko"):
+                lifts = BP.lifts_of(c)
+                for side in leg_sides:
+                    up, fw = lifts.get(side, (0.0, 0.0))
+                    tgt = LEG_IK[side]["ankle_rest"] + mathutils.Vector((0, 0, up)) + FWD * fw
+                    BP.plant_leg(arm_obj, side, LEG_IK[side], tgt)
+            if spec.get("ko"):
+                # ground settle: before impact only lift out of the floor; from impact on, rest the
+                # lowest vertex exactly on it (+4 mm).
+                z = c.get(("r", "z"), 0.0)
+                for _ in range(6):
+                    mz = eval_min_z()
+                    if t < spec["impact"] and mz >= 0.004:
+                        break
+                    if abs(mz - 0.004) < 0.001:
+                        break
+                    z -= (mz - 0.004)
+                    BP.set_root(arm_obj, FWD, (c.get(("r", "x"), 0.0), c.get(("r", "y"), 0.0), z),
+                                c.get(("r", "pitch"), 0.0), c.get(("r", "turn"), 0.0),
+                                c.get(("r", "bank"), 0.0))
+
+        n = int(round(spec["seconds"] * FPS))
+        BP.bake_frames(arm_obj, scene, FWD, clip, n, chans, post)
+        if "marker" in spec:
+            ki, mname = spec["marker"]
+            frac = raw[ki][0]
+            EVENT_MARKERS.setdefault(clip, []).append(
+                {"name": mname, "frame": 1 + round(frac * n), "fraction": frac})
+        print(f"{clip.upper()} ACTION ({creature}, bird): {n + 1} frames @ {FPS}fps, "
+              f"{len(raw)} key poses, {len(layers)} sine layers")
+
+    arm_obj.animation_data.action = None
+    bpy.ops.object.mode_set(mode="OBJECT")
+    with open(os.path.join(OUT, "keyed_event_markers.json"), "w") as f:
+        json.dump({"markers": EVENT_MARKERS, "loop": CLIP_LOOP}, f, indent=2)
+    print(f"EVENT MARKERS ({creature}): {json.dumps(EVENT_MARKERS)}")
+    blend_out = os.path.join(OUT, f"{creature}_keyed.blend")
+    bpy.ops.wm.save_as_mainfile(filepath=blend_out)
+    print(f"SAVED {blend_out}")
+
+
 if CREATURE == "griffin":
     build_griffin_clips()
+elif CREATURE in BIRD_PARAMS:
+    build_bird_clips(CREATURE)
 else:
     build_creature_clips(CREATURE)

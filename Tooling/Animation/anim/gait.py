@@ -131,8 +131,56 @@ GAIT_PARAMS["kirin"].update(_FK_COMMON, cycle_seconds=1.0, crouch_frac=0.05, str
 GAIT_PARAMS["basilisk"].update(_FK_COMMON, cycle_seconds=1.1, crouch_frac=0.04, stride_frac=0.16,
                                lift_frac=0.10, scapula_swing=5.0, pelvis_roll=1.5, pelvis_yaw=5.0,
                                body_bob=0.004, tail_yaw=7.0, tail_pitch=0.0, head_amp=0.8)
+# v19 (birds, rig_templates/winged_biped.py). `bird=True` (the Phoenix's first, walking pass; no
+# creature uses it now, the code path is kept): an upright bird's hop-walk on the same
+# fk_anchored biped machinery (2 legs alternate at phase 0/0.5 via the existing 2-leg branch) plus
+# `bird` extras -- wing balance, tail sway, crest flicker -- authored through anim/bird_pose.py's
+# semantic channels as DATA (sine layers below), replacing the Griffin's hard-coded wing-settle
+# lines. Thunderbird: locomotion "hover" -- it never stands, so Move is a flap cycle (faster than
+# Idle's), forward lean and body bob, no foot contact (see the hover branch below).
+# v19 round 2 (producer change): the Phoenix FLIES like the Thunderbird -- the same hover branch
+# below, Phoenix-specific values only. Its rest pose has the wings half-folded (wing_*_02 pointing
+# up), so a root-only flap would just twitch them: wing_*_02 carries a held -35 deg open offset
+# (bird_pose.HOVER_HOLDS, with the leg tuck) plus a 30 deg swing a quarter-cycle AHEAD of
+# wing_*_01 (flap lag -pi/2), which spreads the wing flat on the downbeat (wing_02 at -65,
+# horizontal) and folds it back toward the rest V on the upstroke. Legs are held tucked with only a
+# small dangle; the flame tail is held streaming back (-pitch) and sways as follow-through.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import bird_pose as _BPH  # noqa: E402  (HOVER_HOLDS: the tuck/wing-open hold shared with keyed.py)
+GAIT_PARAMS["phoenix"] = dict(
+    locomotion="hover", cycle_seconds=1.0, lean=-16.0, neck_comp=8.0, head_comp=6.0,
+    bob=0.035, bob_base=0.035,
+    # 2 flaps per 1.0 s (Idle: 2 per 3.0 s); amps = wing_01 / wing_02 (open-fold) / wing_03.
+    flap_cycles=2, flap_amps=(34.0, 30.0, 8.0), flap_lags=(0.0, -1.57, -1.0), flap_sweep=6.0,
+    tail_sway=[("b", "tail_01", "pitch", 4.0, 2, -1.2), ("b", "tail_02", "pitch", 5.0, 2, -1.8),
+               ("b", "tail_03", "pitch", 6.0, 2, -2.4), ("b", "tail_01", "turn", 5.0, 1, 0.0),
+               ("b", "tail_02", "turn", 7.0, 1, -0.6), ("b", "tail_03", "turn", 9.0, 1, -1.2),
+               ("b", "leg_BL_thigh", "pitch", 3.0, 2, -0.5),
+               ("b", "leg_BR_thigh", "pitch", 3.0, 2, -0.5),
+               ("b", "crest_01", "pitch", 4.0, 2, 1.0), ("b", "crest_02", "pitch", 9.0, 2, 1.6),
+               ("b", "crest_02", "turn", 6.0, 1, 0.3), ("b", "head", "pitch", -2.0, 2, 0.0)],
+    hold=_BPH.HOVER_HOLDS["phoenix"] + [("b", "tail_01", "pitch", -30.0),
+                                        ("b", "tail_02", "pitch", -15.0),
+                                        ("b", "tail_03", "pitch", -10.0)],
+)
+GAIT_PARAMS["thunderbird"] = dict(
+    locomotion="hover", cycle_seconds=1.0, lean=-14.0, neck_comp=7.0, head_comp=5.0,
+    bob=0.035, bob_base=0.035,
+    # 2 flaps per 1.0 s Move cycle (Idle, keyed.py, flaps 2 per 3.0 s): a faster flap.
+    flap_cycles=2, flap_amps=(26.0, 14.0, 10.0), flap_lags=(0.0, 0.7, 1.4), flap_sweep=6.0,
+    tail_sway=[("b", "tail_01", "pitch", 3.0, 2, -1.2), ("b", "tail_02", "pitch", 4.0, 2, -1.8),
+               ("b", "tail_03", "pitch", 5.0, 2, -2.4), ("b", "tail_04", "pitch", 6.0, 2, -3.0),
+               ("b", "tail_02", "turn", 4.0, 1, 0.0), ("b", "tail_04", "turn", 6.0, 1, -0.8),
+               ("b", "leg_BL_thigh", "pitch", 3.0, 2, -0.5),
+               ("b", "leg_BR_thigh", "pitch", 3.0, 2, -0.5),
+               ("b", "head", "pitch", -2.0, 2, 0.0)],
+    hold=[("b", "tail_01", "pitch", -6.0), ("b", "tail_02", "pitch", -4.0)],
+)
 GP = GAIT_PARAMS.get(CREATURE, GAIT_PARAMS["griffin"])
 FK_ANCHORED = GP.get("fk_anchored", False)
+if GP.get("bird"):
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import bird_pose as BP
 if "cycle_seconds" in GP and "cycle-seconds" not in args:
     CYCLE_SECONDS = GP["cycle_seconds"]
 os.makedirs(OUT, exist_ok=True)
@@ -205,7 +253,43 @@ if FORWARD.length < 1e-6:
         "ground-plane position in the rest pose. gait.py refuses to fall back to a hard-coded "
         "axis here (that's exactly the bug this fix removes) -- check the rig's landmarks.")
 FORWARD.normalize()
+if "forward" in arm_data:
+    # v19: winged_biped rigs store their forward axis on the armature (the Phoenix's head is turned
+    # ~20 deg off its body axis, so head-minus-pelvis would walk it crabwise). Other rigs have no
+    # such property and keep the derivation above unchanged.
+    FORWARD = mathutils.Vector(tuple(arm_data["forward"]))
+    FORWARD.z = 0.0
+    FORWARD.normalize()
 print(f"FORWARD (ground-plane, head-pelvis, no hard-coded axis): {tuple(round(c, 4) for c in FORWARD)}")
+
+if GP.get("locomotion") == "hover":
+    # v19 Thunderbird: a hovering flier's Move. No leg stepping exists to drive, so none of the IK
+    # machinery below applies: a flap cycle (tip lagging root), a forward lean carried on the root
+    # with neck/head counter-pitched to keep the gaze level, a body bob phased to rise just after
+    # each downstroke, tail/leg follow-through. In place (the game moves the root); Blender root
+    # height stays >= 0 (the engine adds the sidecar hover offset on top).
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import bird_pose as BP
+    _n = int(round(CYCLE_SECONDS * FPS))
+    _layers = (BP.wing_layers(GP["flap_cycles"], GP["flap_amps"], GP["flap_lags"], GP["flap_sweep"])
+               + list(GP["tail_sway"]))
+    _hold = {("b", b, ch): v for _, b, ch, v in GP["hold"]}
+    _hold.update({("r", "pitch"): GP["lean"], ("b", "neck_01", "pitch"): GP["neck_comp"],
+                  ("b", "head", "pitch"): GP["head_comp"]})
+
+    def _hover_chans(t):
+        c = BP.add_channels(dict(_hold), BP.sines(_layers, t))
+        # body rises ~a quarter-cycle after the downstroke
+        c[("r", "z")] = GP["bob_base"] + GP["bob"] * math.sin(2 * math.pi * GP["flap_cycles"] * t - 1.2)
+        return c
+    bpy.context.view_layer.objects.active = arm_obj
+    bpy.ops.object.mode_set(mode="POSE")
+    BP.bake_frames(arm_obj, scene, FORWARD, "Move", _n, _hover_chans)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    print(f"MOVE ACTION (hover): {_n + 1} frames @ {FPS}fps, flap cycles {GP['flap_cycles']}")
+    bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, f"{CREATURE}_move.blend"))
+    print("GAIT DONE")
+    raise SystemExit(0)
 
 
 def solve_2bone_ik(hip, L1, L2, target, bend_dir):
@@ -1169,11 +1253,23 @@ for i in range(FRAMES + 1):  # +1: bake the loop-closing frame identical to fram
         set_rot_local("tail_04", deg_x=TAIL_AMP * 4 * math.sin(a + 1.1))
         set_rot_local("tail_05", deg_x=TAIL_AMP * 3 * math.sin(a + 1.4))  # Basilisk's 5-bone tail
 
-    # Wings: folded, slight settle motion (not flapping -- this is a ground-locomotion clip).
-    set_rot_local("wing_L_01", deg_z=-6 - 2 * math.sin(a * 2), deg_x=2 * math.sin(a))
-    set_rot_local("wing_L_02", deg_z=-4 * math.sin(a * 2 + 0.5))
-    set_rot_local("wing_R_01", deg_z=6 + 2 * math.sin(a * 2), deg_x=2 * math.sin(a))
-    set_rot_local("wing_R_02", deg_z=4 * math.sin(a * 2 + 0.5))
+    if GP.get("bird"):
+        # v19 Phoenix: wing balance / tail sway / crest flicker as semantic data layers (see
+        # GAIT_PARAMS["phoenix"]); bones the leg IK above depends on (pelvis, spine_02) are not
+        # touched here, so the solve stays consistent.
+        _bc = BP.add_channels({("b", b, ch): v for _, b, ch, v in GP["bird_hold"]},
+                              BP.sines(GP["bird_layers"], t))
+        _per = {}
+        for _k, _v in _bc.items():
+            _per.setdefault(_k[1], {})[_k[2]] = _v
+        for _bn, _ch in _per.items():
+            BP.set_semantic(arm_obj, FORWARD, _bn, _ch)
+    else:
+        # Wings: folded, slight settle motion (not flapping -- this is a ground-locomotion clip).
+        set_rot_local("wing_L_01", deg_z=-6 - 2 * math.sin(a * 2), deg_x=2 * math.sin(a))
+        set_rot_local("wing_L_02", deg_z=-4 * math.sin(a * 2 + 0.5))
+        set_rot_local("wing_R_01", deg_z=6 + 2 * math.sin(a * 2), deg_x=2 * math.sin(a))
+        set_rot_local("wing_R_02", deg_z=4 * math.sin(a * 2 + 0.5))
 
     # Head/neck/spine: a light counter-rotation to the body bob reads as weight/balance. spine_02's
     # rotation here MUST match spine02_local_pitch above exactly (same formula) -- it's the pose
@@ -1195,8 +1291,11 @@ for i in range(FRAMES + 1):  # +1: bake the loop-closing frame identical to fram
             pb = arm_obj.pose.bones[f"leg_{side}_{suffix}"]
             pb.keyframe_insert(data_path="rotation_quaternion", frame=i + 1)
             pb.keyframe_insert(data_path="location", frame=i + 1)
-    for name in ("tail_01", "tail_02", "tail_03", "tail_04", "tail_05", "wing_L_01", "wing_L_02",
-                 "wing_R_01", "wing_R_02", "spine_02", "neck_01", "head", "pelvis"):
+    _keyed_names = ("tail_01", "tail_02", "tail_03", "tail_04", "tail_05", "wing_L_01", "wing_L_02",
+                    "wing_R_01", "wing_R_02", "spine_02", "neck_01", "head", "pelvis")
+    if GP.get("bird"):
+        _keyed_names = _keyed_names + ("wing_L_03", "wing_R_03", "neck_02", "crest_01", "crest_02")
+    for name in _keyed_names:
         pb = arm_obj.pose.bones.get(name)
         if pb:
             pb.keyframe_insert(data_path="rotation_euler", frame=i + 1)
