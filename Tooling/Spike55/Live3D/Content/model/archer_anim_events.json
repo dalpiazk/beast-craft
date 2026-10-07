@@ -1,0 +1,35 @@
+{
+  "fps": 24,
+  "markers": {
+    "Attack": [
+      {
+        "name": "arrow_release",
+        "frame": 23,
+        "fraction": 0.62
+      }
+    ],
+    "Cast": [
+      {
+        "name": "cast_release",
+        "frame": 28,
+        "fraction": 0.66
+      }
+    ],
+    "Hit": [
+      {
+        "name": "hit_react",
+        "frame": 5,
+        "fraction": 0.25
+      }
+    ]
+  },
+  "loop": {
+    "Idle": true,
+    "Move": true,
+    "Attack": false,
+    "Hit": false,
+    "Cast": false,
+    "KO": false,
+    "Victory": true
+  }
+}
