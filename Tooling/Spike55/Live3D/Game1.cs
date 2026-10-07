@@ -230,6 +230,10 @@ namespace BeastCraft.Spike55.Live3D
         // half that). A runtime scale multiplier (not a re-export) so this can be tuned without
         // rebuilding the asset; folded into each swarm instance's World matrix, same place FacingYaw is.
         private const float SwarmScale = 1.4f;
+        // v21: SwarmScale for swarmling_live.glb (0.55 tall); a --swarm-model GLB (Tooling/Animation
+        // normalises every creature to 2.0) is rescaled to the same on-board height.
+        private float _swarmScale = SwarmScale;
+        private int _swarmFrameIndex;
 
         private readonly List<BeastInstance> _instances = new List<BeastInstance>();
         private readonly Random _rng = new Random(12345); // fixed seed: reproducible desync, reproducible bench runs
@@ -295,7 +299,7 @@ namespace BeastCraft.Spike55.Live3D
             // (task 3): the task brief asks for portrait 1080x1920 framing specifically for the battle
             // screenshots, and half-scale screenshots made the swarm's already-small units harder to
             // judge for on-screen readability than the shipped game would be.
-            if (_options.ScreenshotMode || _options.PilotSequenceMode)
+            if (_options.ScreenshotMode || _options.PilotSequenceMode || _options.SwarmSequenceDir != null)
             {
                 _graphics.PreferredBackBufferWidth = 1080;
                 _graphics.PreferredBackBufferHeight = 1920;
@@ -429,7 +433,20 @@ namespace BeastCraft.Spike55.Live3D
 
             if (_options.Battle)
             {
-                _swarmModel = GltfSkinnedModel.Load(Path.Combine(contentRoot, "model", "swarmling_live.glb"));
+                string swarmGlb = _options.SwarmModel != null ? _options.SwarmModel + "_anim.glb" : "swarmling_live.glb";
+                _swarmModel = GltfSkinnedModel.Load(Path.Combine(contentRoot, "model", swarmGlb));
+                if (_options.SwarmModel != null)
+                {
+                    float swarmMinY = float.MaxValue, swarmMaxY = float.MinValue;
+                    foreach (var p in _swarmModel.Positions)
+                    {
+                        swarmMinY = Math.Min(swarmMinY, p.Y);
+                        swarmMaxY = Math.Max(swarmMaxY, p.Y);
+                    }
+                    _swarmScale = 0.55f * SwarmScale / Math.Max(swarmMaxY - swarmMinY, 1e-3f);
+                }
+                if (_options.SwarmClip != null)
+                    _clip = ParseClipName(_options.SwarmClip);
                 _swarmBonesPerInstance = _swarmModel.Joints.Length;
                 if (_swarmBonesPerInstance != 6)
                     throw new InvalidOperationException(
@@ -623,7 +640,7 @@ namespace BeastCraft.Spike55.Live3D
                     // SwarmScale first (local-space, before any rotation/translation), then the fallback
                     // yaw (SnapInitialFacing below overrides it immediately if a Griffin exists), then
                     // place on its cell.
-                    _swarmWorld[i] = NumMatrix.CreateScale(SwarmScale) * NumMatrix.CreateRotationY(fallbackYaw) * NumMatrix.CreateTranslation(center.X, 0f, center.Z);
+                    _swarmWorld[i] = NumMatrix.CreateScale(_swarmScale) * NumMatrix.CreateRotationY(fallbackYaw) * NumMatrix.CreateTranslation(center.X, 0f, center.Z);
                     _swarmAlive[i] = true;
                     _swarmClockOffsets[i] = (float)(_rng.NextDouble() * 4.0);
                     _swarmNodeWorldScratch[i] = new Matrix4x4[_swarmModel.Nodes.Length];
@@ -739,7 +756,7 @@ namespace BeastCraft.Spike55.Live3D
             foreach (var inst in _instances)
                 inst.World = NumMatrix.CreateRotationY(inst.CurrentYaw) * NumMatrix.CreateTranslation(inst.Position.X, 0f, inst.Position.Z);
             for (int i = 0; i < _swarmInstanceCount; i++)
-                _swarmWorld[i] = NumMatrix.CreateScale(SwarmScale) * NumMatrix.CreateRotationY(_swarmCurrentYaw[i]) * NumMatrix.CreateTranslation(_swarmPosition[i].X, 0f, _swarmPosition[i].Z);
+                _swarmWorld[i] = NumMatrix.CreateScale(_swarmScale) * NumMatrix.CreateRotationY(_swarmCurrentYaw[i]) * NumMatrix.CreateTranslation(_swarmPosition[i].X, 0f, _swarmPosition[i].Z);
         }
 
         /// <summary>Producer feedback: "add a key ... that removes a random swarmling so this can be seen
@@ -1060,6 +1077,8 @@ namespace BeastCraft.Spike55.Live3D
             _prevKeyboard = kb;
 
             _elapsedSeconds += (float)gameTime.ElapsedGameTime.TotalSeconds;
+            if (_options.SwarmSequenceDir != null)
+                _elapsedSeconds = _swarmFrameIndex / 60f; // v21: frame-indexed swarm time (reproducible capture)
 
             // Producer feedback: dynamic per-unit facing (battle only -- the single-species stress test
             // keeps its fixed FacingYaw, there being no "enemy" to face there). Must run before the pose/
@@ -1559,11 +1578,28 @@ namespace BeastCraft.Spike55.Live3D
             // that, so every screenshot in the spike doc up to and including the last pass carried the
             // fps/draw-call/memory text baked into the image. `--hide-stats` still parses (now a no-op
             // for screenshots specifically) rather than erroring on old invocations.
-            bool showStats = !_options.BenchMode && !_options.ScreenshotMode && !_options.PilotSequenceMode;
+            bool showStats = !_options.BenchMode && !_options.ScreenshotMode && !_options.PilotSequenceMode
+                && _options.SwarmSequenceDir == null;
             if (showStats)
                 DrawStatsOverlay();
 
             base.Draw(gameTime);
+
+            if (_options.SwarmSequenceDir != null)
+            {
+                // v21: one PNG per frame of swarm time after the same warmup the pilot capture uses.
+                if (_pilotWarmupFramesLeft > 0)
+                {
+                    _pilotWarmupFramesLeft--;
+                }
+                else
+                {
+                    SaveScreenshot(Path.Combine(_options.SwarmSequenceDir, $"frame_{_swarmFrameIndex:D4}.png"));
+                    _swarmFrameIndex++;
+                    if (_swarmFrameIndex >= _options.PilotFrames)
+                        Exit();
+                }
+            }
 
             if (_options.ScreenshotMode && _screenshotElapsedSeconds >= ScreenshotWarmupSeconds)
             {

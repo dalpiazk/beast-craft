@@ -93,6 +93,17 @@
     <None Include="Content\model\treant_anim_events.json" Link="Content\model\treant_anim_events.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Content\model\leviathan_anim.glb" Link="Content\model\leviathan_anim.glb" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Content\model\leviathan_anim_events.json" Link="Content\model\leviathan_anim_events.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- v21, enemies batch 1 (Tooling/Animation/README.md): Stalker (biped template), Brute (biped
+         template) and Swarmling (new blob template, hop locomotion, 6 joints), the first PvE-only
+         enemy rigs. Loadable as pilot-model like every beast above, and the Swarmling is also the
+         first enemy usable with the Live3D battle swarm's new swarm-model/swarm-clip options
+         (see LaunchOptions.cs/Game1.cs), replacing swarmling_live.glb's procedural placeholder. -->
+    <None Include="Content\model\stalker_anim.glb" Link="Content\model\stalker_anim.glb" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\model\stalker_anim_events.json" Link="Content\model\stalker_anim_events.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\model\brute_anim.glb" Link="Content\model\brute_anim.glb" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\model\brute_anim_events.json" Link="Content\model\brute_anim_events.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\model\swarmling_anim.glb" Link="Content\model\swarmling_anim.glb" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\model\swarmling_anim_events.json" Link="Content\model\swarmling_anim_events.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

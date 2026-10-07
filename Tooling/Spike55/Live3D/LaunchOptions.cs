@@ -92,6 +92,15 @@ namespace BeastCraft.Spike55.Live3D
         // (scripts, README commands, CI) keeps behaving exactly as before with no flag change needed.
         public string PilotModel = "griffin";
 
+        // v21 (enemies batch 1): drive the merged-batch swarm path with a Tooling/Animation enemy GLB.
+        // --swarm-model NAME loads NAME_anim.glb instead of swarmling_live.glb (it must still have exactly
+        // 6 skin joints -- Toon.fx's SWARM_BONES_PER_INSTANCE), scaled to the old swarmling's on-board
+        // height; --swarm-clip picks the clip the whole swarm plays (idle|move|...); --swarm-sequence DIR
+        // (implies --battle) writes --frames N frame-indexed PNGs at 60 fps of swarm time, then exits.
+        public string SwarmModel;
+        public string SwarmClip;
+        public string SwarmSequenceDir;
+
         public static LaunchOptions Parse(string[] args)
         {
             var o = new LaunchOptions();
@@ -173,6 +182,16 @@ namespace BeastCraft.Spike55.Live3D
                         break;
                     case "--pilot-model":
                         o.PilotModel = args[++i];
+                        break;
+                    case "--swarm-model":
+                        o.SwarmModel = args[++i];
+                        break;
+                    case "--swarm-clip":
+                        o.SwarmClip = args[++i];
+                        break;
+                    case "--swarm-sequence":
+                        o.SwarmSequenceDir = args[++i];
+                        o.Battle = true;
                         break;
                     default:
                         Console.Error.WriteLine("Unrecognised argument: " + args[i]);
