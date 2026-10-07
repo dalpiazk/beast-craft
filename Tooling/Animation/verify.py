@@ -47,7 +47,7 @@ def _peek_rig_props(path):
     return {k: (list(arm.data[k]) if hasattr(arm.data[k], "__len__") and not isinstance(arm.data[k], str)
                 else arm.data[k])
             for k in ("template", "locomotion", "hover_offset", "forward", "hinges", "follow_squash",
-                      "squash_bone", "max_joints") if k in arm.data}
+                      "squash_bone", "max_joints", "prop_gate") if k in arm.data}
 
 
 RIG_PROPS = _peek_rig_props(MOVE_BLEND or KEYED_BLEND)
@@ -1045,6 +1045,116 @@ def check_mesh_ground(blend_path, clip_names):
     return {"clips": out, "pass": all(v["pass"] for v in out.values())}
 
 
+# v22 round 2 (producer review: the Shaman's staff clipped through his body): prop_clearance, a
+# hard gate for every held/worn prop the rig records in its "prop_gate" armature property
+# (rig_creature.py, from a landmark rigid_parts entry with a "gate"). On EVERY frame of EVERY clip,
+# each prop vertex is tested against the rest of the deformed mesh: inside one of its closed
+# components (ray parity, 3 rays, majority -- per component, so overlapping shells such as an arm
+# laid over the chest do not cancel out), and if inside, its depth = distance to that surface. Prop
+# vertices within `grip_radius` of a gripping bone (a fist round the staff) are exempt; an "attached"
+# prop (antlers, a quiver: part of the body surface) is only tested against the OTHER shells. Fails when
+# any vertex is deeper than PROP_TOL (1 cm in the native ~1.9-unit mesh).
+PROP_TOL = 0.0105
+
+
+def check_prop_clearance(blend_path, clip_names, gates):
+    from mathutils.bvhtree import BVHTree
+    arm_obj = load(blend_path)
+    mesh_obj = next(o for o in bpy.data.objects if o.type == "MESH")
+    scene = bpy.context.scene
+    polys = [tuple(p.vertices) for p in mesh_obj.data.polygons]
+    nv = len(mesh_obj.data.vertices)
+    out = {}
+    dirs = [mathutils.Vector(d).normalized() for d in ((1, 0.013, 0.007), (-0.011, 1, 0.017), (0.009, -0.015, 1))]
+    for g in gates:
+        pset = set(g["verts"])
+        rest = [p for p in polys if not any(i in pset for i in p)]
+        par = list(range(nv))
+
+        def find(x):
+            while par[x] != x:
+                par[x] = par[par[x]]
+                x = par[x]
+            return x
+        for p in rest:
+            for i in p[1:]:
+                a_, b_ = find(p[0]), find(i)
+                if a_ != b_:
+                    par[a_] = b_
+        comps = {}
+        for p in rest:
+            comps.setdefault(find(p[0]), []).append(p)
+        if g.get("attached"):
+            # a WORN prop that is part of the body surface (antlers, a quiver): its own shell is
+            # skipped (the junction where it grows out of the body is not a pass-through); it is
+            # tested against every OTHER shell (a staff, a bow, the arms).
+            own = {find(i) for p in polys if any(j in pset for j in p) for i in p if i not in pset}
+            comps = {k: v for k, v in comps.items() if k not in own}
+        comps = [c for c in comps.values() if len(c) >= 8]
+        res = {}
+        for name in clip_names:
+            action = bpy.data.actions.get(name)
+            if action is None:
+                continue
+            arm_obj.animation_data_create()
+            arm_obj.animation_data.action = action
+            f0, f1 = [int(round(x)) for x in action.frame_range]
+            worst, worst_f, hit_frames, worst_n = 0.0, None, [], 0
+            for f in range(f0, f1 + 1):
+                scene.frame_set(f)
+                dg = bpy.context.evaluated_depsgraph_get()
+                eo = mesh_obj.evaluated_get(dg)
+                me = eo.to_mesh()
+                V = [eo.matrix_world @ v.co for v in me.vertices]
+                eo.to_mesh_clear()
+                segs = [(arm_obj.matrix_world @ arm_obj.pose.bones[b].head,
+                         arm_obj.matrix_world @ arm_obj.pose.bones[b].tail) for b in g["grip_bones"]]
+
+                def near_grip(q):
+                    for h, t in segs:
+                        ab = t - h
+                        u = max(0.0, min(1.0, (q - h).dot(ab) / max(ab.length_squared, 1e-12)))
+                        if (q - (h + ab * u)).length < g["grip_radius"]:
+                            return True
+                    return False
+                trees = [BVHTree.FromPolygons(V, c) for c in comps]
+                fw, fn = 0.0, 0
+                for i in g["verts"]:
+                    q = V[i]
+                    if near_grip(q):
+                        continue
+                    for tr in trees:
+                        loc, _n, _i, d = tr.find_nearest(q)
+                        if loc is None or d <= PROP_TOL:
+                            continue
+                        votes = 0
+                        for dv in dirs:
+                            o, c = q.copy(), 0
+                            for _ in range(40):
+                                h_ = tr.ray_cast(o, dv)
+                                if h_[0] is None:
+                                    break
+                                c += 1
+                                o = h_[0] + dv * 1e-5
+                            votes += c % 2
+                        if votes >= 2:
+                            fn += 1
+                            fw = max(fw, d)
+                            break
+                if fn:
+                    hit_frames.append(f)
+                if fw > worst:
+                    worst, worst_f, worst_n = fw, f, fn
+            res[name] = {"max_depth": round(worst, 4), "worst_frame": worst_f, "verts_at_worst": worst_n,
+                         "frames_hit": hit_frames, "n_frames": f1 - f0 + 1, "pass": not hit_frames}
+            print(f"  prop_clearance {g['name']} {name}: {len(hit_frames)}/{f1 - f0 + 1} frames with "
+                  f"prop vertices inside the body, max depth {worst:.4f} at frame {worst_f} "
+                  f"({worst_n} verts) -> {'PASS' if not hit_frames else 'FAIL'}")
+        out[g["name"]] = res
+    return {"props": out, "tolerance": PROP_TOL,
+            "pass": all(r["pass"] for res in out.values() for r in res.values())}
+
+
 def check_wing_motion(blend_path, action_name="Move", H=2.0):
     arm_obj = load(blend_path)
     action = bpy.data.actions.get(action_name)
@@ -1398,6 +1508,17 @@ if EXT:
     if KEYED_BLEND:
         ground.update(check_mesh_ground(KEYED_BLEND, ["Idle", "Attack", "Cast", "Hit", "KO", "Victory"])["clips"])
     report["mesh_ground_clearance"] = {"clips": ground, "pass": all(v["pass"] for v in ground.values())}
+    if RIG_PROPS.get("prop_gate"):  # v22 round 2: held/worn props (only rigs whose landmarks opt in)
+        _pg = json.loads(RIG_PROPS["prop_gate"])
+        _pc = {"props": {}, "pass": True}
+        for _bl, _cl in ((MOVE_BLEND, ["Move"]), (KEYED_BLEND, ["Idle", "Attack", "Cast", "Hit", "KO", "Victory"])):
+            if _bl:
+                _r = check_prop_clearance(_bl, _cl, _pg)
+                for _k, _v in _r["props"].items():
+                    _pc["props"].setdefault(_k, {}).update(_v)
+                _pc["pass"] = _pc["pass"] and _r["pass"]
+        _pc["tolerance"] = PROP_TOL
+        report["prop_clearance"] = _pc
     if HOVER and MOVE_BLEND:
         report["wing_motion"] = check_wing_motion(MOVE_BLEND, "Move")
     if KEYED_BLEND:
@@ -1419,7 +1540,7 @@ hard_fail = False
 _HARD = ("walk_direction", "foot_orientation", "toe_fan", "toe_deformation")
 if EXT:  # v19/v20: correctness gates for the new rigs (v18 creatures' exit behaviour unchanged)
     _HARD = _HARD + ("mesh_ground_clearance", "wing_motion", "body_wave", "joint_limits", "hop",
-                     "followers")
+                     "followers", "prop_clearance")
 for gate_name in _HARD:
     if gate_name in report and not report[gate_name].get("pass", False):
         print("=" * 70)

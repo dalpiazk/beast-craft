@@ -196,6 +196,17 @@ ARM_MIN_RANGE_DEG = {"Move": 12.0, "Idle": 3.0, "Attack": 40.0, "Cast": 40.0, "H
                      "Victory": 40.0, "KO": 10.0}
 
 
+# v22 round 3 (rigs with a bow_string bone, the Archer): minimum nock travel relative to the bow,
+# as a fraction of the bow's brace height (round 4: the short self bow has a 0.15 brace) -- the
+# draw must reach the GLB.
+STRING_MIN_TRAVEL = {"Attack": 0.6, "Cast": 0.6}
+
+
+# v22 (hop rigs with a stinger tail, the Stingling): minimum summed tail_* rotation range per clip.
+HOP_TAIL_MIN_RANGE_DEG = {"Move": 10.0, "Idle": 5.0, "Attack": 90.0, "Cast": 20.0, "Hit": 10.0,
+                          "Victory": 10.0, "KO": 5.0}
+
+
 def run_gate(glb_path, truth, fps, max_ang_err_deg=2.0, max_pos_err=0.01,
              move_min_leg_range_deg=15.0, move_mode="walk", move_min_wing_range_deg=25.0,
              move_min_wave_sum_deg=30.0, max_joints=None, squash_bone="body", max_scale_err=0.01,
@@ -220,6 +231,7 @@ def run_gate(glb_path, truth, fps, max_ang_err_deg=2.0, max_pos_err=0.01,
         f0 = cdat["frame_start"]
         worst_ang, worst_pos, worst_where = 0.0, 0.0, None
         d_g, d_t = {}, {}
+        d_w = {}  # v22 round 3: GLB world matrices of the bow / bow_string bones (rigs that have them)
         bone_worst = {}
         for f, pose in sorted(cdat["frames"].items(), key=lambda kv: float(kv[0])):
             t = t0 + (float(f) - f0) / fps
@@ -232,6 +244,8 @@ def run_gate(glb_path, truth, fps, max_ang_err_deg=2.0, max_pos_err=0.01,
                 pos = float(np.linalg.norm(gw[b][:3, 3] - tw[:3, 3]))
                 d_g.setdefault(b, []).append(dg)
                 d_t.setdefault(b, []).append(dt)
+                if b in ("bow", "bow_string"):
+                    d_w.setdefault(b, []).append(np.asarray(gw[b]))
                 if b not in bone_worst or ang > bone_worst[b][0]:
                     bone_worst[b] = (round(ang, 2), round(pos, 4), f)
                 if ang > worst_ang:
@@ -272,7 +286,8 @@ def run_gate(glb_path, truth, fps, max_ang_err_deg=2.0, max_pos_err=0.01,
             is_wave = move_mode == "slither" and b.startswith(("tail_", "body_"))
             is_arm = b.startswith("arm_") and b.endswith(("_upper", "_fore"))  # v20 round 2
             is_pair = move_mode == "hop" and b.startswith("legs_")  # v21 blob leg pairs
-            if not (is_leg or is_wing or is_wave or is_arm or is_pair):
+            is_htail = move_mode == "hop" and b.startswith("tail_")  # v22 Stingling stinger tail
+            if not (is_leg or is_wing or is_wave or is_arm or is_pair or is_htail):
                 continue
             rg = max(_rot_angle(m @ d_g[b][0].T) for m in d_g[b])
             rt = max(_rot_angle(m @ d_t[b][0].T) for m in d_t[b])
@@ -321,6 +336,25 @@ def run_gate(glb_path, truth, fps, max_ang_err_deg=2.0, max_pos_err=0.01,
             for b in sorted(x for x in leg_ranges if x.startswith("legs_")):
                 if leg_ranges[b][0] < 10.0:
                     report["failures"].append(f"Move: {b} swing {leg_ranges[b][0]:.1f} deg < 10 in the GLB")
+        # v22 (hop rigs with a tail, the Stingling): the stinger tail must visibly move in the GLB --
+        # the summed tail_* world-rotation range per clip >= HOP_TAIL_MIN_RANGE_DEG (Attack is the
+        # over-the-head whip). Rigs without tail_* bones in hop mode (Brute, Swarmling) are unaffected.
+        if move_mode == "hop":
+            htails = sorted(x for x in leg_ranges if x.startswith("tail_"))
+            if htails:
+                # LOCAL ranges down the chain (tail_01 vs root, tail_NN vs tail_NN-1), so root
+                # leans/spins (Victory's 360) do not count as tail motion
+                tsum = 0.0
+                for i_, x in enumerate(htails):
+                    pa = "root" if i_ == 0 else htails[i_ - 1]
+                    if pa in d_g:
+                        rel = [d_g[pa][k].T @ d_g[x][k] for k in range(len(d_g[x]))]
+                        tsum += max(_rot_angle(m @ rel[0].T) for m in rel)
+                report.setdefault("tail", {})[clip] = round(tsum, 2)
+                need = HOP_TAIL_MIN_RANGE_DEG.get(clip, 0.0)
+                if tsum < need:
+                    report["failures"].append(f"{clip}: tail range sum {tsum:.1f} deg < {need} in the GLB "
+                                              f"(tail not moving)")
         elif clip == "Move":
             sides = sorted({b.split("_")[1] for b in leg_ranges if b.startswith("leg_")})
             for s in sides:
@@ -348,6 +382,19 @@ def run_gate(glb_path, truth, fps, max_ang_err_deg=2.0, max_pos_err=0.01,
             if tot < need:
                 report["failures"].append(f"{clip}: arm {s_} shoulder+elbow local range {tot:.1f} deg < {need} "
                                           f"in the GLB (arm not moving)")
+        if "bow" in d_w and "bow_string" in d_w:
+            # v22 round 3 (the Archer's bow, anim/bow_rig.py): the string's nock must visibly travel
+            # (relative to the bow) in the GLB -- the draw reaches the game, not just Blender.
+            rel = [np.linalg.inv(mb) @ ms for mb, ms in zip(d_w["bow"], d_w["bow_string"])]
+            trav = max(float(np.linalg.norm(m[:3, 3] - rel[0][:3, 3])) for m in rel)
+            # relative to the bow's brace height (string-to-grip at rest: its local offset from the
+            # bow bone in the bind pose), so a short bow is held to the same visible V
+            brace = float(np.linalg.norm((np.linalg.inv(g_rest["bow"]) @ g_rest["bow_string"])[:3, 3]))
+            need = STRING_MIN_TRAVEL.get(clip, 0.0) * brace
+            report.setdefault("string", {})[clip] = {"travel": round(trav, 4), "brace": round(brace, 4)}
+            if trav < need:
+                report["failures"].append(f"{clip}: bow string nock travel {trav:.3f} < {need} in the GLB "
+                                          f"(string not drawn)")
         report["clips"][clip] = {"max_rot_err_deg": round(worst_ang, 3),
                                  "max_pos_err": round(worst_pos, 5),
                                  "worst_at": worst_where,
@@ -371,6 +418,10 @@ if __name__ == "__main__":
         print(f"JOINTS {rep['joints']['count']} (max {rep['joints']['max']})")
     for c, h in rep.get("hop", {}).items():
         print(f"{c:8s} hop: body scale err {h['max_scale_err']} sy {h['body_sy_range']} root z {h['root_z_range']}")
+    for c, tr in rep.get("string", {}).items():
+        print(f"{c:8s} bow string nock travel {tr}")
+    for c, tsum in rep.get("tail", {}).items():
+        print(f"{c:8s} tail range sum deg {tsum}")
     for c, a in rep.get("arms", {}).items():
         print(f"{c:8s} arm shoulder+elbow LOCAL range deg {a}")
     print("PASS" if ok else "FAIL:")

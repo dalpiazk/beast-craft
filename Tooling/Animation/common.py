@@ -842,14 +842,17 @@ def reweight_floating_mesh_islands(mesh_obj, floater_max_verts=300):
     return fixed, len(comps)
 
 
-def auto_weight_with_fallbacks(obj, arm_obj, bone_names, target_height):
+def auto_weight_with_fallbacks(obj, arm_obj, bone_names, target_height, tol=0.05, island_repair=True):
     """Runs the Spike #55 fallback chain: heat weights on raw mesh -> heat weights on a
     voxel-remeshed duplicate (weights data-transferred back) -> envelope weights. Returns
-    (method_used_or_None, log_lines)."""
+    (method_used_or_None, log_lines). `tol`: the unweighted fraction a method may leave (v22: a
+    rig whose separate prop shells are weighted afterwards by rigid_parts raises it). `island_repair`
+    False (v22 round 3, the Archer's keep_shell_heat_weights) keeps each separate shell's own heat
+    weights instead of copying the nearest large component's (its new arms are separate shells)."""
     log = []
     unweighted, total = try_auto_weights(obj, arm_obj)
     log.append(f"attempt 1 (raw mesh, heat weights): {unweighted}/{total} unweighted")
-    method_used = "heat weights (raw mesh)" if unweighted <= total * 0.05 else None
+    method_used = "heat weights (raw mesh)" if unweighted <= total * tol else None
 
     if method_used is None:
         # Clean up attempt 1's own (failed) Armature modifier + all-zero-weight vertex groups
@@ -888,7 +891,7 @@ def auto_weight_with_fallbacks(obj, arm_obj, bone_names, target_height):
         unweighted, total = try_auto_weights(remesh_obj, arm_obj)
         log.append(f"attempt 2 (voxel-remeshed duplicate, heat weights): {unweighted}/{total} unweighted")
 
-        if unweighted <= total * 0.05:
+        if unweighted <= total * tol:
             for name in bone_names:
                 if name not in obj.vertex_groups:
                     obj.vertex_groups.new(name=name)
@@ -906,7 +909,7 @@ def auto_weight_with_fallbacks(obj, arm_obj, bone_names, target_height):
             arm_mod.object = arm_obj
             unweighted, total = count_unweighted(obj)
             log.append(f"after data transfer: {unweighted}/{total} unweighted")
-            if unweighted <= total * 0.05:
+            if unweighted <= total * tol:
                 method_used = "heat weights on a voxel-remeshed duplicate, data-transferred"
             else:
                 obj.modifiers.remove(arm_mod)
@@ -928,7 +931,7 @@ def auto_weight_with_fallbacks(obj, arm_obj, bone_names, target_height):
             log.append(f"envelope weights raised: {e}")
         unweighted, total = count_unweighted(obj)
         log.append(f"attempt 3 (envelope weights): {unweighted}/{total} unweighted")
-        if unweighted <= total * 0.05:
+        if unweighted <= total * tol:
             method_used = "envelope weights"
 
     if method_used is not None and unweighted > 0:
@@ -938,7 +941,9 @@ def auto_weight_with_fallbacks(obj, arm_obj, bone_names, target_height):
     if method_used is not None and "data-transferred" in method_used:
         topo_fixed = repair_topologically_inconsistent_weights(obj)
         log.append(f"topology-consistency repair: fixed {topo_fixed}")
-    if method_used is not None:
+    if method_used is not None and not island_repair:
+        log.append("floating-island repair: skipped (separate shells keep their own heat weights)")
+    elif method_used is not None:
         island_fixed, n_components = reweight_floating_mesh_islands(obj)
         log.append(f"floating-island repair: {n_components} components, re-weighted {island_fixed}")
 
@@ -1202,3 +1207,96 @@ def normalise_transform(obj, target_height=2.0):
     bpy.context.view_layer.objects.active = obj
     bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
     return target_height
+
+
+# ---------------------------------------------------------------------------------------------
+# v22 (enemies batch 2): rigid PROPS and weight RAMPS by region (opt-in "rigid_parts" in a landmark
+# file). A region is a union of "include" shapes minus "exclude" shapes, given in NATIVE prepped-mesh
+# coords and mapped through rig_creature's to_normalized:
+#   {"poly": [[x,y,z], ...], "r": R}  capsule chain (one point = a sphere),
+#   {"box": [x0, x1, y0, y1, z0, z1]}.
+# A part {"bone": B, "include": [...], "exclude": [...], "component_seed(s)": [x,y,z] / [[..], ..]?} sets every
+# selected vertex (region, plus the whole connected shell nearest the seed if given) 100% to B (a bow,
+# a staff, antlers, a quiver: no bone of its own, must move rigidly with one). With "ramp":
+# {"bone_b": B2, "center": [x,y,z], "radius": R} a selected vertex is instead split between B and B2,
+# B2 = clamp(1 - |p - center| / R) (a bow string: its ends ride the bow hand, its nock the draw hand).
+# Runs after every other weighting pass (the final word, like rigid_regions).
+# ---------------------------------------------------------------------------------------------
+def _region_mask(coords, shapes, to_normalized, k):
+    def seg_d(p, a, b):
+        ab = b - a
+        L2 = ab.length_squared
+        t = 0.0 if L2 < 1e-12 else max(0.0, min(1.0, (p - a).dot(ab) / L2))
+        return (p - (a + ab * t)).length
+    out = [False] * len(coords)
+    for s in shapes:
+        if "poly" in s:
+            pts = [to_normalized(q) for q in s["poly"]]
+            segs = list(zip(pts, pts[1:])) or [(pts[0], pts[0])]
+            r = s["r"] * k
+            for i, p in enumerate(coords):
+                if not out[i] and min(seg_d(p, a, b) for a, b in segs) <= r:
+                    out[i] = True
+        elif "box" in s:
+            b = s["box"]
+            lo = to_normalized((b[0], b[2], b[4]))
+            hi = to_normalized((b[1], b[3], b[5]))
+            for i, p in enumerate(coords):
+                if lo.x <= p.x <= hi.x and lo.y <= p.y <= hi.y and lo.z <= p.z <= hi.z:
+                    out[i] = True
+    return out
+
+
+def force_region_weights(obj, part, to_normalized, selected=None):
+    """See the block comment above. Returns the number of vertices set (their indices are appended
+    to `selected` when a list is given)."""
+    me = obj.data
+    o = to_normalized((0.0, 0.0, 0.0))
+    k = (to_normalized((0.0, 0.0, 1.0)) - o).z
+    coords = [v.co.copy() for v in me.vertices]
+    inc = _region_mask(coords, part.get("include", []), to_normalized, k)
+    seeds = part.get("component_seeds") or ([part["component_seed"]] if part.get("component_seed") else [])
+    if seeds:
+        # v22: whole separate shells (props cut free by meshfix/prop_surgery.py): the connected
+        # component holding the vertex nearest each seed point
+        comps = connected_components(obj)
+        for s_ in seeds:
+            sp = to_normalized(s_)
+            seed = min(range(len(coords)), key=lambda i: (coords[i] - sp).length_squared)
+            for i in next(c for c in comps if seed in c):
+                inc[i] = True
+    exc = _region_mask(coords, part.get("exclude", []), to_normalized, k)
+    if part.get("within_component"):
+        # v22: limit the region to one shell (the bow string must not take the draw fist that
+        # overlaps it at the nock)
+        sp = to_normalized(part["within_component"])
+        seed = min(range(len(coords)), key=lambda i: (coords[i] - sp).length_squared)
+        keep = set(next(c for c in connected_components(obj) if seed in c))
+        for i in range(len(coords)):
+            if i not in keep:
+                exc[i] = True
+    gi = {g.name: g.index for g in obj.vertex_groups}
+    a = gi[part["bone"]]
+    ramp = part.get("ramp")
+    if ramp:
+        b = gi[ramp["bone_b"]]
+        c = to_normalized(ramp["center"])
+        R = ramp["radius"] * k
+    n = 0
+    for i, v in enumerate(me.vertices):
+        if not inc[i] or exc[i]:
+            continue
+        for g in list(v.groups):
+            obj.vertex_groups[g.group].remove([i])
+        if ramp:
+            wb = max(0.0, min(1.0, 1.0 - (coords[i] - c).length / R))
+            if wb < 1.0:
+                obj.vertex_groups[a].add([i], 1.0 - wb, "REPLACE")
+            if wb > 0.0:
+                obj.vertex_groups[b].add([i], wb, "REPLACE")
+        else:
+            obj.vertex_groups[a].add([i], 1.0, "REPLACE")
+        n += 1
+        if selected is not None:
+            selected.append(i)
+    return n

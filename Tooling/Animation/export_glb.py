@@ -252,6 +252,8 @@ if "joints" in gate_report:
     print(f"GLB GATE JOINTS: {gate_report['joints']['count']} (max {gate_report['joints']['max']})")
 for _clip, _h in gate_report.get("hop", {}).items():
     print(f"GLB GATE HOP {_clip}: {_h}")
+for _clip, _h in gate_report.get("string", {}).items():  # v22 round 3 (the Archer's bow string)
+    print(f"GLB GATE STRING {_clip}: nock travel {_h}")
 with open(os.path.join(OUT, "glb_gate_report.json"), "w") as f:
     json.dump(gate_report, f, indent=2)
 for _clip, _r in gate_report["clips"].items():

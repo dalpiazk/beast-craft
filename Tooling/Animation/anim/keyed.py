@@ -2177,6 +2177,92 @@ LAST_PARAMS = {
 # factor s (body sy = s, sx = sz = 1/sqrt(s), volume kept), "ground_lift" (lift the root only when
 # the deformed mesh would dip below the floor -- rocking a round body about its centre).
 # ---------------------------------------------------------------------------
+def _sh_arms(L, R):
+    """v22 humanoid arm pose with no relaxed-hang offset: per side (shoulder flex, shoulder abd,
+    elbow flex, wrist flex), all relative to the rest pose (the Shaman/Archer rest pose already
+    holds the staff/bow)."""
+    out = {}
+    for s_, v in (("L", L), ("R", R)):
+        fl, ab, el, wr = v[:4]
+        out[f"arm_{s_}_upper"] = {"flex": fl, "abd": ab}
+        out[f"arm_{s_}_fore"] = {"flex": el}
+        # optional 5th value: wrist abduction (v22 round 2: tilts the Shaman's staff head outward)
+        out[f"arm_{s_}_hand"] = {"flex": wr, "abd": v[4]} if len(v) > 4 else {"flex": wr}
+    return out
+
+
+# Staff held 2-3 cm off the floor, its head tilted OUT and FORWARD of the hood (v22 round 2: the
+# rest-pose staff cap sat in the hood; verify.py prop_clearance found it on every Idle frame).
+_SH_REL = {"arm_L_upper": {"flex": 8.0, "abd": 4.0}, "arm_L_hand": {"flex": -8.0, "abd": -10.0}}
+
+# v22 Archer, rounds 3-5 (see "archer" below; the modelled bow of meshfix/archer_bow.py placed every
+# frame by anim/bow_rig.py from the "_bow" channels). Round 5: the mesh has REAL arms
+# (meshfix/archer_arms.py: shoulder caps under the leaf mantle, upper arm, elbow, forearm, the old
+# fists as hands; rest = a relaxed A-pose with the elbows a little bent), so every arm pose was
+# re-solved (scratch bowopt5.py: fist / nock / elbow targets, arrow aim, prop hits, forearm and fist
+# kept OUT of the head and mantle, and the bow plane's facing measured on the deformed bow -- round
+# 4's search read the bone's rest X and missed the prop's 57 deg rest yaw, which is why its "3/4"
+# bow read as a thin line from the battle camera).
+# _AR_REL: the bow held up in front of the chest, the draw hand resting on the string at the nock
+# (the approved art), the chest turned 20 deg (spine_01/02) so the bow's D faces the battle camera
+# (38 deg off) AND the head-on camera (31 deg off); the head turned back to the front (on the HEAD
+# bone: a neck counter-turn sheared the leaf mantle, weighted to both neck and chest).
+_AR_BOW3Q = {"yaw": -112.8, "cant": -9.0}
+_AR_REL = {"arm_L_upper": {"flex": 50.6, "abd": 22.1}, "arm_L_fore": {"flex": 26.0},
+           "arm_L_hand": {"flex": -10.0, "abd": 3.2},
+           "arm_R_upper": {"flex": 84.1, "abd": 47.0}, "arm_R_fore": {"flex": 41.5},
+           "arm_R_hand": {"flex": -48.3},
+           "spine_01": {"turn": 9.4}, "spine_02": {"turn": 10.0}, "head": {"turn": -25.0},
+           "_bow": dict(_AR_BOW3Q)}
+
+
+def _ar_draw(v):
+    """draw arm: (shoulder flex, abd, twist, elbow flex, wrist flex)"""
+    fl, ab, tw, el, wr = v
+    return {"arm_R_upper": {"flex": fl, "abd": ab, "twist": tw}, "arm_R_fore": {"flex": el},
+            "arm_R_hand": {"flex": wr}}
+
+
+def _ar_bow(L):
+    """bow arm: (shoulder flex, abd, elbow flex, wrist flex, wrist abd)"""
+    fl, ab, el, wr, wa = L
+    return {"arm_L_upper": {"flex": fl, "abd": ab}, "arm_L_fore": {"flex": el},
+            "arm_L_hand": {"flex": wr, "abd": wa}}
+
+
+def _ar_body(turn, sp, neck, head, pitch=(0.0, 0.0, 0.0, 0.0, 0.0), root_pitch=0.0, z=0.0, head_bank=0.0):
+    """side-on stance: root turn (the whole Archer turns its LEFT shoulder to the target), spine
+    turns sp = (spine_01, 02, 03), neck/head counter-turn to look down the arrow; pitch = (spine_01,
+    02, 03, neck, head) lean (positive = back/up)."""
+    return {"spine_01": {"turn": sp[0], "pitch": pitch[0]}, "spine_02": {"turn": sp[1], "pitch": pitch[1]},
+            "spine_03": {"turn": sp[2], "pitch": pitch[2]}, "neck": {"turn": neck, "pitch": pitch[3]},
+            "head": {"turn": head, "pitch": pitch[4], "bank": head_bank},
+            "_root": {"turn": turn, "pitch": root_pitch, "z": z}}
+
+
+# Attack: side-on (root 30 + spine 3 x 8 deg, leaning a touch into the shot, head turned back down
+# the arrow). The bow arm is straight out from the shoulder at shoulder height; the draw elbow is
+# LIFTED and pulled BACK behind the shoulder and the forearm folds forward, bringing the fist up under
+# the mantle brim beside the jaw (the leaf brim, z ~0.9-1.0 out to |x| 0.42, sits between the shoulder
+# and the cheek -- a fist any higher goes into it); the string draws into a V to it (0.62 draw).
+_AR_FULL_BODY = _ar_body(30.0, (8.0, 8.0, 8.0), 0.0, -40.0, pitch=(0.0, -6.0, -6.0, 0.0, 0.0))
+_AR_FULL_L = _ar_bow((60.0, 100.0, -15.0, -30.0, 25.0))
+_AR_FULL_R = _ar_draw((-1.0, 83.3, -21.0, 90.0, -13.1))
+_AR_REACH_R = _ar_draw((64.9, 55.0, -12.0, 49.1, 0.8))      # the fist on the string at the nock
+_AR_LOOSE_R = _ar_draw((-16.0, 92.0, -21.0, 55.0, 17.0))    # the fist flicks back and open
+_AR_FOLLOW_L = _ar_bow((55.0, 61.0, 5.0, -20.0, 14.0))      # the bow arm folds back toward the hold
+_AR_FOLLOW_R = _ar_draw((41.0, 65.0, -10.0, 66.0, -30.0))
+# Cast (volley): the same draw aimed ~30 deg UP -- the Archer leans back into it, bow arm raised.
+_AR_UP_BODY = _ar_body(30.0, (8.0, 8.0, 8.0), 0.0, -45.0, pitch=(10.0, 4.0, 14.0, 10.0, 8.0), root_pitch=-5.0)
+_AR_UP_L = _ar_bow((66.5, 110.0, -25.0, -16.0, 25.0))
+_AR_UP_R = _ar_draw((10.5, 85.3, 3.0, 94.0, -9.6))
+_AR_UP_REACH_R = _ar_draw((80.0, 40.3, -8.3, 29.5, 5.0))
+# Victory: the bow brandished up and out at the left, beside the head (overhead it would cut the
+# huge mask), still facing the battle (32 deg off) and head-on (37 deg off) cameras.
+_AR_RAISE_L = _ar_bow((-9.6, 87.5, -20.0, -26.3, -9.8))
+_AR_PUMP_R = _ar_draw((40.0, 95.0, 0.0, 70.0, 0.0))
+
+
 def _SQ(sq, **extra):
     """Blob body squash channels (volume kept): height x sq, width/depth x 1/sqrt(sq)."""
     w = (1.0 / sq) ** 0.5
@@ -2390,6 +2476,260 @@ ENEMY_PARAMS = {
                           _root={"pitch": 100, "bank": 6, "f": 0.8})),
                 (1.0, "same")]),
         }),
+    # v22 Archer (watchful; humanoid biped_arms). Round 3: a modelled bow (meshfix/archer_bow.py) held
+    # in the LEFT fist, a string bone at the nock and a separate arrow bone, all placed every frame by
+    # anim/bow_rig.py from the "_bow" channels (draw: the nock follows the draw fist; hide: the arrow
+    # shrinks to nothing on release and grows back nocked; drop: the KO bow falls clear). Round 5: real
+    # arms (meshfix/archer_arms.py), every pose re-solved. The shot turns the Archer side-on (left
+    # shoulder to the target), the bow arm extends straight from the shoulder, the draw elbow lifts and
+    # pulls back and the fist comes up beside the jaw (string V), and it LOOSES at arrow_release (the
+    # projectile is spawned in-engine). Feet planted except KO.
+    "archer": dict(
+        hover=False, planted=True,
+        clips={
+            # Watchful: slow scan left and right, breathing, bow hand easing, draw fingers twitching.
+            "Idle": dict(seconds=2.8, keys=[(0.0, _AR_REL), (1.0, _AR_REL)], bob=(-0.006, 0.004, 2), layers=[
+                ("b", "spine_02", "pitch", 1.2, 2, 0.4), ("b", "neck", "turn", 6.0, 1, 0.0),
+                ("b", "head", "turn", 3.0, 1, 0.6), ("b", "head", "pitch", 2.0, 2, 0.9),
+                ("b", "spine_03", "turn", -3.0, 1, 0.3), ("b", "arm_L_upper", "abd", 2.0, 1, 1.2),
+                ("b", "arm_R_fore", "flex", 4.0, 2, 0.5), ("b", "arm_R_hand", "flex", 5.0, 3, 1.4)]),
+            "Attack": dict(seconds=1.5, sharp=4, marker=(4, "arrow_release"), keys=[
+                (0.0, _AR_REL),
+                # turn side-on, the bow arm up into the aim, the draw fist on the string at the nock
+                (0.18, _P(_AR_FULL_BODY, _AR_FULL_L, _AR_REACH_R, _bow={"cant": -15.0})),
+                # full draw: the elbow lifts and pulls back, the string comes back into a V beside the jaw
+                (0.42, _P(_AR_FULL_BODY, _AR_FULL_L, _AR_FULL_R, _bow={"cant": 0.0, "draw": 1.0})),
+                (0.58, _P(_AR_FULL_BODY, _AR_FULL_L, _AR_FULL_R, _bow={"cant": 0.0, "draw": 1.0})),
+                # loose: the string snaps straight, the arrow is gone (spawned in-engine)
+                (0.62, _P(_AR_FULL_BODY, _AR_FULL_L, _AR_LOOSE_R, _bow={"cant": 0.0, "hide": 1.0})),
+                (0.78, _P(_ar_body(15.0, (4.0, 6.0, 8.0), -14.0, -10.0), _AR_FOLLOW_L, _AR_FOLLOW_R,
+                          _bow={"cant": -6.0, "yaw": -60.0, "hide": 1.0})),
+                # a fresh arrow grows back on the string as the bow returns to the hold
+                (0.92, _AR_REL),
+                (1.0, _AR_REL)]),
+            # Volley: the same draw aimed HIGH (leaning back, head up), loosed skyward (cast_release).
+            "Cast": dict(seconds=1.7, sharp=4, marker=(4, "cast_release"), keys=[
+                (0.0, _AR_REL),
+                (0.20, _P(_AR_UP_BODY, _AR_UP_L, _AR_UP_REACH_R, _bow={"cant": 0.0, "pitch": 30.0})),
+                (0.46, _P(_AR_UP_BODY, _AR_UP_L, _AR_UP_R, _bow={"cant": 0.0, "draw": 1.0})),
+                (0.62, _P(_AR_UP_BODY, _AR_UP_L, _AR_UP_R, _bow={"cant": 0.0, "draw": 1.0})),
+                (0.66, _P(_AR_UP_BODY, _AR_UP_L, _AR_LOOSE_R, _bow={"cant": 0.0, "pitch": 30.0, "hide": 1.0})),
+                (0.82, _P(_ar_body(15.0, (4.0, 6.0, 8.0), -14.0, -10.0, pitch=(5.0, 2.0, 8.0, 4.0, 2.0)),
+                          _AR_FOLLOW_L, _AR_FOLLOW_R, _bow={"cant": -6.0, "yaw": -60.0, "pitch": 10.0, "hide": 1.0})),
+                (0.94, _AR_REL),
+                (1.0, _AR_REL)]),
+            # Struck: rocks back, head snapped aside, bow arm flung out (bow tipping), draw hand off
+            # the string and out.
+            "Hit": dict(seconds=0.6, sharp=1, marker=(1, "hit_react"), keys=[
+                (0.0, _AR_REL),
+                (0.25, _P(_AR_REL, _ar_bow((35.0, 50.0, 15.0, -10.0, 5.0)), _ar_draw((55.0, 80.0, 0.0, 25.0, -10.0)),
+                          spine_01=(0, 9.4, 0), spine_02=(6, 10, -3), spine_03=(6, 0, 0), neck=(6, 0, 0), head=(10, -15, 8),
+                          _bow={"cant": -20.0, "yaw": -100.0}, _root={"f": -0.06, "z": -0.02})),
+                (0.55, _P(_AR_REL, _ar_bow((45.0, 35.0, 20.0, -10.0, 4.0)), _ar_draw((75.0, 60.0, 0.0, 35.0, -30.0)),
+                          spine_01=(0, 9.4, 0), spine_02=(2, 10, -1), head=(4, -22, 3),
+                          _bow={"cant": -12.0, "yaw": -108.0}, _root={"f": -0.02, "z": -0.01})),
+                (1.0, _AR_REL)]),
+            # Pleased: the bow raised high twice with a little hop, the free fist pumping; returns
+            # exactly to the hold (loops).
+            "Victory": dict(seconds=2.2, bob=(-0.01, 0.006, 4), layers=[("b", "head", "pitch", 4.0, 2, 3.14)], keys=[
+                (0.0, _AR_REL),
+                (0.20, _P(_AR_REL, _AR_RAISE_L, _AR_PUMP_R, head=(10, -25, 0),
+                          _root={"z": 0.04}, _bow={"yaw": -117.5, "cant": -13.7})),
+                (0.38, _P(_AR_REL, head=(-4, -25, 0))),
+                (0.62, _P(_AR_REL, _AR_RAISE_L, _AR_PUMP_R, head=(10, -25, 0),
+                          _root={"z": 0.04}, _bow={"yaw": -117.5, "cant": -13.7})),
+                (0.80, _P(_AR_REL, head=(-4, -25, 0))),
+                (1.0, _AR_REL)]),
+            # Topples backward and lies on its back; the bow leaves the fist and falls clear to lie
+            # flat on the floor at its left (bow_rig "drop"), the arrow gone; arms flung out (the KO
+            # settle rests the BODY's lowest point on the floor; feet slide forward onto its tile).
+            "KO": dict(seconds=1.8, ko=True, impact=0.6, keys=[
+                (0.0, _AR_REL),
+                (0.22, _P(_ar_bow((40.0, 60.0, 15.0, -10.0, -5.0)), _ar_draw((40.0, 60.0, 0.0, 25.0, 0.0)),
+                          spine_01=(0, 4, 0), spine_02=(-6, 4, 0), spine_03=(-4, 0, 0), head=(-10, -10, 0),
+                          _bow={"hide": 1.0, "cant": -9.0, "yaw": -112.8}, _root={"bank": 4, "z": -0.03})),
+                (0.60, _P(_ar_bow((20.0, 70.0, 10.0, -10.0, 0.0)), _ar_draw((10.0, 75.0, 0.0, 15.0, 0.0)),
+                          spine_02=(2, 0, 0), head=(-6, 0, 0),
+                          _bow={"hide": 1.0, "drop": 1.0}, _root={"pitch": 80, "bank": 8, "f": 0.6})),
+                (0.85, _P(_ar_bow((20.0, 75.0, 10.0, -10.0, 0.0)), _ar_draw((5.0, 80.0, 0.0, 10.0, 0.0)),
+                          spine_02=(4, 0, 0), head=(4, 0, 0),
+                          _bow={"hide": 1.0, "drop": 1.0}, _root={"pitch": 86, "bank": 6, "f": 0.7})),
+                (1.0, "same")]),
+        }),
+    # v22 Shaman (gnarled elder; humanoid biped_arms like the Treant). Slow, deliberate, stern. The
+    # staff is rigid in the LEFT fist, so the left arm's channels place the whole staff: its key
+    # poses were solved numerically for staff end points (scratch propopt.py) -- Cast holds it
+    # upright and HIGH (bottom +0.5), Attack winds it back over the head and swings the mushroom
+    # head forward at the foe. _SH_REL keeps the planted staff 2 cm off the floor (a forward lean
+    # would otherwise drive it through). Feet planted (IK) except KO.
+    "shaman": dict(
+        hover=False, planted=True,
+        clips={
+            # Breathing, a slow stern look about, antlers nodding, the free hand fidgeting, the
+            # staff hand easing.
+            "Idle": dict(seconds=3.2, keys=[(0.0, _SH_REL), (1.0, _SH_REL)], bob=(-0.006, 0.004, 2), layers=[
+                ("b", "spine_02", "pitch", 1.2, 2, 0.4), ("b", "spine_03", "pitch", 1.5, 2, 0.1),
+                ("b", "neck", "turn", 5.0, 1, 0.8), ("b", "head", "turn", 3.0, 1, 1.3),
+                ("b", "head", "pitch", 2.5, 2, 1.0), ("b", "head", "bank", 2.0, 1, 2.0),
+                ("b", "arm_L_upper", "flex", 2.5, 1, 0.5), ("b", "arm_R_upper", "flex", 5.0, 1, 2.3),
+                ("b", "arm_R_fore", "flex", 8.0, 2, 1.8), ("b", "arm_R_hand", "flex", 8.0, 2, 0.3)]),
+            # Staff strike: wind the staff back over the head (lean back), then swing the mushroom
+            # head forward at the foe as the body leans in, follow through, recover.
+            "Attack": dict(seconds=1.4, sharp=2, keys=[
+                (0.0, _SH_REL),
+                (0.32, _P(_sh_arms((75.0, -3.5, -50.0, -23.0), (30, 30, 20, 0)),
+                          spine_02=(4, 0, 0), spine_03=(5, 6, 0), head=(6, -6, 0), _root={"z": -0.02})),
+                (0.48, _P(_sh_arms((92.2, 3.8, -67.8, -36.8), (-10, 20, 10, 0)),
+                          spine_01=(-3, 0, 0), spine_02=(-6, 0, 0), spine_03=(-8, -6, 0), neck=(-4, 0, 0),
+                          head=(-6, 4, 0), _root={"f": 0.06, "z": -0.03})),
+                (0.66, _P(_sh_arms((75, 0, -45, -25), (0, 15, 10, 0)),
+                          spine_02=(-4, 0, 0), spine_03=(-5, -4, 0), head=(-3, 2, 0),
+                          _root={"f": 0.05, "z": -0.025})),
+                (1.0, _SH_REL)]),
+            # The signature: gather (bow the head, draw the staff in), then raise the staff high
+            # and upright, head and ANTLERS thrown back high, free arm flung wide; held
+            # (cast_release at the peak), lowered.
+            "Cast": dict(seconds=1.7, sharp=3, marker=(3, "cast_release"), keys=[
+                (0.0, _SH_REL),
+                (0.28, _P(_sh_arms((22, 0, 0, -10, -20), (35, 0, 60, 10)),
+                          spine_02=(-4, 0, 0), spine_03=(-4, 0, 0), neck=(-6, 0, 0), head=(-8, 0, 0),
+                          _root={"z": -0.03})),
+                (0.42, _P(_sh_arms((55, 0, -40, -30, -12), (58, 30, 30, -10)),
+                          spine_03=(1, 0, 0), neck=(1, 0, 0), head=(5, 0, 0), _root={"z": -0.02})),
+                (0.55, _P(_sh_arms((101.5, 5.0, -56.0, -55.0), (80, 60, 0, -20)),
+                          spine_02=(4, 0, 0), spine_03=(6, 0, 0), neck=(8, 0, 0), head=(18, 0, 0),
+                          _root={"z": -0.005})),
+                (0.80, _P(_sh_arms((99, 5.0, -54.0, -53.0), (76, 58, 0, -18)),
+                          spine_02=(4, 0, 0), spine_03=(6, 0, 0), neck=(8, 0, 0), head=(16, 0, 0),
+                          _root={"z": -0.005})),
+                (1.0, _SH_REL)]),
+            # Struck: rocks back, head and antlers whip aside (AWAY from the staff), staff jolts up and
+            # out, free arm flung out.
+            "Hit": dict(seconds=0.6, sharp=1, marker=(1, "hit_react"), keys=[
+                (0.0, _SH_REL),
+                (0.25, _P(_sh_arms((25, 25, 0, -15, -25), (-15, 35, 30, 10)),
+                          spine_02=(6, 0, 3), spine_03=(6, 0, 0), neck=(6, 0, 0), head=(10, 8, -8),
+                          _root={"f": -0.05, "z": -0.02})),
+                (0.55, _P(_sh_arms((14, 10, 2, -10, -14), (-5, 12, 15, 4)), spine_02=(2, 0, 1),
+                          head=(4, 3, -3), _root={"f": -0.02, "z": -0.01})),
+                (1.0, _SH_REL)]),
+            # Stern approval: two slow staff pumps (raised and thumped), a deep nod, the free hand
+            # raised; returns exactly to rest (loops).
+            "Victory": dict(seconds=2.6, bob=(-0.012, 0.008, 2), layers=[
+                ("b", "head", "pitch", 5.0, 2, 3.14), ("b", "arm_R_fore", "flex", 12.0, 4, 0.0)], keys=[
+                (0.0, _SH_REL),
+                (0.20, _P(_sh_arms((60, 5, -30, -30), (60, 40, 20, 0)), head=(8, 0, 0))),
+                (0.38, _P(_sh_arms((8, 4, 0, -8, -10), (60, 40, 20, 0)), head=(-6, 0, 0), _root={"z": -0.02})),
+                (0.62, _P(_sh_arms((60, 5, -30, -30), (60, 40, 20, 0)), head=(8, 0, 0))),
+                (0.80, _P(_sh_arms((8, 4, 0, -8, -10), (40, 25, 15, 0)), head=(-6, 0, 0), _root={"z": -0.02})),
+                (1.0, _SH_REL)]),
+            # Topples backward and lies on its back, free arm flung out, the staff arm held out with the
+            # staff tilted clear of the body so it falls beside him (v22 round 2), the staff falling with the
+            # hand; antlers on the ground (the KO settle rests the lowest point on the floor; the
+            # feet slide forward so it lands on its own tile).
+            "KO": dict(seconds=1.8, ko=True, impact=0.6, keys=[
+                (0.0, _SH_REL),
+                (0.22, _P(_sh_arms((10, 10, 0, -10, -25), (20, 35, 30, 0)),
+                          spine_02=(-6, 0, 0), spine_03=(-4, 0, 0), head=(-10, 0, 0),
+                          _root={"bank": 4, "z": -0.03})),
+                (0.60, _P(_sh_arms((10, 10, -20, -10, -25), (-10, 60, 20, 0)),
+                          spine_02=(2, 0, 0), head=(-6, 0, 0), _root={"pitch": 80, "bank": 8, "f": 0.75})),
+                (0.85, _P(_sh_arms((10, 10, -20, -10, -25), (-10, 65, 15, 0)),
+                          spine_02=(4, 0, 0), head=(4, 0, 0), _root={"pitch": 86, "bank": 6, "f": 0.85})),
+                (1.0, "same")]),
+        }),
+    # v22 Stingling (buzzy, a swarm pest; 6 bones: root, body, legs_L/R, tail_01/02). Quick and
+    # fidgety, never still; the stinger tail is the star. Attack: the tail rears up high behind the
+    # ball, then whips forward OVER the head and stabs down in front of the face. The tail is much
+    # shorter than the ball is tall (0.85 vs 1.75 normalised), so the whip STRETCHES it (uniform
+    # scale on tail_01 -- a non-uniform parent scale would shear tail_02 and glTF TRS can't carry
+    # shear -- a cartoon smear held for a few frames) and BOWS the ball forward so the arc clears the
+    # head fluff. The cock/strike/follow-through tail poses were solved numerically against the
+    # deformed mesh (scratch tailopt2.py: stinger-tip target, no tail sample inside the body).
+    "stingling": dict(
+        hover=False, planted=False, ground_lift=True,
+        clips={
+            # Buzzing: fast little squash pulses, weight hopping foot to foot, the tail swishing and
+            # the stinger twitching.
+            "Idle": dict(seconds=2.0, keys=[(0.0, {}), (1.0, {})], layers=[
+                ("b", "body", "sy", 0.03, 4, 0.0), ("b", "body", "sx", -0.015, 4, 0.0),
+                ("b", "body", "sz", -0.015, 4, 0.0), ("b", "legs_L", "pitch", 7.0, 2, 0.0),
+                ("b", "legs_R", "pitch", -7.0, 2, 0.0), ("r", "bank", 2.5, 2, 0.4),
+                ("b", "tail_01", "turn", 10.0, 1, 0.0), ("b", "tail_02", "turn", 16.0, 1, -0.9),
+                ("b", "tail_02", "bank", 10.0, 3, 0.3), ("r", "turn", 4.0, 1, 1.2)]),
+            # Tail-whip sting over the head: squash and lean back as the tail rears up high behind,
+            # then the ball bows forward and the stretched tail whips the stinger over the head,
+            # stabbing down in front of the face; recover.
+            "Attack": dict(seconds=1.25, sharp=3, keys=[
+                (0.0, {}),
+                (0.16, _P(body=_SQ(0.92), tail_01={"bank": 75, "pitch": -15, "turn": -55, "sx": 1.2, "sy": 1.2, "sz": 1.2},
+                          tail_02={"bank": -20, "turn": 25}, _root={"pitch": -2})),
+                (0.36, _P(body=_SQ(0.84),
+                          tail_01={"bank": 151.5, "pitch": -34.7, "turn": -104.25, "sx": 1.8, "sy": 1.8, "sz": 1.8},
+                          tail_02={"bank": -44.0, "pitch": 31.8, "turn": 49.5}, _root={"pitch": -7.8, "f": -0.04})),
+                (0.50, _P(body=_SQ(0.88),
+                          tail_01={"bank": 141.5, "pitch": -34.7, "turn": -104.25, "sx": 2.2, "sy": 2.2, "sz": 2.2},
+                          tail_02={"bank": -68.4, "pitch": -18.8, "turn": 60.1},
+                          _root={"pitch": -29.7, "f": 0.08})),
+                (0.62, _P(body=_SQ(0.92),
+                          tail_01={"bank": 151.5, "pitch": -34.7, "turn": -101.75, "sx": 1.94, "sy": 1.94, "sz": 1.94},
+                          tail_02={"bank": -70.9, "pitch": -18.8, "turn": 61.35},
+                          _root={"pitch": -40, "f": 0.08})),
+                (0.80, _P(body=_SQ(1.03), tail_01={"bank": 70, "pitch": -15, "turn": -50, "sx": 1.2, "sy": 1.2, "sz": 1.2},
+                          tail_02={"bank": -15, "turn": 15}, _root={"pitch": -8, "f": 0.03})),
+                (1.0, {})]),
+            # Buzz-up: squash, then a tall stretch off the ground with the tail reared high behind
+            # and quivering (cast_release at the peak), drop back with a squash.
+            "Cast": dict(seconds=1.35, sharp=2, marker=(2, "cast_release"), layers=[
+                ("b", "tail_02", "turn", 6.0, 5, 0.0), ("b", "body", "sy", 0.02, 6, 0.0)], keys=[
+                (0.0, {}),
+                (0.28, _P(body=_SQ(0.82), tail_01={"bank": 70, "pitch": -20, "turn": -70},
+                          tail_02={"bank": -20, "turn": 20})),
+                (0.50, _P(body=_SQ(1.16), legs_L=(-14, 0, 0), legs_R=(14, 0, 0),
+                          tail_01={"bank": 145.5, "pitch": -40.7, "turn": -134.0, "sx": 1.3, "sy": 1.3, "sz": 1.3},
+                          tail_02={"bank": -45.4, "pitch": -0.8, "turn": 44.1}, _root={"z": 0.10})),
+                (0.72, _P(body=_SQ(1.10),
+                          tail_01={"bank": 140, "pitch": -40, "turn": -130, "sx": 1.25, "sy": 1.25, "sz": 1.25},
+                          tail_02={"bank": -40, "turn": 40}, _root={"z": 0.05})),
+                (0.86, _P(body=_SQ(0.86), tail_01={"bank": 40, "pitch": -10, "turn": -40})),
+                (1.0, {})]),
+            # Struck: bowled back and squashed, legs kicking, the tail flung up.
+            "Hit": dict(seconds=0.45, sharp=1, marker=(1, "hit_react"), keys=[
+                (0.0, {}),
+                (0.25, _P(body=_SQ(0.80), legs_L=(24, 0, 0), legs_R=(18, 0, 0),
+                          tail_01={"bank": 45, "turn": -20}, tail_02={"bank": 30},
+                          _root={"f": -0.12, "pitch": 14})),
+                (0.6, _P(body=_SQ(1.05), legs_L=(6, 0, 0), tail_01={"bank": 12}, _root={"f": -0.04, "pitch": 3})),
+                (1.0, {})]),
+            # Delighted: four bouncy hops in place spinning a full turn, the tail held up and
+            # wagging (loops).
+            "Victory": dict(seconds=1.6, layers=[("b", "legs_L", "pitch", 16.0, 4, 0.0),
+                                                 ("b", "legs_R", "pitch", -16.0, 4, 0.0),
+                                                 ("b", "tail_02", "turn", 22.0, 4, -0.8)], keys=[
+                (0.0, {}),
+                (0.06, _P(body=_SQ(0.84), tail_01={"bank": 50, "turn": -50})),
+                (0.13, _P(body=_SQ(1.12), tail_01={"bank": 70, "turn": -70}, _root={"z": 0.10})),
+                (0.20, _P(body=_SQ(0.86), tail_01={"bank": 70, "turn": -70})),
+                (0.31, _P(body=_SQ(1.12), tail_01={"bank": 70, "turn": -70}, _root={"z": 0.12})),
+                (0.45, _P(body=_SQ(0.86), tail_01={"bank": 70, "turn": -70})),
+                (0.56, _P(body=_SQ(1.12), tail_01={"bank": 70, "turn": -70}, _root={"z": 0.12})),
+                (0.70, _P(body=_SQ(0.86), tail_01={"bank": 70, "turn": -70})),
+                (0.81, _P(body=_SQ(1.12), tail_01={"bank": 60, "turn": -60}, _root={"z": 0.10})),
+                (0.94, _P(body=_SQ(0.90), tail_01={"bank": 20, "turn": -20})), (1.0, {})],
+                tracks=[[(0.0, {}), (0.22, {}), (0.66, {"_root": {"turn": 360.0}}),
+                         (1.0, {"_root": {"turn": 360.0}})]]),
+            # Dizzy wobble, then topples over onto its side and lies there, legs out, tail limp
+            # (root bank pivots on the floor; "x" slides it by about the ball's radius so it rolls
+            # over in place; the KO ground settle rests the lowest point on the floor).
+            "KO": dict(seconds=1.3, ko=True, impact=0.6, keys=[
+                (0.0, {}),
+                (0.22, _P(body=_SQ(0.9), tail_01={"bank": 20}, _root={"bank": -10, "turn": 15})),
+                (0.60, _P(body=_SQ(0.9), legs_L=(-20, 0, 0), legs_R=(-25, 0, 0), tail_01={"bank": -10, "turn": 20},
+                          tail_02={"turn": 15}, _root={"bank": 84, "x": 0.55})),
+                (0.84, _P(body=_SQ(0.92), legs_L=(-16, 0, 0), legs_R=(-20, 0, 0), tail_01={"bank": -12, "turn": 22},
+                          tail_02={"turn": 18}, _root={"bank": 80, "x": 0.55})),
+                (1.0, "same")]),
+        }),
 }
 
 
@@ -2436,6 +2776,11 @@ def build_bird_clips(creature):
                 out["bones"][k] = dict(v)
         return out
 
+    # v22 round 3 (Archer): bow / string / arrow placed every frame from the "_bow" channels -- see
+    # anim/bow_rig.py (armature property "bow_rig"; absent on every other rig).
+    import bow_rig as _BR
+    BOW_CFG = _BR.cfg_of(arm_obj)
+
     def keys_of(raw):
         res, prev = [], None
         for i, (f, p) in enumerate(raw):
@@ -2469,12 +2814,20 @@ def build_bird_clips(creature):
         eo.to_mesh_clear()
         return mz
 
+    # v22 round 3: the KO ground settle rests the BODY on the floor -- a dropped bow / hidden arrow
+    # (anim/bow_rig.py) is placed on its own, so their vertices are left out (empty on other rigs)
+    BOW_SKIP = set()
+    if BOW_CFG:
+        for _g in json.loads(arm_obj.data.get("prop_gate", "[]")):
+            if _g["name"] in ("bow", "arrow"):
+                BOW_SKIP |= set(_g["verts"])
+
     def eval_min_z():
         bpy.context.view_layer.update()
         dg = bpy.context.evaluated_depsgraph_get()
         eo = mesh_obj.evaluated_get(dg)
         me = eo.to_mesh()
-        mz = min((eo.matrix_world @ v.co).z for v in me.vertices)
+        mz = min((eo.matrix_world @ v.co).z for i, v in enumerate(me.vertices) if i not in BOW_SKIP)
         eo.to_mesh_clear()
         return mz
 
@@ -2523,6 +2876,8 @@ def build_bird_clips(creature):
                     up, fw = lifts.get(side, (0.0, 0.0))
                     tgt = LEG_IK[side]["ankle_rest"] + mathutils.Vector((0, 0, up)) + FWD * fw
                     BP.plant_leg(arm_obj, side, LEG_IK[side], tgt)
+            if BOW_CFG:
+                _BR.place(arm_obj, FWD, _BR.channels(c), BOW_CFG)
             if spec.get("ko") and spec.get("ko_settle"):
                 # v20 (Leviathan): bisect the fraction of the listed bones' authored KO pose that
                 # is applied so the region (head/upper neck) rests on the floor (+4 mm) -- before
@@ -2559,9 +2914,35 @@ def build_bird_clips(creature):
                     BP.set_root(arm_obj, FWD, (c.get(("r", "x"), 0.0), c.get(("r", "y"), 0.0), z),
                                 c.get(("r", "pitch"), 0.0), c.get(("r", "turn"), 0.0),
                                 c.get(("r", "bank"), 0.0))
+                if BOW_CFG:  # re-place the bow / arrow after the root settled (world-space drop)
+                    _BR.place(arm_obj, FWD, _BR.channels(c), BOW_CFG)
 
         n = int(round(spec["seconds"] * FPS))
-        BP.bake_frames(arm_obj, scene, FWD, clip, n, chans, post)
+        if BOW_CFG and BOW_CFG.get("auto_clear"):
+            # v22 round 4 (Archer): per-frame bow/arrow clearance through the bow's own channels
+            _names = [pb.name for pb in arm_obj.pose.bones]
+
+            def _pose_at(t, chans=chans, post=post):
+                for pb in arm_obj.pose.bones:
+                    pb.matrix_basis = mathutils.Matrix.Identity(4)
+                c = chans(t)
+                BP.apply_channels(arm_obj, FWD, c, _names)
+                post(c, t)
+                return _BR.channels(c)
+            arm_obj.animation_data.action = None
+            _offs = _BR.solve_clearance(arm_obj, mesh_obj, FWD, n, _pose_at, loop=bool(CLIP_LOOP.get(clip)),
+                                        name=clip)
+            if _offs:
+                def chans(t, _base=chans, _offs=_offs):
+                    c = dict(_base(t))
+                    for k, o in _offs(t).items():
+                        c[("b", "_bow", k)] = c.get(("b", "_bow", k), 0.0) + o
+                    return c
+        _act = BP.bake_frames(arm_obj, scene, FWD, clip, n, chans, post)
+        if "prop_clear" in arm_obj.data:  # v22 round 2: held prop kept out of the body (prop_clear.py)
+            import prop_clear as _PC
+            _PC.fix(arm_obj, mesh_obj, scene, _act, FWD,
+                    dict(json.loads(arm_obj.data["prop_clear"]), loop=CLIP_LOOP.get(clip, False)))
         if "marker" in spec:
             ki, mname = spec["marker"]
             frac = raw[ki][0]

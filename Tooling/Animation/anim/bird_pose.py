@@ -246,6 +246,16 @@ def wing_layers(cycles, amps=(18.0, 10.0, 8.0), lags=(0.0, 0.6, 1.2), sweep=0.0,
     return out
 
 
+def euler_near(r, prev):
+    """v22 round 4: of an XYZ Euler's two equivalent solutions (x, y, z) and (x+pi, pi-y, z+pi),
+    each made 2pi-compatible with `prev`, the one closest to `prev` (make_compatible alone keeps
+    the solution it is given, so a bone sweeping past y = +-90 deg flips by 180 on two axes)."""
+    a = r.copy(); a.make_compatible(prev)
+    b = mathutils.Euler((r.x + math.pi, math.pi - r.y, r.z + math.pi), "XYZ"); b.make_compatible(prev)
+    da = sum(abs(x - y) for x, y in zip(a, prev)); db = sum(abs(x - y) for x, y in zip(b, prev))
+    return a if da <= db else b
+
+
 def bake_frames(arm_obj, scene, fwd, name, n_frames, chan_fn, post_fn=None, interp_fn=None):
     """Two-pass per-frame bake. Pass 1 (no action assigned, so a depsgraph update can never
     re-drive the pose from F-curves -- see gait.py's set_bone_world_matrix_direct note): for each
@@ -259,14 +269,27 @@ def bake_frames(arm_obj, scene, fwd, name, n_frames, chan_fn, post_fn=None, inte
     arm_obj.animation_data_create()
     arm_obj.animation_data.action = None
     snaps = []
+    # v22 round 3 (the Archer's bow / string / arrow bones, placed by anim/bow_rig.py from a world
+    # matrix): keep their Euler keys continuous (no +-180 deg flips between frames). No other rig
+    # carries "bow_rig", so every other bake is unchanged.
+    compat = set()
+    if arm_obj.data.get("bow_rig"):
+        import json as _json
+        _br = _json.loads(arm_obj.data["bow_rig"])
+        compat = {_br["bow"], _br["string"], _br["arrow"]}
     for i in range(n_frames + 1):
         t = i / n_frames
         chans = chan_fn(t)
         apply_channels(arm_obj, fwd, chans, names)
         if post_fn:
             post_fn(chans, t)
-        snaps.append({pb.name: (tuple(pb.rotation_euler), tuple(pb.scale), tuple(pb.location))
-                      for pb in arm_obj.pose.bones})
+        snap = {}
+        for pb in arm_obj.pose.bones:
+            r = pb.rotation_euler.copy()
+            if pb.name in compat and snaps:
+                r = euler_near(r, mathutils.Euler(snaps[-1][pb.name][0], "XYZ"))
+            snap[pb.name] = (tuple(r), tuple(pb.scale), tuple(pb.location))
+        snaps.append(snap)
     act = bpy.data.actions.new(name)
     act.use_fake_user = True
     arm_obj.animation_data.action = act

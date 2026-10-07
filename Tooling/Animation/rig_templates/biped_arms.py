@@ -35,6 +35,7 @@ from winged_quadruped import (
 )
 from quadruped import fix_root_leg_bleed  # noqa: F401 -- re-exported
 from quadruped import fix_sole_weights    # noqa: F401 -- re-exported (rigid root-feet soles)
+from quadruped import force_rigid_to_bone, rigid_regions_normalized, smooth_weights_region  # noqa: F401 -- v22
 from winged_biped import fill_unweighted, dump_axes, _seg_dist  # noqa: F401 -- re-exported
 
 LANDMARKS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "landmarks")
@@ -93,6 +94,25 @@ def detect_landmarks_handplaced(obj, H, to_normalized, beast_name):
         "head_top": pt(spine["head_top"], snap=False), "head_tip": pt(spine["snout_tip"]),
         "tail_tip": head, "tail_points": [], "notes": data.get("notes", ""),
         "locomotion": data.get("locomotion", "walk"),
+        # v22 opt-ins (absent on the Treant, so its rig is unchanged): rig_creature.py's generic
+        # rigid_regions / rigid_parts / weight_smooth_regions passes.
+        "rigid_regions": rigid_regions_normalized(data, to_normalized),
+        "rigid_parts": data.get("rigid_parts") or [],
+        "arm_ramp": data.get("arm_ramp"),
+        "joint_limit_overrides": data.get("joint_limit_overrides"),
+        "arm_roll_closing": data.get("arm_roll_closing", False),
+        "arm_hinge_from_upper": data.get("arm_hinge_from_upper", False),
+        "extra_bones": [dict(x, head=pt(x["head"], snap=False), tail=pt(x["tail"], snap=False))
+                        for x in data.get("extra_bones") or []],
+        "bow_rig": (dict(data["bow_rig"], arrow_rest=list(pt(data["bow_rig"]["arrow_rest"], snap=False)))
+                    if data.get("bow_rig") else None),
+        "prop_clear": data.get("prop_clear"),
+        "strip_heat_bones": data.get("strip_heat_bones") or [],
+        "keep_shell_heat_weights": data.get("keep_shell_heat_weights", False),
+        "heat_unweighted_tolerance": data.get("heat_unweighted_tolerance", 0.05),
+        "weight_smooth_regions": rigid_regions_normalized(
+            {"rigid_regions": [dict(r, bone="") for r in data.get("weight_smooth_regions") or []]},
+            to_normalized, keep=("iterations",)),
     }
 
 
@@ -135,12 +155,23 @@ def armature_props(lm):
         for k, v in HUMAN_LIMITS.items():
             for s in ([a["side"] for a in lm["arms"]] if "{s}" in k else [None]):
                 lim[k.format(s=s) if s else k] = {c: list(r) for c, r in v.items()}
+        # v22 opt-in "joint_limit_overrides" ({bone: {channel: [lo, hi]}}): the channels are relative
+        # to the REST pose, and a rig whose rest elbow is already bent ~90 deg (the Shaman's staff
+        # arm, the Archer's bow arms) needs negative elbow flex (extension) to straighten it --
+        # still inside the anatomical range verify.py's joint_limits gate measures on the mesh.
+        for k, v in (lm.get("joint_limit_overrides") or {}).items():
+            lim.setdefault(k, {}).update({c: list(r) for c, r in v.items()})
         hin = {}
         for k, (pa, ch, sg, rng, off) in HINGES.items():
             sides = [a["side"] for a in lm["arms"]] if k.startswith("elbow") else [lg["side"] for lg in lm["legs"]]
             for s in sides:
                 hin[k.format(s=s)] = [pa.format(s=s), ch.format(s=s), sg, list(rng), off]
         props.update(humanoid=True, joint_limits=json.dumps(lim), hinges=json.dumps(hin))
+    if lm.get("prop_clear"):  # v22 round 2: anim/prop_clear.py's correction direction
+        props["prop_clear"] = json.dumps(lm["prop_clear"])
+    if lm.get("bow_rig"):  # v22 round 3 (Archer): anim/bow_rig.py's keyed bow / string / arrow bones
+        br = lm["bow_rig"]
+        props.update(bow_rig=json.dumps(br), loc_keyed=[br["bow"], br["string"], br["arrow"]])
     return props
 
 
@@ -189,6 +220,9 @@ def build_bones(eb, lm, H):
         mk(f"arm_{s}_upper", a["shoulder"], a["elbow"], f"arm_{s}_clav", role=f"arm_{s}")
         mk(f"arm_{s}_fore", a["elbow"], a["wrist"], f"arm_{s}_upper", role=f"arm_{s}")
         mk(f"arm_{s}_hand", a["wrist"], a["hand_tip"], f"arm_{s}_fore", role=f"arm_{s}")
+    for xb in lm.get("extra_bones") or []:
+        # v22 opt-in (Archer): a prop bone, e.g. the bow string's nock, child of a hand
+        mk(xb["name"], xb["head"], xb["tail"], xb["parent"], role=xb.get("role", "prop"))
     for leg in lm["legs"]:
         s = leg["side"]
         mk(f"leg_{s}_thigh", leg["hip"], leg["knee"], "pelvis", role=f"leg_{s}")
@@ -204,6 +238,32 @@ def build_bones(eb, lm, H):
             # humanoid arms: local Z = FORWARD (projected) so local X is the elbow/wrist/shoulder
             # flexion hinge and +X rotation swings the bone's tip FORWARD (= flexion).
             f_p = FWD - FWD.dot(d) * d
+            if lm.get("arm_hinge_from_upper") and n.endswith(("_fore", "_hand")):
+                # v22 opt-in (Archer: straight template arms, where the elbow-closing direction is
+                # undefined): the forearm and hand share the upper arm's hinge -- local X = the
+                # upper arm's local X (projected perpendicular to this bone), so an elbow "flex" is
+                # a pure hinge bend and verify.py's joint_limits gate reads no off-hinge twist.
+                xu = eb[f"arm_{n.split('_')[1]}_upper"].x_axis
+                x_p = xu - xu.dot(d) * d
+                if x_p.length > 1e-6:
+                    b.align_roll(x_p.normalized().cross(d))
+                    continue
+            if lm.get("arm_roll_closing") and n.endswith(("_fore", "_hand")) and f_p.length < 0.5:
+                # v22 opt-in (Shaman, Archer): a forearm held FORWARD (staff, bow) runs along
+                # FORWARD, so the projection above is degenerate (the Shaman's elbow hinge came out
+                # vertical: "flexion" swung the fist sideways). local Z = the direction that CLOSES
+                # the elbow (shoulder - elbow, perpendicular to the forearm), so +flex bends the
+                # forearm toward the upper arm about the true hinge; the hand shares its forearm's
+                # plane (its wrist flexes the same way).
+                s_ = n.split("_")[1]
+                arm_ = next(x for x in lm["arms"] if x["side"] == s_)
+                df = (arm_["wrist"] - arm_["elbow"]).normalized()
+                c_ = arm_["shoulder"] - arm_["elbow"]
+                c_ = c_ - c_.dot(df) * df
+                c_ = c_ - c_.dot(d) * d
+                if c_.length > 1e-6:
+                    b.align_roll(c_.normalized())
+                    continue
             b.align_roll(f_p.normalized())
             continue
         lat_p = LAT - LAT.dot(d) * d
@@ -268,14 +328,20 @@ def fix_humanoid_weights(obj, bone_roles, lm):
     # trunk than the arm in radius-normalised terms (distance to the arm chain / arm radius vs
     # distance to the spine axis / trunk radius).
     gi = {g.name: g.index for g in obj.vertex_groups}
-    limb = {gi[n] for n in gi if n.startswith("arm_") and not n.endswith("_clav")}
+    # v22 opt-in "arm_ramp" (Shaman: the arms come out from under a fat leaf cloak, and heat weighting
+    # gave each clavicle ~1400 cloak vertices): {"include_clav": bool, "radii": [arm, trunk]} --
+    # the clavicle joins the ramped set and the arm/trunk radii (x H/2) fit the creature. Absent on the
+    # Treant (unchanged).
+    _ar = lm.get("arm_ramp") or {}
+    limb = {gi[n] for n in gi if n.startswith("arm_") and (_ar.get("include_clav") or not n.endswith("_clav"))}
     spine_pts = [lm["pelvis"], lm["spine_01"], lm["spine_02"], lm["chest"], lm["neck_top"]]
     spine_names = ["spine_01", "spine_02", "spine_03", "neck"]
     arm_segs = []
     for a in lm["arms"]:
         pts = [a["shoulder"], a["elbow"], a["wrist"], a["hand_tip"]]
         arm_segs += list(zip(pts, pts[1:]))
-    R_ARM, R_TRUNK = 0.06 * lm["H"] / 2.0, 0.17 * lm["H"] / 2.0
+    _ra, _rt = _ar.get("radii", (0.06, 0.17))
+    R_ARM, R_TRUNK = _ra * lm["H"] / 2.0, _rt * lm["H"] / 2.0
     stripped = 0
     for vi, v in enumerate(me.vertices):
         if not any(g.group in limb and g.weight > 1e-4 for g in v.groups):
@@ -303,6 +369,10 @@ def fix_humanoid_weights(obj, bone_roles, lm):
                 obj.vertex_groups[g.group].remove([vi])
             stripped += 1
     print(f"HUMANOID ARM/TRUNK: {stripped} trunk vertices had arm weight ramped down/removed")
+    if lm.get("keep_shell_heat_weights"):
+        # v22 opt-in (Archer): the separate shells are new ARMS (meshfix/prop_surgery.py copies) whose
+        # own heat weights are right; the crown-shell copy below would give them the head's weights
+        return 0
     comps = sorted(connected_components(obj), key=len, reverse=True)
     if len(comps) <= 1:
         return 0
