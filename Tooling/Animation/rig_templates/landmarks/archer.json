@@ -1,0 +1,486 @@
+{
+ "body_plan": "upright biped with arms (humanoid): masked leaf-hooded folk archer, bow in the left (-X) fist, draw hand on the string",
+ "humanoid": true,
+ "legs": [
+  {
+   "side": "BL",
+   "is_front": false,
+   "chain": [
+    [
+     -0.12,
+     0.02,
+     0.42
+    ],
+    [
+     -0.15,
+     0.0,
+     0.24
+    ],
+    [
+     -0.165,
+     0.05,
+     0.1
+    ],
+    [
+     -0.21,
+     0.0,
+     0.03
+    ]
+   ],
+   "toe_tip": [
+    -0.21,
+    -0.04,
+    0.02
+   ]
+  },
+  {
+   "side": "BR",
+   "is_front": false,
+   "chain": [
+    [
+     0.13,
+     0.02,
+     0.42
+    ],
+    [
+     0.22,
+     0.0,
+     0.24
+    ],
+    [
+     0.29,
+     0.05,
+     0.1
+    ],
+    [
+     0.32,
+     0.0,
+     0.03
+    ]
+   ],
+   "toe_tip": [
+    0.33,
+    -0.04,
+    0.02
+   ]
+  }
+ ],
+ "arms": [
+  {
+   "side": "L",
+   "chain": [
+    [
+     -0.2511,
+     -0.0498,
+     0.8005
+    ],
+    [
+     -0.3556,
+     -0.1007,
+     0.6575
+    ],
+    [
+     -0.4095,
+     -0.2009,
+     0.5529
+    ]
+   ],
+   "hand_tip": [
+    -0.4614,
+    -0.3246,
+    0.4452
+   ]
+  },
+  {
+   "side": "R",
+   "chain": [
+    [
+     0.2658,
+     -0.0498,
+     0.807
+    ],
+    [
+     0.371,
+     -0.1006,
+     0.6691
+    ],
+    [
+     0.4248,
+     -0.2008,
+     0.5645
+    ]
+   ],
+   "hand_tip": [
+    0.4736,
+    -0.3116,
+    0.4676
+   ]
+  }
+ ],
+ "spine": {
+  "pelvis": [
+   0.0,
+   0.02,
+   0.45
+  ],
+  "spine_01": [
+   0.0,
+   0.0,
+   0.58
+  ],
+  "spine_02": [
+   0.0,
+   0.0,
+   0.7
+  ],
+  "chest": [
+   0.0,
+   0.0,
+   0.82
+  ],
+  "neck_top": [
+   0.0,
+   -0.03,
+   0.98
+  ],
+  "head": [
+   0.0,
+   -0.08,
+   1.25
+  ],
+  "head_top": [
+   0.0,
+   0.0,
+   1.6
+  ],
+  "snout_tip": [
+   0.03,
+   -0.4,
+   1.27
+  ],
+  "jaw_tip": [
+   0.03,
+   -0.33,
+   1.1
+  ]
+ },
+ "tail": [],
+ "rigid_parts": [
+  {
+   "bone": "bow",
+   "note": "the modelled bow (meshfix/archer_bow.py): rigid to the keyed bow bone (seeds: one vertex per closed shell, bow_report.json shell_seeds)",
+   "component_seeds": [
+    [
+     -0.6113,
+     -0.0103,
+     0.325
+    ],
+    [
+     -0.734,
+     -0.0644,
+     0.745
+    ]
+   ],
+   "gate": {
+    "name": "bow",
+    "grip_bones": [
+     "arm_L_hand",
+     "arm_R_hand"
+    ],
+    "grip_radius": 0.08
+   }
+  },
+  {
+   "bone": "bow",
+   "note": "string: weight ramps linearly from the limb tips (bow) to the nock (bow_string)",
+   "include": [
+    {
+     "poly": [
+      [
+       -0.6026,
+       -0.0238,
+       0.325
+      ],
+      [
+       -0.6026,
+       -0.0238,
+       1.275
+      ]
+     ],
+     "r": 0.012
+    }
+   ],
+   "within_component": [
+    -0.6059,
+    -0.0259,
+    0.325
+   ],
+   "ramp": {
+    "bone_b": "bow_string",
+    "center": [
+     -0.6026,
+     -0.0238,
+     0.8
+    ],
+    "radius": 0.477
+   }
+  },
+  {
+   "bone": "arrow",
+   "note": "the modelled arrow, rigid to the keyed arrow bone",
+   "component_seeds": [
+    [
+     -0.6105,
+     0.28,
+     0.3
+    ],
+    [
+     -0.578,
+     -0.212,
+     0.3
+    ],
+    [
+     -0.618,
+     0.26,
+     0.3095
+    ],
+    [
+     -0.6292,
+     0.26,
+     0.297
+    ],
+    [
+     -0.6128,
+     0.26,
+     0.2935
+    ],
+    [
+     -0.5902,
+     -0.2296,
+     0.3002
+    ],
+    [
+     -0.6055,
+     -0.1624,
+     0.2882
+    ],
+    [
+     -0.6345,
+     -0.1624,
+     0.2882
+    ],
+    [
+     -0.62,
+     -0.1835,
+     0.3729
+    ]
+   ],
+   "gate": {
+    "name": "arrow",
+    "grip_bones": [
+     "arm_L_hand",
+     "arm_R_hand",
+     "bow_string"
+    ],
+    "grip_radius": 0.08
+   }
+  },
+  {
+   "bone": "spine_03",
+   "note": "quiver and its arrows, rigid to the chest",
+   "include": [
+    {
+     "poly": [
+      [
+       0.02,
+       0.26,
+       0.36
+      ],
+      [
+       0.42,
+       0.25,
+       0.74
+      ]
+     ],
+     "r": 0.09
+    },
+    {
+     "box": [
+      0.4,
+      0.7,
+      0.12,
+      0.4,
+      0.62,
+      0.88
+     ]
+    }
+   ],
+   "gate": {
+    "name": "quiver",
+    "grip_bones": [],
+    "grip_radius": 0.0,
+    "attached": true
+   }
+  }
+ ],
+ "arm_ramp": {
+  "include_clav": true,
+  "radii": [
+   0.06,
+   0.22
+  ],
+  "note": "the new arm shells sit on a cape: chest/cape vertices nearer the trunk than an arm hand their arm/clavicle weight to the spine"
+ },
+ "joint_limit_overrides": {
+  "arm_L_fore": {
+   "flex": [
+    -25,
+    120
+   ]
+  },
+  "arm_R_fore": {
+   "flex": [
+    -25,
+    120
+   ]
+  },
+  "arm_L_upper": {
+   "flex": [
+    -45,
+    160
+   ]
+  },
+  "arm_R_upper": {
+   "flex": [
+    -45,
+    160
+   ]
+  }
+ },
+ "notes": "v22 enemy (Hollow region): Archer, a watchful masked folk archer (ranged). Rigged from archer_prep_v2 (meshfix/prop_surgery.py + archer_cfg.json): Meshy modelled one arm lying across the chest with its fist on the arrow; it was replaced by two copies of it -- the bow arm from the -X shoulder to the grip knob where the stave crosses the arrow, the draw arm from the +X shoulder across the chest to the nock -- and the bow ripped free of the body. Arms are straight tubes in the template (elbow at mid-length). The bow (stave, flame-tipped arrow, string) is rigid in the bow fist; the string ramps to the draw hand at the nock so a draw pulls it into a V. Quiver rigid to the chest. Legs: wide pants, feet at x -0.21 / +0.32. Round 4 (producer: the bow arm joined the torso at the wrong place): the bow arm is rebuilt as the exact mirror image of the draw arm across the trunk mid-plane x=0.02 (meshfix post_mirror_x) and its chain is the mirrored draw-arm chain re-aimed at the bow grip: shoulder (-0.10,-0.08,0.80), symmetric with the draw arm's (0.14,-0.08,0.80). Round 5 (producer: the arm still joined the torso at the wrong place -- the mesh had no shoulders or upper arms): meshfix/archer_arms.py builds real arms (shoulder cap under the mantle, upper arm, bent elbow, forearm, the old fists as hands) joined watertight to the torso; the arm chains are its arms_report.json points (shoulder 2 cm inside the cap centre, elbow, wrist = the fist's wrist rim, hand tip = the fist's far end).",
+ "_prep": "archer_prep_r5: prep_mesh.py --no-ground-sheet -> meshfix/prop_surgery.py (archer_cfg.json: Meshy bow tangle removed, fist shells) -> meshfix/archer_arms.py (archer_arms_cfg.json: real arms joined to the torso) -> meshfix/archer_bow.py (archer_bow_cfg.json: short pale D-shaped self bow + flaming arrow)",
+ "heat_unweighted_tolerance": 0.12,
+ "arm_hinge_from_upper": true,
+ "keep_shell_heat_weights": true,
+ "extra_bones": [
+  {
+   "name": "bow",
+   "head": [
+    -0.72,
+    -0.1,
+    0.8
+   ],
+   "tail": [
+    -0.72,
+    -0.1,
+    0.95
+   ],
+   "parent": "root",
+   "role": "prop"
+  },
+  {
+   "name": "bow_string",
+   "head": [
+    -0.6026,
+    -0.0238,
+    0.8
+   ],
+   "tail": [
+    -0.6026,
+    -0.0238,
+    0.85
+   ],
+   "parent": "bow",
+   "role": "prop"
+  },
+  {
+   "name": "arrow",
+   "head": [
+    -0.62,
+    0.28,
+    0.3
+   ],
+   "tail": [
+    -0.62,
+    0.13,
+    0.3
+   ],
+   "parent": "root",
+   "role": "prop"
+  }
+ ],
+ "strip_heat_bones": [
+  "bow",
+  "bow_string",
+  "arrow"
+ ],
+ "_placed_by": "v22: placed by the writer from z/x/y mesh sections (coloured section tool), the calibrated views and the surgery's own arm transforms; checked with tools/lmcheck.py on archer_prep_v2. Spine at the section centres (pelvis z 0.45: 0.53/0.50 of the x/y extents; chest z 0.82: 0.49/0.55). Arms are straight template shells: shoulder->hand tip along each new arm's own axis, elbow at 0.42 and wrist at 0.64 of its length (collinear, so the hinge comes from the upper arm: arm_hinge_from_upper). lmcheck OUTSIDE by design: both toe tips (1.0/1.3 cm under the boot toe, snapped) and the bow hand tip (2.2 cm, the fist's end on the grip knob).",
+ "bow_rig": {
+  "bow": "bow",
+  "string": "bow_string",
+  "arrow": "arrow",
+  "bow_hand": "arm_L_hand",
+  "draw_hand": "arm_R_hand",
+  "grip_t": 0.6,
+  "arrow_rest": [
+   -0.7776,
+   -0.048,
+   0.835
+  ],
+  "move": {
+   "yaw": -112.8,
+   "pitch": 0.0,
+   "cant": -9.0,
+   "draw": 0.0,
+   "hide": 0.0
+  },
+  "_note": "anim/bow_rig.py: rest placement from meshfix/archer_bow.py's bow_report.json; arrow_rest is native (normalised by the template like every landmark); drop.at is in NORMALISED rig/world units (KO: the bow lies flat on the floor at the Archer's left)",
+  "drop": {
+   "at": [
+    -0.8,
+    -0.3,
+    0.035
+   ],
+   "limbs": [
+    0,
+    -1,
+    0
+   ],
+   "belly": [
+    -1,
+    0,
+    0
+   ],
+   "arc": 0.15
+  },
+  "auto_clear": {
+   "cant": [
+    6,
+    -6,
+    12,
+    -12,
+    18,
+    -18,
+    24,
+    -24,
+    32,
+    -32,
+    40,
+    -40
+   ],
+   "yaw": [
+    15,
+    -15,
+    30,
+    -30,
+    45,
+    -45
+   ],
+   "dilate": 1,
+   "smooth": 1,
+   "_note": "anim/bow_rig.py solve_clearance: per frame, the smallest bow cant (then yaw) change that clears the bow and arrow; dilated and smoothed"
+  },
+  "rest_yaw": -57.0,
+  "_move_note": "round 5: the Idle/Move hold's bow channels (= keyed.py _AR_BOW3Q), re-solved with the bow plane measured on the deformed bow: 38 deg off the battle camera, 31 deg off head-on"
+ }
+}

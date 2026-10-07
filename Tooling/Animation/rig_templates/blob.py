@@ -91,8 +91,14 @@ def detect_landmarks_handplaced(obj, H, to_normalized, beast_name):
         parts.append(q)
     if snap_log:
         print(f"HAND LANDMARKS ({beast_name}): {len(snap_log)} point(s) snapped inside: {snap_log}")
-    head = next(p for p in parts if p["name"] == "head")
-    forward_sign = -1.0 if head["tail"].y < head["head"].y else 1.0
+    head = next((p for p in parts if p["name"] == "head"), None)
+    if head is None:
+        # v22 (Stingling): no head bone (6-joint swarm budget spent on legs + tail; the face is
+        # painted on the ball) -- forward comes from the landmark file, the head points from "spine".
+        head = {"head": pt(data["spine"]["head"], snap=False), "tail": pt(data["spine"]["snout_tip"], snap=False)}
+        forward_sign = float(data["forward_sign"])
+    else:
+        forward_sign = -1.0 if head["tail"].y < head["head"].y else 1.0
     return {
         "H": H, "forward_sign": forward_sign, "legs": [], "body_base": base, "body_top": top,
         "parts": parts, "pelvis": base, "chest": top, "head_base": head["head"], "head": head["tail"],

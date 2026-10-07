@@ -104,6 +104,14 @@
     <None Include="Content\model\brute_anim_events.json" Link="Content\model\brute_anim_events.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Content\model\swarmling_anim.glb" Link="Content\model\swarmling_anim.glb" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Content\model\swarmling_anim_events.json" Link="Content\model\swarmling_anim_events.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- v22, enemies batch 2 (Tooling/Animation/README.md): Archer and Shaman (humanoid biped_arms,
+         bow/staff rigid in a fist, meshfix/prop_surgery.py) and the 6-joint swarm Stingling (blob). -->
+    <None Include="Content\model\archer_anim.glb" Link="Content\model\archer_anim.glb" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\model\archer_anim_events.json" Link="Content\model\archer_anim_events.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\model\shaman_anim.glb" Link="Content\model\shaman_anim.glb" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\model\shaman_anim_events.json" Link="Content\model\shaman_anim_events.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\model\stingling_anim.glb" Link="Content\model\stingling_anim.glb" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\model\stingling_anim_events.json" Link="Content\model\stingling_anim_events.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

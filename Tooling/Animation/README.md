@@ -1994,6 +1994,369 @@ Every rig bone hash, weight hash and Move/keyed F-curve hash is byte-identical. 
 Leviathan and Treant GLBs (and their events sidecars) are byte-identical to the shipped ones. So is the
 Phoenix after `tools/fillholes_glb.py` (the shipped talon fix).
 
+## v22: enemies batch 2 (Hollow region) -- Archer, Shaman, Stingling; prop surgery, painted eyes, a bow string
+
+Three more Hollow enemies from Meshy image-to-3D outputs (records
+`Tooling/ArtLab/provenance/meshy-01a114ac/ae/af-*.md`). The thirteen shipped creatures are untouched (see
+Regression). Every new behaviour is keyed off landmark-file opt-ins, armature properties or `--creature`
+data.
+
+### Prep, eyes, surgery
+
+| Enemy | Prep | Eyes | Surgery | Final tris |
+| --- | --- | --- | --- | --- |
+| Archer | `--no-ground-sheet` | both mask slits present | `meshfix/prop_surgery.py` + `archer_cfg.json` | 8734 |
+| Shaman | `--no-ground-sheet` | bumps present, glow lost: painted (`eyefix/eyepaint.py`) | `prop_surgery.py` + `shaman_cfg.json` | 8394 |
+| Stingling | `--no-ground-sheet --target-tris 1500` | both glowing eyes present | none | 1499 |
+
+- All three face -Y (orientation probe). The ground-sheet pass would have opened 36 / 0 / 13 floor
+  boundary edges. With `--no-ground-sheet` the counts match the raw mesh (10 / 2 / 5, none near the floor).
+- **Shaman eyes:** the sprite has two glowing amber eyes beside the beard. The mesh kept both eye bumps,
+  but they are plain cream knobs, so the face read eyeless. The new `eyefix/eyepaint.py` projects a
+  procedural glowing-eye decal along each bump's own normal. Only the image bufferView changes
+  (`glbtex.py compare` ok). Both eyes read head-on and from 3/4 in-engine.
+- **Fused props:** a prop that is rigid to a hand moves only if no face joins it to the body.
+  - Shaman: the back of the staff is fused into the beard edge (z 0.74-1.17), and the rim of its cap
+    into the hood. A colour-gated `rip` floods the staff from its shaft and deletes only the mixed
+    faces. The strips on both sides are ear-clip filled, subdivided, relaxed and inflated, then
+    coloured from the nearest original vertex of the same piece. A plain fill gave a flat plank, then
+    a smeared bark/beard mosaic.
+  - Archer: Meshy modelled ONE arm, lying across the chest with its fist on the arrow, and no arm to
+    the bow grip. Two copies of that forearm and fist become the bow arm (-X shoulder to the grip knob)
+    and the draw arm (+X shoulder to the nock). The old arm is cut away, the bow ripped free and the
+    arrow gap bridged with a tube.
+
+### Rigs (every roll explicit; axis dumps in `<enemy>_anim/axes_check.json`)
+
+| Enemy | Template | Bones | Props |
+| --- | --- | --- | --- |
+| Archer | `biped_arms` humanoid | 26 (incl. `bow`, `bow_string`, `arrow`; rounds 3-4) | modelled bow rigid to the keyed `bow` bone (placed in the bow fist every frame; round 4: a child of root); string ramped to `bow_string`; arrow rigid to `arrow`; quiver rigid to `spine_03` |
+| Shaman | `biped_arms` humanoid | 23 | staff shell rigid to `arm_L_hand`; antlers rigid to `head`; cloak heat-skinned to spine/thighs |
+| Stingling | `blob` | **6** (swarm budget): root, body, legs_L, legs_R, tail_01, tail_02 | no head bone (the face is painted on the ball); tail_01 is a squash follower |
+
+The Stingling is a swarm unit: the encounter library places 14-20 of them with swarmlings, and 12
+round the Deepwild giant. The 6-joint merged-swarm budget therefore applies, and
+`--swarm-model stingling` plays it in Live3D's merged batches.
+
+New opt-ins (absent everywhere else, so older rigs are byte-identical):
+- `rigid_parts` (`common.force_region_weights`): capsule/box regions or whole shells
+  (`component_seed(s)`) set 100% to a bone or ramped between two (`ramp`), optionally limited to one
+  shell (`within_component`).
+- `arm_ramp` (`include_clav`, radii): the Shaman's arms come out from under a fat cloak, and heat
+  weighting gave each clavicle ~1400 cloak vertices.
+- `arm_roll_closing` / `arm_hinge_from_upper`: a forearm held FORWARD has no usable forward
+  projection. The Shaman's elbow hinge came out vertical, so "flex" swung the fist sideways. Straight
+  template arms (the Archer) take the upper arm's hinge.
+- `joint_limit_overrides`: the rest elbow already holds the staff at ~78 deg, so straightening it needs
+  negative channel flex. The joint_limits gate still measures the anatomical range on the mesh.
+- `extra_bones`, `bow_rig`, `strip_heat_bones`: the Archer's keyed `bow`, `bow_string` and `arrow`
+  prop bones, placed every frame by `anim/bow_rig.py` (round 3, below; it replaced round 1's
+  `string` key).
+- `heat_unweighted_tolerance`, `keep_shell_heat_weights`: for separate prop and arm shells.
+
+`blob.py` accepts a part list with no head (forward comes from the file). The Stingling's legs are
+`legs_*` (the v21 hop prefix), so the hop gates see them.
+
+### Clips (gait.py `GAIT_PARAMS`, keyed.py `ENEMY_PARAMS`)
+
+- **Archer (watchful):**
+  - Move is a light, wary step (1.0 s, soft knees, head scanning).
+  - Attack and Cast draw and loose. The torso turns to aim the arrow forward-left and the bow arm
+    extends. The draw hand pulls the nock back and up to the jaw, holds, and looses. The
+    `arrow_release` marker is in the events sidecar; Cast is a volley aimed high (`cast_release`).
+  - The arm channels were solved numerically for grip, arrow and nock targets.
+- **Shaman (gnarled elder):**
+  - Move is a slow, staff-planting walk (1.8 s). The staff arm only flexes forward of rest, because
+    swinging it back drives the planted staff into the floor.
+  - Cast raises the staff high and upright and throws the head and antlers back (held).
+  - Attack winds the staff back over the head and swings the mushroom head down at the foe.
+  - The staff poses were solved for end points.
+- **Stingling (buzzy):**
+  - Move is a skittering cycle of two hops per 0.7 s, stepping off alternate feet with a waddle while
+    the tail swishes.
+  - Attack rears the tail up behind, then whips the stinger over the head to stab down in front of the
+    face. The tail is much shorter than the ball, so the whip stretches it (a uniform tail_01 scale up
+    to 2.2x, held as a cartoon smear). The poses were solved against the deformed mesh.
+- Every KO lies down. The humanoids topple onto their backs, with the feet sliding forward so they land
+  on their own tile.
+
+### Gates
+
+`glb_gate.py` gains a tail check for hop rigs: the local tail_* range per clip, with Attack >= 90 deg.
+
+| Gate | Archer | Shaman | Stingling |
+| --- | --- | --- | --- |
+| loop seams Move/Idle/Victory | 0.000 | 0.000 | 0.000 |
+| walk_direction / foot_orientation | PASS (toe 18.3, sole 14.9 deg) | PASS (16.3 / 16.9) | skipped (hop) |
+| knee range | PASS | PASS | skipped |
+| joint_limits, 7 clips | PASS (elbow_R 2.9..93.8, off <= 8.2) | PASS (elbow_L 9.4..88.4, off <= 5.4) | n/a |
+| hop / followers | -- | -- | PASS (0.092, 10/17 contact, 5/17 air, sy 0.86..1.09, legs 26 deg) / 0.0 mm |
+| mesh ground, every frame | PASS (min -0.0000; KO 0.004) | PASS | PASS |
+| KO held | 0.000 | 0.000 | 0.001 |
+| edge stretch Move/Attack/KO | 4.7/23.0/6.3 FAIL | 3.6/11.5/9.5 FAIL | 2.4/3.4/2.4 FAIL |
+| glb_gate, 7 clips | PASS 0.00 deg; arms Attack 42/128 | PASS 0.00; arms Cast 151/157 | PASS 0.00; 6 joints; tail Attack 268 deg |
+
+Where the worst edge stretch sits:
+- Archer (23x): the bow string's nock, pulled away from the arrow. The string is drawn by design.
+- Shaman: the skin of the left upper arm and elbow under the cloak as the staff rises.
+- None of these show as tearing in the in-engine strips.
+
+### In-engine (Live3D `--pilot-model`, copies in the bin's Content/model)
+
+- Full-set MP4s per enemy (battle, head-on, side), with 7 labelled clips and the usual encode.
+- Strips are cut from the MP4s.
+- The three GLBs and their sidecars ship in `Tooling/Spike55/Live3D/Content/model`.
+
+### Regression
+
+`regress/run_regress.sh` was run on all thirteen shipped creatures, once before any change and once
+after the last.
+- Every rig bone hash, weight hash and Move/keyed F-curve hash is byte-identical.
+- Re-exported Kirin, Treant, Brute and Swarmling GLBs are byte-identical to the shipped ones.
+
+### v22 round 2: props never pass through the body (producer review: the Shaman's staff clipped)
+
+**New hard gate, `verify.py` `prop_clearance`.** A landmark `rigid_parts` entry with a `"gate"` records
+its prop's vertex set on the armature (`prop_gate`). On every frame of every clip, each prop vertex is
+tested against every closed shell of the rest of the deformed mesh (ray parity per shell, 3 rays); the
+depth is the distance to that surface. Vertices within `grip_radius` of a gripping bone are exempt.
+`"attached": true` props (antlers, the quiver) are tested only against the other shells. The gate
+fails above 1 cm.
+
+**Fixed in the animation:**
+- Key poses were re-posed, each checked with a static pose probe: the staff head is held tilted out
+  and forward of the hood, Hit's head whips away from the staff, KO holds the staff arm out with the
+  staff tilted clear, and Cast carries the staff up in front through a new 0.42 key. The Archer's
+  recoil swings the bow up and out, its wrist holds the bow tilted, and its Victory and KO bow poses
+  stay out of the body.
+- `anim/prop_clear.py`, opt-in through the `prop_clear` landmark key, handles whatever the key poses
+  leave. Per clip it picks one correction direction: Shaman shoulder abduction plus outward wrist
+  tilt, or for the Archer one of five shoulder/wrist directions. Per frame it finds the smallest
+  amount of that correction that clears the prop, dilates and smooths the amounts so the correction
+  eases in and out, and re-keys the arm.
+
+| Clip | Shaman staff before | after | Archer bow before | after |
+| --- | --- | --- | --- | --- |
+| Move | 44/44 frames, 13.3 cm | 0 | 8/25, 1.5 cm | 0 |
+| Idle | 78/78, 8.5 cm | 0 | 0 | 0 |
+| Attack | 17/35, 5.4 cm | 0 | 30/37, 5.2 cm | 0 |
+| Cast | 21/42, 17.4 cm | 0 | 33/42, 5.0 cm | 0 |
+| Hit | 15/15, 18.4 cm | 0 | 6/15, 2.4 cm | 0 |
+| KO | 26/44, 26.5 cm | 0 | 41/44, 18.2 cm | 0 |
+| Victory | 31/63, 7.7 cm | 0 | 44/54, 19.9 cm | 0 |
+
+The Shaman's antlers (up to 6.8 cm before) and the Archer's quiver (0 before) are at 0 on every clip.
+Joint limits, ground, loop seams and glb_gate (0.00 deg) still pass on both, and the regression on
+all thirteen shipped creatures is byte-identical.
+
+### v22 round 3: a clean, modelled bow for the Archer (producer rejected the Meshy bow)
+
+**Props.** `meshfix/archer_cfg.json` now removes the whole Meshy bow tangle (stave, string, flame
+sticks, arrow) with `prop_surgery.py`'s new `drop_component` op; the quiver stays. The body is 6936
+tris with 0 open edges. `meshfix/archer_bow.py` then adds two scripted props as closed shells:
+- a recurve bow, about 0.8 of the Archer's height, 568 tris, 0 open edges. It has tapered limbs, a
+  wrapped grip, one thin string and violet flame wisps at both tips;
+- an arrow, 132 tris, 0 open edges, with a leaf head, fletching and a flame at the head only.
+
+Both props are UV'd onto the Archer's own painted texture, so there is a single material. The
+total mesh is 7636 tris. See `meshfix/README.md`.
+
+**Rig** (`rig_templates/landmarks/archer.json`, `anim/bow_rig.py`). There are three prop bones:
+- `bow`, a child of the left (bow) hand;
+- `bow_string`, a child of `bow` at the nock. The string's weight ramps linearly from both limb
+  tips (`bow`) to the nock (`bow_string`);
+- `arrow`, a child of root.
+
+`anim/bow_rig.py` places all three on every baked frame from a clip's `"_bow"` channels:
+- **Grip and aim.** The grip sits in the bow fist and the bow stands upright, `cant` degrees off
+  vertical about the aim.
+- **`draw`.** The nock moves that fraction of the way to the draw fist. While drawn, the aim
+  follows the line from the draw fist through the bow fist, so the string forms a clean V from both
+  tips to the draw hand.
+- **Arrow.** The arrow's nock sits on the string, and its shaft passes beside the grip.
+- **`hide`.** Scales the arrow to nothing about its nock. It reaches 1 on the `arrow_release` /
+  `cast_release` frame, and the arrow grows back, nocked, before the clip ends.
+- **`drop`.** In KO, the bow falls clear and lies flat on the floor.
+
+Supporting changes:
+- `gait.py` places the bow on Move.
+- `bird_pose.bake_frames` keeps these bones' Euler keys continuous.
+- The KO ground settle ignores the dropped bow's vertices.
+- `prop_clear` is no longer used on the Archer. Its poses are solved clean instead (scratch pose
+  search: fist targets, arrow aim, prop hits, prop floor clearance).
+
+**Arm skin fix.** The floating-island weight repair used to copy the nearest large piece's weights
+onto the separate new arm shells, and with the Meshy bow gone that piece was the trunk. The
+`keep_shell_heat_weights` opt-in now also skips that repair (`island_repair=False`); no other rig
+uses the key.
+
+**Poses.**
+- **Idle and Move.** The bow is upright at the left side, out past the hood, with the arrow nocked
+  and pointing ahead.
+- **Attack.** The Archer turns side-on (root turn 35 deg, spine turns, head counter-turned to look
+  down the arrow). The bow arm goes straight out at shoulder height, with the bow canted 18 deg off
+  the hood. The draw fist goes to under the cheek and the string follows it into a V. On release
+  the arrow vanishes, the fist flicks back, the bow arm folds in and a fresh arrow grows back.
+- **Cast.** The same draw, leaning back and aimed about 34 deg up (cant 15).
+- **Victory.** The bow is raised high at the side, twice.
+- **KO.** The bow leaves the fist and lands flat on the floor at the Archer's left.
+
+**Gates.**
+- `prop_clearance` (bow and arrow both gated): 0 frames hit on every clip. The bow is exempt only
+  near the two fists that hold it.
+- Joint limits, ground clearance, loop seams and jitter pass.
+- glb_gate passes at 0.00 deg on all clips. It now also checks the string: in Attack and Cast the
+  nock must travel at least 0.15 relative to the bow in the GLB. The measured travel is 0.277 in
+  Attack and 0.166 in Cast.
+- The arm ranges in the GLB are L 59 deg / R 248 deg in Attack and L 63 deg / R 231 deg in Cast.
+- The regression on all thirteen shipped creatures is byte-identical. Treant, Kirin, Brute,
+  Swarmling, Griffin, Shaman and Stingling GLBs are byte-identical too.
+
+**Known limits.**
+- The chibi arms are about 0.35 long under a head of radius about 0.45. A real nock-and-draw from
+  the bow is out of reach, so the draw fist rises to the cheek while the string comes back to it.
+- From the head-on camera, the drawn bow is seen edge-on in front of the face. It does not touch
+  the face (the gate shows 0 hits).
+
+### v22 round 4: a short self bow like the approved art; the bow arm re-attached (producer review)
+
+The producer had two complaints. The round-3 bow read as a staff ("a bow staff, not a bow for
+arrows"), and the left arm joined the torso at the wrong place.
+
+**Bow (`meshfix/archer_bow.py`, `archer_bow_cfg.json`).** It now matches
+`content/art/source/enemies/archer/hollow/character.png`:
+- a SHORT pale-wood D-shaped self bow, 0.95 chord, which is 0.5 of the Archer's 1.90 height;
+- a sagitta of 0.14, which is 29 % of the limb, with a rounder `profile_exp` 1.35 curve;
+- thicker limbs and a leather grip wrap, with no flames on the bow;
+- 268 tris and 0 open edges.
+
+The violet flame now belongs to the arrow. The arrow has:
+- a thicker shaft, a larger leaf head and fletching;
+- three flame tongues flaring back round the head;
+- a curling pale-lilac smoke wisp.
+
+The arrow is 228 tris with 0 open edges.
+
+`srgb_texels: true` fixes a round-3 bug where colour gates read the texture ~25 % too light (that
+"pale" stave was mid-brown). The wood now samples the cream-tan of the trousers.
+
+The bow rests yawed -57 deg (`rest_yaw`), midway through its pose range. This keeps the keyed bone's
+XYZ Euler twist inside +-90 deg, with no gimbal pops. The bow bone is now a child of root; it is
+still placed in the bow fist every frame. `bird_pose.euler_near` picks the nearer of the two
+equivalent Euler solutions for the bow bones only.
+
+**Left arm (`meshfix/prop_surgery.py` `post_mirror_x`, `archer_cfg.json`).** The bow arm is now the
+exact mirror image of the draw arm across the trunk mid-plane, x = 0.02 (the face, head and feet
+midline). It is built exactly like the draw arm, aimed at the mirrored grip, then mirrored.
+- The shoulder joint moves from (-0.14, -0.08, 0.80) to (-0.10, -0.08, 0.80), symmetric with the draw
+  arm's (0.14, -0.08, 0.80).
+- The landmark chain is the mirrored draw-arm chain, re-aimed at the grip.
+- The body is still 6936 tris with 0 open edges; each arm is a closed 182-tri shell sunk into the
+  torso under the mantle.
+
+`keep_shell_heat_weights` skips the floating-island weight repair (`island_repair=False`), so the
+arm shells keep their own heat weights.
+
+**Presentation.** The battle camera looks from behind the Archer's right shoulder, so a bow held at
+the left side was hidden by the head.
+- Idle and Move now hold the bow upright in FRONT, as in the art.
+- Its plane is turned (yaw -115, cant -14.5) so the D faces the battle camera (33 deg off) and the
+  head-on camera (36 deg off).
+- The scratch pose search solved this with occlusion and facing costs; 17 % of the bow is occluded
+  head-on and 33 % in battle.
+- Attack and Cast keep the side-on draw, with the bow plane edge-on to the head-on camera, since the
+  arrow points at it.
+- Victory brandishes the bow out front-left.
+
+**Automatic bow clearance (`bow_rig.solve_clearance`, landmark `auto_clear`).** Per frame, it finds
+the smallest change to the bow's OWN cant (then yaw) that keeps the bow and arrow out of the body.
+It works because the string and arrow stay consistent through `place()`. The changes are dilated
+and smoothed, every frame is re-verified, and any remaining fix is tapered over +-2 frames. It runs
+inside the keyed bake and on Move.
+
+**Gates.**
+- `prop_clearance` (bow, arrow, quiver): 0 frames on every clip.
+- `joint_limits`, ground, loop seams and jitter (max 0.10) pass.
+- `glb_gate` is 0.00 deg on all clips. The arm ranges are L 90 / R 229 deg in Attack and L 71 / R
+  221 deg in Cast.
+- The string travel is now gated as a fraction of the brace height (>= 0.6). Attack is 1.00 x and
+  Cast is 0.67 x the 0.147 brace.
+- Regression on all thirteen creatures is byte-identical. The Treant, Kirin, Brute, Swarmling,
+  Griffin, Shaman and Stingling GLBs are byte-identical too.
+
+### v22 round 5: real arms for the Archer (producer review: "his left arm is attached to his torso at the wrong place")
+
+**Root cause.** The mesh had NO shoulders or upper arms. Each "arm" was a copy of Meshy's fist on a
+short forearm stub, poking out of the chest under the leaf mantle; moving the stub (round 4) could
+not fix that. The producer chose to build real arms.
+
+**Mesh (`meshfix/archer_arms.py` + `archer_arms_cfg.json`; runs between `prop_surgery.py` and
+`archer_bow.py`).**
+- Both stubs are cut at the wrist; the fists are kept as hands.
+- A socket is cut in the torso wall just under the mantle on each side (found by a ray from the trunk
+  axis). A 12-sided tube runs from it: shoulder cap, upper arm, bent elbow, forearm. It has 3 loops
+  at the cap and 3 round the elbow.
+- The tube is zipped to the socket rim and to the fist's wrist rim (angle-ordered zipper). Body and
+  arms are one watertight surface; the mantle overlaps the shoulder caps.
+- The left arm is the mirror image of the right's parameters across x = 0.02.
+- Every new vertex samples one cream-skin square of the existing atlas, found automatically nearest
+  the torso's colour. A triangle wave round the arm avoids a wrap seam. One material.
+
+| | Before (round 4) | After (round 5) |
+| --- | --- | --- |
+| Body tris | 6936 (body + 2 arm-stub shells) | 7522 (1 shell; arms 488 / 486 tris) |
+| Open / non-manifold edges | 0 / 0 | 0 / 0 |
+| With bow and arrow | 7432 | 8018 |
+
+**Rig.** Same `biped_arms` humanoid opt-ins. The arm chains come from `arms_report.json`:
+- shoulder: 2 cm inside the cap centre;
+- elbow and wrist: on the tube's centreline;
+- hand tip: the fist's far end.
+
+The axis dump shows the elbow hinge closing forward and up (`arm_hinge_from_upper`). Heat weights
+plus `arm_ramp` give clean shoulder and elbow gradients. Arm weight stops at the shoulder: only the
+mantle underside directly over the cap carries a little clavicle weight. The bow, string, arrow,
+quiver and `bow_rig.py` are unchanged.
+
+**Poses** (`keyed.py` archer constants, `gait.py` `_ARCHER_HOLD`, the landmark's `bow_rig.move`).
+All were re-solved with a scratch search that keeps the forearms and fists out of the head and
+mantle.
+- **Facing bug.** Round 4's search measured the bow plane from the bone's rest X, which missed the
+  prop's 57 deg `rest_yaw`. That is why its "3/4" bow read as a thin line from the battle camera. The
+  plane is now measured on the deformed bow.
+- **Idle and Move.** The bow is held up in front of the chest with the draw hand on the string at
+  the nock, as in the art. The chest is turned 20 deg (spine_01/02) and the head turned back on the
+  head bone; a neck counter-turn sheared the mantle (11x edge stretch). The bow plane is 38 deg off
+  the battle camera and 31 deg off head-on.
+- **Attack.** Side-on stance. The bow arm is straight out from the shoulder. The draw elbow lifts
+  and pulls back behind the shoulder, and the fist comes up beside the jaw, just under the mantle
+  brim. The string forms a V; the release is at `arrow_release` and the arrow regrows.
+- **Cast.** The same draw, leaning back and aimed about 30 deg up.
+- **Hit and KO.** As before; in KO the bow drops clear and lies flat at the left.
+- **Victory.** The bow is raised out at the left, beside the head; overhead it would cut the mask.
+
+**Gates.**
+- `verify.py` exits 0.
+  - `prop_clearance` (bow, arrow, quiver): 0 frames on every clip.
+  - `joint_limits`: PASS on every clip (elbow_R 50..119 deg, off-hinge <= 8.2 deg).
+  - Ground, loop seams (0.000) and jitter (max 0.062) pass.
+  - Edge stretch is at most 9.2x, at the quiver's rigid edge; it is not on the arms.
+- `glb_gate` PASSES at 0.00 deg on every clip.
+  - Arm ranges: L 92 / R 123 deg in Attack, L 96 / R 138 deg in Cast.
+  - String travel: 0.471 in Attack and 0.447 in Cast (3.2x and 3.0x the 0.147 brace; gate >= 0.6x).
+
+**Regression.** `regress/run_regress.sh` was run on all thirteen shipped creatures. Every rig, Move
+and keyed hash is byte-identical to round 4 (39/39). Shaman and Stingling were rebuilt and
+re-exported; their GLBs and event sidecars are byte-identical to the shipped ones. The Archer's GLB and
+sidecar ship in `Tooling/Spike55/Live3D/Content/model`.
+
+**Honest limits.**
+- The leaf mantle brim (z ~0.9-1.0, out to |x| 0.42) sits between the shoulder and the cheek. The
+  draw fist anchors under the brim beside the jaw, not on the cheek; any higher, it enters the mantle.
+- From the head-on camera the drawn bow is edge-on, because the arrow points at the camera.
+- In Victory, the raised bow is hidden behind the head from the battle camera.
+- A cream fold left on the chest by round 1's arm cut-away is still visible under the mantle.
+
 ## v9: max-edge-stretch gate + weight/render fixes -- partial progress, honestly not fully resolved
 ## (lead-review round 9)
 

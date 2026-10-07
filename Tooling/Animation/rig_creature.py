@@ -72,7 +72,9 @@ BIRD_CREATURES = ("phoenix", "thunderbird")
 V20_TEMPLATES = {"treant": "biped_arms", "leviathan": "serpent",
                  # v21 enemies: the legless Brute and the 6-bone Swarmling use the new blob template
                  # (the Stalker is a plain quadruped).
-                 "brute": "blob", "swarmling": "blob"}
+                 "brute": "blob", "swarmling": "blob",
+                 # v22 enemies batch 2: humanoid Archer/Shaman, 6-bone swarm Stingling
+                 "archer": "biped_arms", "shaman": "biped_arms", "stingling": "blob"}
 TEMPLATE_NAME = args.get("template") or ("winged_quadruped" if CREATURE == "griffin" else
                                          "winged_biped" if CREATURE in BIRD_CREATURES else
                                          V20_TEMPLATES.get(CREATURE, "quadruped"))
@@ -200,7 +202,14 @@ report["leg_masks"] = {side: len(vids) for side, vids in leg_masks.items()}
 print("LEG MASKS:", json.dumps(report["leg_masks"]))
 
 # --- Weighting ---------------------------------------------------------------
-method_used, weight_log = common.auto_weight_with_fallbacks(obj, arm_obj, bone_names, H)
+# v22 opt-in "heat_unweighted_tolerance" (Archer): separate prop shells far from every bone (the
+# ripped-free bow) come back unweighted from heat weighting; rigid_parts weights them below.
+# v22 round 3: "keep_shell_heat_weights" (Archer) also skips the floating-island repair, which
+# copied the nearest body vertex's weights onto the separate new ARM shells (the Meshy bow tangle
+# used to be the nearest large piece; with it gone the bow arm took the trunk's weights).
+method_used, weight_log = common.auto_weight_with_fallbacks(obj, arm_obj, bone_names, H,
+                                                           tol=lm.get("heat_unweighted_tolerance", 0.05),
+                                                           island_repair=not lm.get("keep_shell_heat_weights"))
 report["weighting"] = {"method": method_used, "log": weight_log}
 for line in weight_log:
     print("WEIGHT:", line)
@@ -399,6 +408,40 @@ for _rr in lm.get("rigid_regions") or []:
                                       protect_threshold=_rr.get("protect_threshold", 0.1))
     report["weighting"].setdefault("rigid_regions", []).append({"bone": _rr["bone"], "forced": _n})
     print(f"RIGID REGION: {_n} vertices forced 100% to {_rr['bone']!r}")
+
+# v22 (opt-in per landmark file, Archer): prop bones that must carry ONLY the weights rigid_parts
+# gives them (heat weighting hands the bow-string bone the chest and fist round the nock).
+for _sb in lm.get("strip_heat_bones") or []:
+    _n = common.strip_bone_weight(obj, _sb)
+    common.normalize_weights(obj)
+    print(f"STRIP HEAT BONE: {_n} memberships removed from {_sb!r}")
+
+# v22 (opt-in per landmark file, Archer bow/quiver, Shaman staff/antlers): rigid props and weight
+# ramps by capsule/box region, in native coords -- see common.force_region_weights.
+# v22 round 2: a part with a "gate" ({"name", "grip_bones", "grip_radius" native}) is a held/worn
+# prop whose vertex set is recorded on the armature ("prop_gate") for verify.py's prop_clearance gate
+# (the prop must never pass through the rest of the mesh, except inside its gripping hand).
+_prop_gate = {}
+for _rp in lm.get("rigid_parts") or []:
+    _sel = []
+    _n = common.force_region_weights(obj, _rp, to_normalized, _sel)
+    if _rp.get("gate"):
+        _g = _rp["gate"]
+        _k = (to_normalized((0.0, 0.0, 1.0)) - to_normalized((0.0, 0.0, 0.0))).z
+        _e = _prop_gate.setdefault(_g["name"], {"name": _g["name"], "verts": [],
+                                                "grip_bones": _g.get("grip_bones", []),
+                                                "grip_radius": _g.get("grip_radius", 0.07) * _k,
+                                                "attached": bool(_g.get("attached", False))})
+        _e["verts"] = sorted(set(_e["verts"]) | set(_sel))
+    report["weighting"].setdefault("rigid_parts", []).append({"bone": _rp["bone"], "set": _n,
+                                                               "note": _rp.get("note", "")})
+    print(f"RIGID PART: {_n} vertices set to {_rp['bone']!r}"
+          + (f" (ramp to {_rp['ramp']['bone_b']!r})" if _rp.get("ramp") else ""))
+
+if _prop_gate:
+    arm_data["prop_gate"] = json.dumps(list(_prop_gate.values()))
+    print("PROP GATE: " + ", ".join(f"{g['name']} {len(g['verts'])} verts grip {g['grip_bones']}"
+                                    for g in _prop_gate.values()))
 
 # v21 (opt-in per landmark file, Stalker): relax hard weight boundaries inside a sphere -- see
 # quadruped.smooth_weights_region.

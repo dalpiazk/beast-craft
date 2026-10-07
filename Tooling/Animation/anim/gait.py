@@ -181,6 +181,52 @@ GAIT_PARAMS["treant"].update(_FK_COMMON, cycle_seconds=1.6, duty=0.6, crouch_fra
                              foot_curl=10.0, toe_curl=16.0,
                              knee_pole="forward", bird=True, bird_layers=_TREANT_SWAY,
                              bird_hold=_TREANT_HOLD)
+# v22 (enemies batch 2): Shaman -- humanoid biped_arms like the Treant. A gnarled elder's slow
+# STAFF-PLANTING walk: a long 1.8 s cycle, short careful steps, a little bob and sway, the head and
+# antlers nodding with each step (head_amp: gait.py's own spine_02/head nod sinusoids). The staff (rigid in the left fist) is lifted forward and thumped
+# down once per cycle: the left shoulder only ever flexes FORWARD of its rest (hold +14 + a 13 deg
+# sine), because a backward swing lowers the fist and would drive the planted staff into the floor.
+# The free right arm swings gently against the steps.
+_SHAMAN_SWAY = [
+    ("b", "arm_L_upper", "flex", 13.0, 1, 0.0),
+    ("b", "arm_R_upper", "flex", 10.0, 1, 1.57), ("b", "arm_R_fore", "flex", 6.0, 1, 1.07),
+    ("b", "spine_01", "bank", 2.0, 1, 0.3), ("b", "spine_03", "turn", 2.5, 1, -1.57),
+    ("b", "neck", "pitch", -2.0, 2, 0.6), ("b", "neck", "turn", -2.0, 1, -1.57)]
+_SHAMAN_HOLD = [("b", "arm_L_upper", "flex", 16.0), ("b", "arm_L_upper", "abd", 4.0),
+                ("b", "arm_L_hand", "flex", -8.0), ("b", "arm_L_hand", "abd", -10.0),
+                ("b", "arm_R_fore", "flex", 10.0), ("b", "spine_03", "pitch", -3.0)]
+GAIT_PARAMS["shaman"] = dict(GAIT_PARAMS["tarasque"])
+GAIT_PARAMS["shaman"].update(_FK_COMMON, cycle_seconds=1.8, duty=0.62, crouch_frac=0.05,
+                             stride_frac=0.12, lift_frac=0.10, pelvis_roll=3.0, pelvis_yaw=3.0,
+                             body_bob=0.008, tail_yaw=0.0, tail_pitch=0.0, head_amp=1.2,
+                             foot_curl=8.0, toe_curl=12.0,
+                             knee_pole="forward", bird=True, bird_layers=_SHAMAN_SWAY,
+                             bird_hold=_SHAMAN_HOLD)
+# v22 (enemies batch 2): Archer -- humanoid biped_arms (two new arms, the bow rigid in the left fist).
+# Watchful: a LIGHT, WARY step -- a quick 1.0 s cycle, knees soft (a little crouch), short springy
+# strides, almost no bob, the head turning slowly to scan as it goes (neck turn) and the torso
+# counter-turning a touch; the bow is carried ready in front (the Idle hold), both arms quiet.
+_ARCHER_SWAY = [
+    ("b", "neck", "turn", 5.0, 1, 0.4), ("b", "spine_03", "turn", 3.0, 1, -1.57),
+    ("b", "spine_01", "bank", 2.0, 1, 0.3), ("b", "arm_L_upper", "abd", 2.0, 2, 0.0),
+    ("b", "arm_L_upper", "flex", 7.0, 1, -1.57),
+    ("b", "arm_R_upper", "flex", 6.0, 1, 1.57), ("b", "arm_R_fore", "flex", 5.0, 1, 1.07)]
+# v22 rounds 3-5: the bow held up in front, its D facing the battle and head-on cameras (= keyed.py
+# _AR_REL, round 5's real arms; the bow's yaw/cant are the landmark's bow_rig "move" channels)
+_ARCHER_HOLD = [("b", "arm_L_upper", "flex", 50.6), ("b", "arm_L_upper", "abd", 22.1),
+                ("b", "arm_L_fore", "flex", 26.0), ("b", "arm_L_hand", "flex", -10.0),
+                ("b", "arm_L_hand", "abd", 3.2), ("b", "arm_R_upper", "flex", 84.1),
+                ("b", "arm_R_upper", "abd", 47.0), ("b", "arm_R_fore", "flex", 41.5),
+                ("b", "arm_R_hand", "flex", -48.3), ("b", "spine_01", "turn", 9.4),
+                ("b", "spine_02", "turn", 10.0), ("b", "head", "turn", -25.0),
+                ("b", "spine_03", "pitch", -3.0)]
+GAIT_PARAMS["archer"] = dict(GAIT_PARAMS["tarasque"])
+GAIT_PARAMS["archer"].update(_FK_COMMON, cycle_seconds=1.0, duty=0.58, crouch_frac=0.08,
+                             stride_frac=0.16, lift_frac=0.13, pelvis_roll=3.0, pelvis_yaw=4.0,
+                             body_bob=0.006, tail_yaw=0.0, tail_pitch=0.0, head_amp=0.5,
+                             foot_curl=10.0, toe_curl=14.0,
+                             knee_pole="forward", bird=True, bird_layers=_ARCHER_SWAY,
+                             bird_hold=_ARCHER_HOLD)
 # v21 (enemies): Stalker -- quadruped template with the Frost Wyrm opt-ins (body forward, lateral
 # roll). A sneaky predator's PROWL: a deep crouch (crouch_frac 0.12 of its ~0.5 legs), a slow 1.4 s
 # cycle with a high duty factor (three feet down most of the time -- careful, not trotting), long low
@@ -297,6 +343,19 @@ GAIT_PARAMS["swarmling"] = dict(locomotion="hop", cycle_seconds=0.8, keys=(
             ("b", "legs_B", "pitch", -24.0, 2, 0.0), ("b", "crest", "pitch", 8.0, 2, -1.2),
             ("b", "crest", "turn", 6.0, 1, -0.6), ("b", "head", "turn", 5.0, 1, 0.5),
             ("b", "head", "pitch", 3.0, 2, 0.8)])
+# v22 (enemies batch 2): Stingling (buzzy) -- a SKITTERING hop-walk: two short, quick hops per 0.7 s,
+# each one stepping off a different foot (leg_L / leg_R swing in antiphase, one stride per hop), a
+# side-to-side waddle toward the landing foot, the stinger tail swishing behind (turn about UP keeps
+# it level over the floor) with the leaf lagging. Same _SW_HOP shape as the Swarmling, lower and
+# snappier.
+_STG_HOP = [_hk(0.00, 1.00), _hk(0.10, 0.86, pitch=-3.0), _hk(0.22, 1.10, z=0.05, ease="in"),
+            _hk(0.36, 1.03, z=0.09, ease="out"), _hk(0.50, 1.05, z=0.04, pitch=2.0, ease="in"),
+            _hk(0.58, 0.86, z=0.0, pitch=2.0, ease="in"), _hk(0.76, 1.03), _hk(1.00, 1.00)]
+GAIT_PARAMS["stingling"] = dict(locomotion="hop", cycle_seconds=0.7, keys=(
+    [(0.5 * t, p, e) for t, p, e in _STG_HOP] + [(0.5 + 0.5 * t, p, e) for t, p, e in _STG_HOP[1:]]),
+    layers=[("r", "bank", 5.0, 1, 0.0), ("b", "legs_L", "pitch", 26.0, 1, 0.0),
+            ("b", "legs_R", "pitch", -26.0, 1, 0.0), ("b", "tail_01", "turn", 9.0, 1, -0.8),
+            ("b", "tail_02", "turn", 14.0, 1, -1.6), ("b", "tail_02", "bank", 6.0, 2, -1.0)])
 GP = GAIT_PARAMS.get(CREATURE, GAIT_PARAMS["griffin"])
 FK_ANCHORED = GP.get("fk_anchored", False)
 if GP.get("bird"):
@@ -1494,6 +1553,22 @@ n_curves = common.set_interpolation(move_action, "LINEAR")
 stride_summary = ", ".join(f"{s}={legs[s]['stride']:.3f}" for s in leg_sides)
 print(f"MOVE ACTION: {FRAMES + 1} frames @ {FPS}fps, {n_curves} fcurves, duty={DUTY}, "
       f"stride=[{stride_summary}]")
+
+if "bow_rig" in arm_data:
+    # v22 round 3 (Archer): bow / string / arrow placed on every Move frame -- see anim/bow_rig.py
+    import bow_rig as _BR
+    bpy.ops.object.mode_set(mode="POSE")
+    _bw = json.loads(arm_data["bow_rig"]).get("move", {})
+    _BR.post_action(arm_obj, scene, move_action, FORWARD, lambda t: dict(_bw), mesh_obj=mesh_obj)
+    bpy.ops.object.mode_set(mode="OBJECT")
+
+if "prop_clear" in arm_data:
+    # v22 round 2: keep a held prop (the Shaman's staff) out of the body -- see anim/prop_clear.py.
+    # Only rigs whose landmark file opts in carry the property; every other Move is untouched.
+    import prop_clear as _PC
+    bpy.ops.object.mode_set(mode="POSE")
+    _PC.fix(arm_obj, mesh_obj, scene, move_action, FORWARD, dict(json.loads(arm_data["prop_clear"]), loop=True))
+    bpy.ops.object.mode_set(mode="OBJECT")
 
 blend_out = os.path.join(OUT, f"{CREATURE}_move.blend")
 bpy.ops.wm.save_as_mainfile(filepath=blend_out)

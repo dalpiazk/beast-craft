@@ -1,0 +1,568 @@
+{
+ "name": "archer",
+ "_comment": "v22 Archer: Meshy modelled ONE arm -- from under the cape at the -X shoulder, across the chest, its fist round the arrow shaft near the +X end -- and none to the bow grip at -X; the bow (stave, string, flame-tipped arrow, grip knob) is one surface with that fist. Two new arms are copies of the modelled forearm+fist (white sleeve, brown fist; read from the ORIGINAL mesh): the bow arm from the -X shoulder to the grip knob, the draw arm (mirrored) from the +X shoulder to the nock. The old arm is cut away (stump filled), the bow ripped free of the body (flood from the stave through the bow's own region), the arrow's gap where the old fist wrapped it bridged with a shaft tube. Native coords of archer_prepped.glb (prep_mesh --no-ground-sheet). Round 3: the ripped bow pieces (stave, string, arrow shaft with a flame at both ends) are DROPPED instead of kept; meshfix/archer_bow.py adds a clean modelled bow and arrow. Round 4: the bow arm is the mirror image of the draw arm at the shoulder (post_mirror_x).",
+ "stages": [
+  {
+   "op": "copy",
+   "tag": "bow_arm",
+   "include": [
+    {
+     "poly": [
+      [
+       -0.16,
+       -0.19,
+       0.775
+      ],
+      [
+       0.08,
+       -0.23,
+       0.75
+      ],
+      [
+       0.2,
+       -0.26,
+       0.72
+      ],
+      [
+       0.27,
+       -0.27,
+       0.72
+      ]
+     ],
+     "r": 0.075
+    }
+   ],
+   "exclude": [
+    {
+     "poly": [
+      [
+       -0.95,
+       -0.24,
+       0.62
+      ],
+      [
+       -0.45,
+       -0.28,
+       0.58
+      ],
+      [
+       -0.355,
+       -0.29,
+       0.615
+      ],
+      [
+       -0.1,
+       -0.28,
+       0.625
+      ],
+      [
+       0.05,
+       -0.27,
+       0.645
+      ],
+      [
+       0.2,
+       -0.27,
+       0.72
+      ],
+      [
+       0.45,
+       -0.25,
+       0.85
+      ]
+     ],
+     "r": 0.028
+    },
+    {
+     "box": [
+      -1,
+      -0.165,
+      -1,
+      1,
+      -1,
+      3
+     ]
+    }
+   ],
+   "colors": [
+    {
+     "s": [
+      0.0,
+      0.22
+     ],
+     "v": [
+      0.6,
+      1.0
+     ]
+    },
+    {
+     "h": [
+      0.0,
+      0.13
+     ],
+     "s": [
+      0.15,
+      0.75
+     ],
+     "v": [
+      0.2,
+      0.85
+     ]
+    }
+   ],
+   "transform": {
+    "mirror_x": 0.0,
+    "from": [
+     [
+      -0.16,
+      -0.19,
+      0.775
+     ],
+     [
+      0.2,
+      -0.26,
+      0.72
+     ]
+    ],
+    "to": [
+     [
+      0.14,
+      -0.08,
+      0.8
+     ],
+     [
+      0.39499999999999996,
+      -0.29,
+      0.615
+     ]
+    ],
+    "post_mirror_x": 0.02
+   },
+   "_note": "v22 round 4 (producer: the left arm joined the torso at the wrong place): built exactly like the draw arm (mirrored copy, shoulder at the draw arm's shoulder (0.14,-0.08,0.80)) aimed at the mirror of the bow grip, then mirrored across the trunk mid-plane x=0.02 (face/head/feet midline) -- the bow arm is the mirror image of the draw arm at the shoulder: joint (-0.10,-0.08,0.80), fist at the bow grip (-0.355,-0.29,0.615)"
+  },
+  {
+   "op": "copy",
+   "tag": "draw_arm",
+   "include": [
+    {
+     "poly": [
+      [
+       -0.16,
+       -0.19,
+       0.775
+      ],
+      [
+       0.08,
+       -0.23,
+       0.75
+      ],
+      [
+       0.2,
+       -0.26,
+       0.72
+      ],
+      [
+       0.27,
+       -0.27,
+       0.72
+      ]
+     ],
+     "r": 0.075
+    }
+   ],
+   "exclude": [
+    {
+     "poly": [
+      [
+       -0.95,
+       -0.24,
+       0.62
+      ],
+      [
+       -0.45,
+       -0.28,
+       0.58
+      ],
+      [
+       -0.355,
+       -0.29,
+       0.615
+      ],
+      [
+       -0.1,
+       -0.28,
+       0.625
+      ],
+      [
+       0.05,
+       -0.27,
+       0.645
+      ],
+      [
+       0.2,
+       -0.27,
+       0.72
+      ],
+      [
+       0.45,
+       -0.25,
+       0.85
+      ]
+     ],
+     "r": 0.028
+    },
+    {
+     "box": [
+      -1,
+      -0.165,
+      -1,
+      1,
+      -1,
+      3
+     ]
+    }
+   ],
+   "colors": [
+    {
+     "s": [
+      0.0,
+      0.22
+     ],
+     "v": [
+      0.6,
+      1.0
+     ]
+    },
+    {
+     "h": [
+      0.0,
+      0.13
+     ],
+     "s": [
+      0.15,
+      0.75
+     ],
+     "v": [
+      0.2,
+      0.85
+     ]
+    }
+   ],
+   "transform": {
+    "mirror_x": 0.0,
+    "from": [
+     [
+      -0.16,
+      -0.19,
+      0.775
+     ],
+     [
+      0.2,
+      -0.26,
+      0.72
+     ]
+    ],
+    "to": [
+     [
+      0.14,
+      -0.08,
+      0.8
+     ],
+     [
+      -0.09,
+      -0.29,
+      0.61
+     ]
+    ]
+   }
+  },
+  {
+   "op": "delete",
+   "tag": "old_arm",
+   "include": [
+    {
+     "poly": [
+      [
+       -0.16,
+       -0.19,
+       0.775
+      ],
+      [
+       0.08,
+       -0.23,
+       0.75
+      ],
+      [
+       0.2,
+       -0.26,
+       0.72
+      ],
+      [
+       0.27,
+       -0.27,
+       0.72
+      ]
+     ],
+     "r": 0.075
+    }
+   ],
+   "exclude": [
+    {
+     "poly": [
+      [
+       -0.95,
+       -0.24,
+       0.62
+      ],
+      [
+       -0.45,
+       -0.28,
+       0.58
+      ],
+      [
+       -0.355,
+       -0.29,
+       0.615
+      ],
+      [
+       -0.1,
+       -0.28,
+       0.625
+      ],
+      [
+       0.05,
+       -0.27,
+       0.645
+      ],
+      [
+       0.2,
+       -0.27,
+       0.72
+      ],
+      [
+       0.45,
+       -0.25,
+       0.85
+      ]
+     ],
+     "r": 0.028
+    },
+    {
+     "box": [
+      -1,
+      -0.165,
+      -1,
+      1,
+      -1,
+      3
+     ]
+    }
+   ],
+   "colors": [
+    {
+     "s": [
+      0.0,
+      0.22
+     ],
+     "v": [
+      0.6,
+      1.0
+     ]
+    },
+    {
+     "h": [
+      0.0,
+      0.13
+     ],
+     "s": [
+      0.15,
+      0.75
+     ],
+     "v": [
+      0.2,
+      0.85
+     ]
+    }
+   ]
+  },
+  {
+   "op": "rip",
+   "tag": "bow",
+   "seed": [
+    -0.335,
+    -0.38,
+    0.2
+   ],
+   "include": [
+    {
+     "poly": [
+      [
+       -0.29,
+       -0.395,
+       0.04
+      ],
+      [
+       -0.335,
+       -0.38,
+       0.2
+      ],
+      [
+       -0.37,
+       -0.35,
+       0.35
+      ],
+      [
+       -0.395,
+       -0.3,
+       0.55
+      ],
+      [
+       -0.395,
+       -0.25,
+       0.85
+      ],
+      [
+       -0.365,
+       -0.215,
+       1.0
+      ],
+      [
+       -0.31,
+       -0.2,
+       1.18
+      ]
+     ],
+     "r": 0.05
+    },
+    {
+     "box": [
+      -1.0,
+      -0.42,
+      -0.5,
+      -0.1,
+      0.38,
+      1.15
+     ]
+    },
+    {
+     "poly": [
+      [
+       -0.95,
+       -0.24,
+       0.62
+      ],
+      [
+       -0.45,
+       -0.28,
+       0.58
+      ],
+      [
+       -0.355,
+       -0.29,
+       0.615
+      ],
+      [
+       -0.1,
+       -0.28,
+       0.625
+      ],
+      [
+       0.05,
+       -0.27,
+       0.645
+      ],
+      [
+       0.2,
+       -0.27,
+       0.72
+      ],
+      [
+       0.45,
+       -0.25,
+       0.85
+      ]
+     ],
+     "r": 0.05
+    },
+    {
+     "box": [
+      0.4,
+      1.0,
+      -0.5,
+      -0.1,
+      0.7,
+      1.5
+     ]
+    },
+    {
+     "poly": [
+      [
+       -0.355,
+       -0.29,
+       0.615
+      ]
+     ],
+     "r": 0.085
+    },
+    {
+     "poly": [
+      [
+       -0.31,
+       -0.21,
+       1.12
+      ],
+      [
+       -0.09,
+       -0.29,
+       0.61
+      ],
+      [
+       -0.28,
+       -0.39,
+       0.14
+      ]
+     ],
+     "r": 0.025
+    }
+   ]
+  },
+  {
+   "op": "drop_component",
+   "tag": "meshy_bow",
+   "seeds": [
+    [
+     -0.335,
+     -0.38,
+     0.2
+    ],
+    [
+     0.6,
+     -0.22,
+     0.95
+    ],
+    [
+     -0.8,
+     -0.25,
+     0.6
+    ]
+   ],
+   "_note": "v22 round 3 (producer): the Meshy bow, arrow, both flame sticks and the string are one tangle -- all removed; meshfix/archer_bow.py builds a clean bow and arrow"
+  },
+  {
+   "op": "drop_small",
+   "tag": "slivers",
+   "min_verts": 12
+  },
+  {
+   "op": "fill",
+   "tag": "holes",
+   "poke": false,
+   "smooth": {
+    "cuts": 1,
+    "iters": 30,
+    "inflate": 0.3,
+    "mosaic": true
+   }
+  }
+ ]
+}
