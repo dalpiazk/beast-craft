@@ -172,7 +172,79 @@ def detect_landmarks_handplaced(obj, H, to_normalized, beast_name):
                       and "hinge" in data["jaw_split"] else None),
         "jaw_mouth_tip": (to_normalized(data["jaw_split"]["mouth_tip"]) if isinstance(data.get("jaw_split"), dict)
                           and "mouth_tip" in data["jaw_split"] else None),
+        # v21 (opt-in, Stalker): rigid detail with no bone of its own (antlers) -- see
+        # rigid_regions_normalized and rig_creature.py's generic rigid_regions pass.
+        "rigid_regions": rigid_regions_normalized(data, to_normalized),
+        "weight_smooth_regions": rigid_regions_normalized(
+            {"rigid_regions": [dict(r, bone="") for r in data.get("weight_smooth_regions") or []]},
+            to_normalized, keep=("iterations",)),
     }
+
+
+def smooth_weights_region(obj, center, radius, iterations=6, max_influences=4, **_):
+    """v21 (opt-in "weight_smooth_regions", Stalker chest underside): Laplacian relaxation of the
+    vertex weights of every vertex within `radius` of `center` (mesh-edge neighbours, half own /
+    half neighbour mean per pass; vertices outside the sphere act as fixed boundary values), then
+    the top `max_influences` kept and renormalised. For a patch where heat weighting left HARD
+    neighbouring ownerships of independently moving bones (one vertex 100% scapula_FL beside one
+    on leg_FR_thigh/neck_01/jaw under the Stalker's chin): a gradient over several edge rings
+    instead of one 5-8x stretched edge. Returns the number of vertices relaxed."""
+    import bmesh
+    me = obj.data
+    r2 = radius * radius
+    region = [v.index for v in me.vertices if (v.co - center).length_squared <= r2]
+    if not region:
+        return 0
+    nbr = {i: set() for i in range(len(me.vertices))}
+    for e in me.edges:
+        a, b = e.vertices
+        nbr[a].add(b)
+        nbr[b].add(a)
+    W = [{g.group: g.weight for g in v.groups} for v in me.vertices]
+    rs = set(region)
+    for _ in range(iterations):
+        new = {}
+        for i in region:
+            acc = {}
+            nb = nbr[i]
+            for j in nb:
+                for g, w in W[j].items():
+                    acc[g] = acc.get(g, 0.0) + w / len(nb)
+            mixed = {g: 0.5 * W[i].get(g, 0.0) + 0.5 * acc.get(g, 0.0) for g in set(W[i]) | set(acc)}
+            top = sorted(mixed.items(), key=lambda kv: -kv[1])[:max_influences]
+            tot = sum(w for _, w in top) or 1.0
+            new[i] = {g: w / tot for g, w in top if w / tot > 1e-4}
+        for i in region:
+            W[i] = new[i]
+    for i in rs:
+        v = me.vertices[i]
+        for g in list(v.groups):
+            if g.group not in W[i]:
+                obj.vertex_groups[g.group].remove([i])
+        for g, w in W[i].items():
+            obj.vertex_groups[g].add([i], w, "REPLACE")
+    return len(region)
+
+
+def rigid_regions_normalized(data, to_normalized, keep=()):
+    """v21: the landmark file's optional "rigid_regions" list ({bone, center, radius, min_z?, min_y?,
+    protect_roles?}, native coords) converted to the normalised frame (radius/min_* scaled by the
+    same uniform factor as every point). [] when absent, so older rigs are unchanged."""
+    regs = data.get("rigid_regions") or []
+    if not regs:
+        return []
+    o = to_normalized((0.0, 0.0, 0.0))
+    k = (to_normalized((0.0, 0.0, 1.0)) - o).z
+    out = []
+    for r in regs:
+        c = to_normalized(r["center"])
+        out.append({"bone": r["bone"], "center": c, "radius": r["radius"] * k,
+                    "min_z": to_normalized((0, 0, r["min_z"])).z if "min_z" in r else None,
+                    "min_y": to_normalized((0, r["min_y"], 0)).y if "min_y" in r else None,
+                    "protect_roles": tuple(r.get("protect_roles", ())),
+                    "protect_threshold": r.get("protect_threshold", 0.1),
+                    **{k: r[k] for k in keep if k in r}})
+    return out
 
 
 def _body_forward(lm):

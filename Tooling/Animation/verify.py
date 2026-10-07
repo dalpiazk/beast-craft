@@ -46,15 +46,17 @@ def _peek_rig_props(path):
     arm = next(o for o in bpy.data.objects if o.type == "ARMATURE")
     return {k: (list(arm.data[k]) if hasattr(arm.data[k], "__len__") and not isinstance(arm.data[k], str)
                 else arm.data[k])
-            for k in ("template", "locomotion", "hover_offset", "forward", "hinges") if k in arm.data}
+            for k in ("template", "locomotion", "hover_offset", "forward", "hinges", "follow_squash",
+                      "squash_bone", "max_joints") if k in arm.data}
 
 
 RIG_PROPS = _peek_rig_props(MOVE_BLEND or KEYED_BLEND)
 IS_BIRD = RIG_PROPS.get("template") == "winged_biped"
 # v20: rigs that carry the armature props (winged_biped, the opted-in quadruped Frost Wyrm, and the
 # new biped_arms / serpent templates) all get the whole-mesh ground gate and every-clip edge stretch.
-EXT = RIG_PROPS.get("template") in ("winged_biped", "quadruped", "biped_arms", "serpent")
+EXT = RIG_PROPS.get("template") in ("winged_biped", "quadruped", "biped_arms", "serpent", "blob")
 SLITHER = RIG_PROPS.get("locomotion") == "slither"
+HOP = RIG_PROPS.get("locomotion") == "hop"  # v21 blob rigs (Brute, Swarmling)
 HOVER = RIG_PROPS.get("locomotion") == "hover"
 HOVER_OFFSET = float(RIG_PROPS.get("hover_offset", 0.0))
 if EXT:
@@ -131,6 +133,11 @@ if MOVE_BLEND:
     if SLITHER:
         # v20 legless serpent: no feet at all; check_body_wave below is its Move gate instead.
         move_report["skipped"] = "legless slither: no feet (foot-slide/knee gates n/a)"
+        leg_sides = []
+    if HOP:
+        # v21 blob: no stepping leg chains (the Brute has none; the Swarmling's leg PAIRS jiggle,
+        # they never plant); check_hop below is its Move gate instead.
+        move_report["skipped"] = "blob hop: no stepping legs (foot-slide/knee gates n/a)"
         leg_sides = []
     for side in leg_sides:
         if set(leg_sides) == set(LATERAL_SEQUENCE):
@@ -616,7 +623,10 @@ def check_walk_direction(blend_path, action_name="Move"):
     return result
 
 
-if MOVE_BLEND and SLITHER:
+if MOVE_BLEND and HOP:
+    report["walk_direction"] = {"pass": True, "skipped": "blob hop: no stepping feet"}
+    print("  walk_direction: SKIPPED (blob hop -- see check_hop)")
+elif MOVE_BLEND and SLITHER:
     report["walk_direction"] = {"pass": True, "skipped": "legless slither: no feet"}
     print("  walk_direction: SKIPPED (legless slither -- see check_body_wave)")
 elif MOVE_BLEND and HOVER:
@@ -747,7 +757,9 @@ def check_foot_orientation(blend_path, action_name="Move"):
     return {"forward": list(round(c, 4) for c in forward), "legs": leg_results, "pass": overall_pass}
 
 
-if MOVE_BLEND and SLITHER:
+if MOVE_BLEND and HOP:
+    report["foot_orientation"] = {"pass": True, "skipped": "blob hop: no planted feet"}
+elif MOVE_BLEND and SLITHER:
     report["foot_orientation"] = {"pass": True, "skipped": "legless slither: no feet"}
 elif MOVE_BLEND and HOVER:
     report["foot_orientation"] = {"pass": True, "skipped": "hover flier: feet never planted"}
@@ -1167,6 +1179,158 @@ def check_body_wave(blend_path, H=2.0):
 if MOVE_BLEND and SLITHER:
     report["body_wave"] = check_body_wave(MOVE_BLEND)
 
+
+# v21 hop (blob rigs, hard gate): the hop Move must actually HOP and squash/stretch at the right
+# moments, with the footprint on the floor between hops, and the rigid face/horn followers must stay
+# attached to the squashing ball on every frame of every clip. Measured on the baked actions:
+#   * hop: the deformed mesh's lowest vertex rises >= HOP_MIN_LIFT * H off the floor; >= 25% of the
+#     cycle in floor contact (lowest vertex within 1 cm of the floor -- the footprint sits on the
+#     ground between hops) and >= 15% airborne (lowest vertex above half the peak clearance); never
+#     below -5 mm on a contact frame;
+#   * squash/stretch: body scale Y reaches <= 1 - SQUASH_MIN (squash) and >= 1 + STRETCH_MIN
+#     (stretch); the deepest squash happens on a contact frame and the mean height scale while
+#     airborne exceeds the mean in contact (stretch in the air, squash on the ground); the scale
+#     volume sx*sy*sz stays within VOLUME_TOL of 1 on every frame;
+#   * loop seam INCLUDING scale and location (the rotation-only seam above would miss a squash
+#     that does not return);
+#   * legs: any leg-pair bone (legs_*) swings >= 10 deg over the cycle;
+#   * followers (every clip): each follow_squash bone's head is within 1 mm of where the body's
+#     posed transform carries its rest head.
+HOP_MIN_LIFT, SQUASH_MIN, STRETCH_MIN, VOLUME_TOL = 0.03, 0.10, 0.05, 0.15
+
+
+def _follower_err(arm_obj, follow, squash_bone):
+    body = arm_obj.pose.bones[squash_bone]
+    M = body.matrix @ body.bone.matrix_local.inverted()
+    worst = 0.0
+    for n in follow:
+        pb = arm_obj.pose.bones.get(n)
+        if pb is None:
+            continue
+        want = M @ pb.bone.head_local
+        worst = max(worst, (pb.head - want).length)
+    return worst
+
+
+def check_hop(blend_path, H=2.0):
+    arm_obj = load(blend_path)
+    mesh_obj = next(o for o in bpy.data.objects if o.type == "MESH")
+    action = bpy.data.actions.get("Move")
+    arm_obj.animation_data_create()
+    arm_obj.animation_data.action = action
+    scene = bpy.context.scene
+    sb = RIG_PROPS.get("squash_bone", "body")
+    f0, f1 = [int(round(x)) for x in action.frame_range]
+    rz, sy, vol, lowv = [], [], [], []
+    legs = sorted(b.name for b in arm_obj.data.bones if b.name.startswith("legs_"))
+    leg_rot = {b: [] for b in legs}
+    for f in range(f0, f1):
+        scene.frame_set(f)
+        rz.append((arm_obj.matrix_world @ arm_obj.pose.bones["root"].head).z)
+        sc = arm_obj.pose.bones[sb].scale
+        sy.append(sc.y)
+        vol.append(sc.x * sc.y * sc.z)
+        lowv.append(min((v.co.z for v in _eval_verts(mesh_obj))))
+        for b in legs:
+            leg_rot[b].append(arm_obj.pose.bones[b].matrix_basis.to_quaternion())
+    # contact / airborne from the deformed mesh itself (the root may be raised a little on a
+    # grounded frame to keep a leaning round base out of the floor -- see blob_pose.ground_lift)
+    lift = max(lowv)
+    contact = [i for i, z in enumerate(lowv) if z <= 0.01]
+    air = [i for i, z in enumerate(lowv) if z > 0.5 * lift]
+    n = len(rz)
+    i_sq = min(range(n), key=lambda i: sy[i])
+    sy_air = sum(sy[i] for i in air) / max(1, len(air))
+    sy_con = sum(sy[i] for i in contact) / max(1, len(contact))
+    foot_lo = min(lowv[i] for i in contact) if contact else 1e9
+    foot_hi = max(lowv[i] for i in contact) if contact else 1e9
+    leg_rng = {}
+    for b, qs in leg_rot.items():
+        leg_rng[b] = round(max(math.degrees(qs[0].rotation_difference(q).angle) for q in qs), 2)
+    # seam incl. scale + location
+    seam = 0.0
+    scene.frame_set(f0)
+    s0 = {pb.name: (pb.matrix_basis.copy()) for pb in arm_obj.pose.bones}
+    scene.frame_set(f1)
+    for pb in arm_obj.pose.bones:
+        a, b = s0[pb.name], pb.matrix_basis
+        seam = max(seam, max(abs(a[i][j] - b[i][j]) for i in range(4) for j in range(4)))
+    res = {"clearance_peak": round(lift, 4), "root_z_range": [round(min(rz), 4), round(max(rz), 4)], "contact_frac": round(len(contact) / n, 3),
+           "airborne_frac": round(len(air) / n, 3), "body_sy_min": round(min(sy), 4),
+           "body_sy_max": round(max(sy), 4), "deepest_squash_on_contact": i_sq in contact,
+           "sy_mean_airborne": round(sy_air, 4), "sy_mean_contact": round(sy_con, 4),
+           "volume_range": [round(min(vol), 4), round(max(vol), 4)],
+           "contact_lowest_vertex_z": [round(foot_lo, 4), round(foot_hi, 4)],
+           "leg_pair_swing_deg": leg_rng, "seam_max_matrix_delta": round(seam, 6)}
+    ok_hop = lift >= HOP_MIN_LIFT * H and len(contact) >= 0.25 * n and len(air) >= 0.15 * n
+    ok_sq = (min(sy) <= 1 - SQUASH_MIN and max(sy) >= 1 + STRETCH_MIN and i_sq in contact
+             and sy_air > sy_con and all(abs(v - 1) <= VOLUME_TOL for v in vol))
+    ok_foot = -0.005 <= foot_lo and foot_hi <= 0.01
+    ok_legs = all(r >= 10.0 for r in leg_rng.values())
+    ok_seam = seam < 1e-3
+    res.update({"hop_pass": ok_hop, "squash_stretch_pass": ok_sq, "footprint_pass": ok_foot,
+                "legs_pass": ok_legs, "seam_pass": ok_seam,
+                "pass": ok_hop and ok_sq and ok_foot and ok_legs and ok_seam})
+    print(f"  hop: peak clearance {lift:.3f} (>= {HOP_MIN_LIFT * H:.2f}), contact {len(contact)}/{n} airborne "
+          f"{len(air)}/{n}; body sy {min(sy):.3f}..{max(sy):.3f} (deepest squash on contact {i_sq in contact}, "
+          f"mean sy air {sy_air:.3f} > contact {sy_con:.3f}), volume {min(vol):.3f}..{max(vol):.3f}; "
+          f"footprint lowest vertex on contact frames {foot_lo:.4f}..{foot_hi:.4f}; leg pairs {leg_rng}; "
+          f"seam {seam:.2e} -> {'PASS' if res['pass'] else 'FAIL'}")
+    return res
+
+
+def _eval_verts(mesh_obj):
+    dg = bpy.context.evaluated_depsgraph_get()
+    eo = mesh_obj.evaluated_get(dg)
+    me = eo.to_mesh()
+    out = [type("V", (), {"co": eo.matrix_world @ v.co})() for v in me.vertices]
+    eo.to_mesh_clear()
+    return out
+
+
+def check_followers(blend_path, clip_names):
+    arm_obj = load(blend_path)
+    scene = bpy.context.scene
+    follow = list(RIG_PROPS.get("follow_squash", []))
+    sb = RIG_PROPS.get("squash_bone", "body")
+    out = {}
+    for name in clip_names:
+        action = bpy.data.actions.get(name)
+        if action is None:
+            continue
+        arm_obj.animation_data_create()
+        arm_obj.animation_data.action = action
+        f0, f1 = [int(round(x)) for x in action.frame_range]
+        w = 0.0
+        for f in range(f0, f1 + 1):
+            scene.frame_set(f)
+            w = max(w, _follower_err(arm_obj, follow, sb))
+        rec = {"max_err": round(w, 6), "pass": w <= 0.001}
+        if name in ("Idle", "Victory", "Move"):  # looping: full seam incl. scale + location
+            scene.frame_set(f0)
+            m0 = {pb.name: pb.matrix_basis.copy() for pb in arm_obj.pose.bones}
+            scene.frame_set(f1)
+            sm = max(abs(m0[pb.name][i][j] - pb.matrix_basis[i][j]) for pb in arm_obj.pose.bones
+                     for i in range(4) for j in range(4))
+            rec["seam_full_max_delta"] = round(sm, 6)
+            rec["pass"] = rec["pass"] and sm < 1e-3
+        out[name] = rec
+    ok = all(v["pass"] for v in out.values())
+    print(f"  followers attached ({follow}): " + ", ".join(f"{k} {v['max_err']:.5f}" for k, v in out.items())
+          + f" -> {'PASS' if ok else 'FAIL'}")
+    return {"clips": out, "pass": ok}
+
+
+if MOVE_BLEND and HOP:
+    report["hop"] = check_hop(MOVE_BLEND)
+if HOP and RIG_PROPS.get("follow_squash"):
+    _fo = {}
+    if MOVE_BLEND:
+        _fo.update(check_followers(MOVE_BLEND, ["Move"])["clips"])
+    if KEYED_BLEND:
+        _fo.update(check_followers(KEYED_BLEND, ["Idle", "Attack", "Cast", "Hit", "KO", "Victory"])["clips"])
+    report["followers"] = {"clips": _fo, "pass": all(v["pass"] for v in _fo.values())}
+
 # v20 round 2 (humanoid Treant, hard gate): every hinge (elbows, knees -- rig_templates/biped_arms
 # HINGES, stored on the armature as `hinges`) must bend like a human one on EVERY frame of every
 # clip: the child bone's direction in the parent's posed frame is split into a flexion angle about
@@ -1254,7 +1418,8 @@ print("VERIFY DONE")
 hard_fail = False
 _HARD = ("walk_direction", "foot_orientation", "toe_fan", "toe_deformation")
 if EXT:  # v19/v20: correctness gates for the new rigs (v18 creatures' exit behaviour unchanged)
-    _HARD = _HARD + ("mesh_ground_clearance", "wing_motion", "body_wave", "joint_limits")
+    _HARD = _HARD + ("mesh_ground_clearance", "wing_motion", "body_wave", "joint_limits", "hop",
+                     "followers")
 for gate_name in _HARD:
     if gate_name in report and not report[gate_name].get("pass", False):
         print("=" * 70)

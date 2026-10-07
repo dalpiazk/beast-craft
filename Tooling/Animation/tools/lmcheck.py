@@ -108,6 +108,13 @@ def chains_of(L):
             out.append(("crown", [L["crown"]["base"], t], (40, 160, 40)))
     if "horns" in L:
         out.append(("horn", [L["horns"]["base"], L["horns"]["tip"]], (255, 255, 255)))
+    if "body" in L and "parts" in L:  # v21 blob: body column + every part bone
+        out.append(("body", [L["body"]["base"], L["body"]["top"]], (255, 160, 0)))
+        cols = [(255, 0, 0), (0, 120, 255), (0, 200, 90), (160, 60, 255), (0, 230, 230), (255, 0, 255)]
+        for i, p in enumerate(L["parts"]):
+            out.append((p["name"], [p["head"], p["tail"]], cols[i % len(cols)]))
+            for f in p.get("feet", []):
+                out.append((p["name"] + "_foot", [p["tail"], [f[0], f[1], 0.0]], cols[i % len(cols)]))
     return out
 
 
@@ -138,6 +145,11 @@ def all_points(L):
     if "horns" in L:
         pts.append(("horn_base", L["horns"]["base"]))
         pts.append(("horn_tip", L["horns"]["tip"]))
+    if "body" in L and "parts" in L:  # v21 blob
+        pts.append(("body_top", L["body"]["top"]))
+        for p in L["parts"]:
+            pts.append((p["name"] + "_head", p["head"]))
+            pts.append((p["name"] + "_tail", p["tail"]))
     return pts
 
 
@@ -258,7 +270,19 @@ def main():
     sp = L.get("spine", {})
     specs = []
     body_plan = L.get("body_plan", "")
-    if L.get("body_chain"):  # serpent: sagittal x=0 + transverse z sections of the neck, coil z
+    if "body" in L and "parts" in L:  # v21 blob: sagittal through the body column + sections per part
+        bx = L["body"]["base"][0]
+        specs.append((0, float(bx), [("body_top", L["body"]["top"])] +
+                      [(p["name"], p["head"]) for p in L["parts"]], f"sagittal x={bx:.2f}"))
+        for p in L["parts"]:
+            for end in ("head", "tail"):
+                q = p[end]
+                specs.append((1, q[1], [(p["name"] + "_" + end, q)], f"y={q[1]:.2f} {p['name']}_{end}"))
+                rep["sections"].append(sec_report(P, F, 1, q[1], q, f"{p['name']}_{end} @y"))
+        bt = L["body"]["top"]
+        mid = [bt[0], bt[1], bt[2] / 2]
+        rep["sections"].append(sec_report(P, F, 1, mid[1], mid, "body_mid @y"))
+    elif L.get("body_chain"):  # serpent: sagittal x=0 + transverse z sections of the neck, coil z
         specs.append((0, 0.0, [(f"b{i}", p) for i, p in enumerate(L["body_chain"])] +
                       [(k, v) for k, v in sp.items()], "sagittal x=0"))
         for i, p in enumerate(L["body_chain"]):

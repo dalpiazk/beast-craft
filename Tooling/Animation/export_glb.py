@@ -72,10 +72,14 @@ TRUTH = {"rest": {b.name: _m(arm_obj.matrix_world @ b.matrix_local) for b in arm
 # v19 (birds): per-creature facts stored on the armature by rig_templates/winged_biped.py (absent
 # on every other rig, which keeps its exact previous behaviour): the flier gate mode, the engine
 # hover offset and extra outline-mask joints, both forwarded to the events sidecar below.
-MOVE_MODE = {"hover": "hover", "slither": "slither"}.get(arm_obj.data.get("locomotion"), "walk")
+MOVE_MODE = {"hover": "hover", "slither": "slither", "hop": "hop"}.get(arm_obj.data.get("locomotion"), "walk")
+# v21: the Swarmling's merged-swarm joint budget (absent on every other rig -> no check)
+MAX_JOINTS = int(arm_obj.data["max_joints"]) if "max_joints" in arm_obj.data else None
 HOVER_OFFSET = float(arm_obj.data.get("hover_offset", 0.0))
 OUTLINE_MASK_ZERO = list(arm_obj.data.get("outline_mask_zero", []))
 TRUTH["move_mode"] = MOVE_MODE
+if MAX_JOINTS is not None:
+    TRUTH["max_joints"] = MAX_JOINTS
 
 
 def quaternion_fcurves_to_euler(action):
@@ -243,7 +247,11 @@ else:
 # v18 round 5: hard gate on the GLB itself -- see glb_gate.py. Fails the export loudly.
 with open(os.path.join(OUT, "glb_gate_truth.json"), "w") as f:
     json.dump({"fps": FPS, **TRUTH}, f)  # lets `python glb_gate.py GLB TRUTH` re-run the gate standalone
-gate_pass, gate_report = glb_gate.run_gate(out_path, TRUTH, FPS, move_mode=MOVE_MODE)
+gate_pass, gate_report = glb_gate.run_gate(out_path, TRUTH, FPS, move_mode=MOVE_MODE, max_joints=MAX_JOINTS)
+if "joints" in gate_report:
+    print(f"GLB GATE JOINTS: {gate_report['joints']['count']} (max {gate_report['joints']['max']})")
+for _clip, _h in gate_report.get("hop", {}).items():
+    print(f"GLB GATE HOP {_clip}: {_h}")
 with open(os.path.join(OUT, "glb_gate_report.json"), "w") as f:
     json.dump(gate_report, f, indent=2)
 for _clip, _r in gate_report["clips"].items():

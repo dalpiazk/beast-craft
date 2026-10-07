@@ -181,6 +181,18 @@ GAIT_PARAMS["treant"].update(_FK_COMMON, cycle_seconds=1.6, duty=0.6, crouch_fra
                              foot_curl=10.0, toe_curl=16.0,
                              knee_pole="forward", bird=True, bird_layers=_TREANT_SWAY,
                              bird_hold=_TREANT_HOLD)
+# v21 (enemies): Stalker -- quadruped template with the Frost Wyrm opt-ins (body forward, lateral
+# roll). A sneaky predator's PROWL: a deep crouch (crouch_frac 0.12 of its ~0.5 legs), a slow 1.4 s
+# cycle with a high duty factor (three feet down most of the time -- careful, not trotting), long low
+# strides, almost no bob, the head carried low and forward (neck_02 held -14 deg: bowed toward the
+# prey) with a slow scanning turn, and the bushy tail held out and swishing.
+GAIT_PARAMS["stalker"] = dict(GAIT_PARAMS["tarasque"])
+GAIT_PARAMS["stalker"].update(_FK_COMMON, cycle_seconds=1.4, duty=0.68, crouch_frac=0.12,
+                              stride_frac=0.16, lift_frac=0.10, scapula_swing=7.0,
+                              pelvis_roll=2.0, pelvis_yaw=3.5, body_bob=0.003, tail_yaw=7.0,
+                              tail_pitch=1.5, head_amp=0.4, foot_curl=8.0, toe_curl=12.0,
+                              bird=True, bird_layers=[("b", "neck_02", "turn", 4.0, 1, 0.6)],
+                              bird_hold=[("b", "neck_02", "pitch", -14.0)])
 # v20 (anim-last): Leviathan -- rig_templates/serpent.py, `locomotion: "slither"`. No legs: Move is
 # an in-place slither, baked per frame through anim/bird_pose.py's semantic channels: a TRAVELLING
 # yaw wave runs down the flat coil from the neck base to the tail tip (each tail bone's "turn" lags
@@ -245,6 +257,46 @@ GAIT_PARAMS["thunderbird"] = dict(
                ("b", "head", "pitch", -2.0, 2, 0.0)],
     hold=[("b", "tail_01", "pitch", -6.0), ("b", "tail_02", "pitch", -4.0)],
 )
+# v21 (enemies batch 1): blob rigs (rig_templates/blob.py) -- `locomotion: "hop"`. No legs to step:
+# Move is an in-place HOP baked per frame through anim/bird_pose.py's semantic channels, with the
+# body bone's SCALE carrying the squash/stretch (anim/blob_pose.SQ keeps the volume) and the face/
+# horn followers riding on the ball (blob_pose.follow_squash). Key poses are (fraction, pose, ease)
+# in bird_pose's pose format; _hk() builds one. The footprint stays on the floor between hops (root
+# z 0 at every contact key; ground_lift only ever raises the root when a lean would dip the round
+# base through the floor).
+def _hk(t, sq, z=0.0, pitch=0.0, bank=0.0, ease="inout", **bones):
+    b = {"body": dict(zip(("sx", "sy", "sz"), ((1.0 / sq) ** 0.5, sq, (1.0 / sq) ** 0.5)))}
+    for k, v in bones.items():
+        b[k] = {"pitch": v} if isinstance(v, (int, float)) else dict(v)
+    return (t, {"bones": b, "root": {"z": z, "pitch": pitch, "bank": bank}}, ease)
+
+
+# Brute (stubborn, heavy): ONE big lumbering hop per 1.2 s -- a long anticipation squash (leaning
+# into it, brow down), a launch stretch, a heavy arc to ~10% of its height, a stretched fall and a
+# hard landing squash that the tuft whips through, a small rebound, then the footprint sits on the
+# floor until the next wind-up.
+GAIT_PARAMS["brute"] = dict(locomotion="hop", cycle_seconds=1.2, keys=[
+    _hk(0.00, 1.00),
+    _hk(0.24, 0.80, pitch=-5.0, head=-6.0, tuft=6.0),
+    _hk(0.36, 1.13, z=0.10, pitch=-3.0, head=-2.0, tuft=-8.0, ease="in"),
+    _hk(0.50, 1.04, z=0.19, pitch=2.0, head=2.0, tuft=-4.0, ease="out"),
+    _hk(0.64, 1.07, z=0.07, pitch=3.0, head=3.0, tuft=4.0, ease="in"),
+    _hk(0.71, 0.76, z=0.0, pitch=0.0, head=-5.0, tuft=-12.0, ease="in"),
+    _hk(0.85, 1.04, head=2.0, tuft=6.0),
+    _hk(1.00, 1.00)],
+    layers=[("b", "head", "turn", 2.0, 1, 0.0), ("b", "tuft", "turn", 4.0, 1, -0.8)])
+# Swarmling (skittery): TWO quick little hops per 0.8 s with a side-to-side waddle (the root rocks
+# toward each landing side in turn), both leg pairs scrabbling in antiphase, the crest jiggling and
+# the head darting about. Hop keys below are fractions of ONE hop (half the cycle).
+_SW_HOP = [_hk(0.00, 1.00), _hk(0.12, 0.84, pitch=-3.0), _hk(0.24, 1.12, z=0.07, ease="in"),
+           _hk(0.38, 1.03, z=0.13, ease="out"), _hk(0.52, 1.06, z=0.06, pitch=2.0, ease="in"),
+           _hk(0.60, 0.84, z=0.0, pitch=2.0, ease="in"), _hk(0.78, 1.03), _hk(1.00, 1.00)]
+GAIT_PARAMS["swarmling"] = dict(locomotion="hop", cycle_seconds=0.8, keys=(
+    [(0.5 * t, p, e) for t, p, e in _SW_HOP] + [(0.5 + 0.5 * t, p, e) for t, p, e in _SW_HOP[1:]]),
+    layers=[("r", "bank", 4.0, 1, 0.0), ("b", "legs_F", "pitch", 24.0, 2, 0.0),
+            ("b", "legs_B", "pitch", -24.0, 2, 0.0), ("b", "crest", "pitch", 8.0, 2, -1.2),
+            ("b", "crest", "turn", 6.0, 1, -0.6), ("b", "head", "turn", 5.0, 1, 0.5),
+            ("b", "head", "pitch", 3.0, 2, 0.8)])
 GP = GAIT_PARAMS.get(CREATURE, GAIT_PARAMS["griffin"])
 FK_ANCHORED = GP.get("fk_anchored", False)
 if GP.get("bird"):
@@ -270,6 +322,37 @@ H = 2.0  # this pipeline's shared normalisation convention (common.normalise_tra
 all_bones = [b.name for b in arm_data.bones]
 leg_sides = sorted({n.split("_")[1] for n in all_bones if n.startswith("leg_")})
 print(f"LEG SIDES: {leg_sides}")
+
+if GP.get("locomotion") == "hop":
+    # v21 blob hop Move (see GAIT_PARAMS["brute"] / ["swarmling"]); FORWARD from the armature prop
+    # (a blob has no pelvis bone for the head-minus-pelvis derivation below).
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import bird_pose as BP
+    import blob_pose as BLP
+    _fwd = mathutils.Vector(tuple(arm_data["forward"]))
+    _fwd.z = 0.0
+    _fwd.normalize()
+    _n = int(round(CYCLE_SECONDS * FPS))
+    _keys = list(GP["keys"])
+
+    def _hop_chans(t):
+        return BP.add_channels(BP.sample_keys(_keys, t), BP.sines(GP.get("layers", []), t))
+
+    def _hop_post(c, t):
+        BLP.follow_squash(arm_obj)
+        BLP.ground_lift(arm_obj, mesh_obj, lambda z: BP.set_root(
+            arm_obj, _fwd, (c.get(("r", "x"), 0.0), c.get(("r", "y"), 0.0), z), c.get(("r", "pitch"), 0.0),
+            c.get(("r", "turn"), 0.0), c.get(("r", "bank"), 0.0)), c.get(("r", "z"), 0.0))
+    bpy.context.view_layer.objects.active = arm_obj
+    bpy.ops.object.mode_set(mode="POSE")
+    BP.bake_frames(arm_obj, scene, _fwd, "Move", _n, _hop_chans, _hop_post)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    print(f"MOVE ACTION (hop): {_n + 1} frames @ {FPS}fps, {len(_keys)} key poses, "
+          f"{len(GP.get('layers', []))} sine layers, FORWARD {tuple(round(c, 3) for c in _fwd)}")
+    bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, f"{CREATURE}_move.blend"))
+    print("GAIT DONE")
+    raise SystemExit(0)
+
 
 # Per-leg bend direction (and is_front), read from rig_creature.py's rig_report.json (same OUT
 # directory as the rigged .blend) -- this is the horizontal-slicing landmark detection's own read

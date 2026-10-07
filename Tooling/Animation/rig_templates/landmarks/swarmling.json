@@ -1,0 +1,162 @@
+{
+ "body_plan": "blob: small round mite on four stubby legs, curled horns, spiky crest",
+ "locomotion": "hop",
+ "max_joints": 6,
+ "body": {
+  "base": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "top": [
+   0.0,
+   0.0,
+   1.15
+  ]
+ },
+ "parts": [
+  {
+   "name": "head",
+   "parent": "root",
+   "role": "head",
+   "follow": true,
+   "head": [
+    0.0,
+    -0.2,
+    0.55
+   ],
+   "tail": [
+    0.0,
+    -0.6,
+    0.5
+   ],
+   "region": [
+    {
+     "axis": "y",
+     "hi": -0.15,
+     "ramp": 0.15
+    },
+    {
+     "axis": "z",
+     "lo": 0.2,
+     "ramp": 0.12
+    }
+   ]
+  },
+  {
+   "name": "legs_F",
+   "parent": "root",
+   "role": "legs_F",
+   "head": [
+    0.0,
+    -0.16,
+    0.28
+   ],
+   "tail": [
+    0.0,
+    -0.16,
+    0.03
+   ],
+   "feet": [
+    [
+     -0.454,
+     -0.158
+    ],
+    [
+     0.35,
+     -0.158
+    ]
+   ],
+   "foot_radius": 0.21,
+   "z_full": 0.12,
+   "z_top": 0.26,
+   "snap_tail": false
+  },
+  {
+   "name": "legs_B",
+   "parent": "root",
+   "role": "legs_B",
+   "head": [
+    -0.1,
+    0.37,
+    0.28
+   ],
+   "tail": [
+    -0.1,
+    0.37,
+    0.03
+   ],
+   "feet": [
+    [
+     -0.336,
+     0.42
+    ],
+    [
+     0.128,
+     0.315
+    ]
+   ],
+   "foot_radius": 0.21,
+   "z_full": 0.12,
+   "z_top": 0.26,
+   "snap_tail": false
+  },
+  {
+   "name": "crest",
+   "parent": "body",
+   "role": "crest",
+   "head": [
+    0.0,
+    0.0,
+    0.95
+   ],
+   "tail": [
+    0.0,
+    0.15,
+    1.34
+   ],
+   "snap_tail": false,
+   "region": {
+    "axis": "z",
+    "lo": 0.85,
+    "ramp": 0.15
+   }
+  }
+ ],
+ "rigid_regions": [
+  {
+   "bone": "head",
+   "center": [
+    -0.76,
+    -0.33,
+    0.75
+   ],
+   "radius": 0.27,
+   "note": "left curled horn: rigid with the face"
+  },
+  {
+   "bone": "head",
+   "center": [
+    0.66,
+    -0.33,
+    0.75
+   ],
+   "radius": 0.27,
+   "note": "right curled horn"
+  }
+ ],
+ "spine": {
+  "head": [
+   0.0,
+   -0.2,
+   0.55
+  ],
+  "snout_tip": [
+   0.0,
+   -0.6,
+   0.5
+  ]
+ },
+ "notes": "v21 enemy (Hollow region): Swarmling, a skittery swarm biter. A small pear-shaped moss puff on four stubby rust legs, two curled rust horns at the cheeks, a spiky leaf crest, violet glow-slit eyes. Crowd unit drawn through Live3D's merged swarm batches: HARD budget of 6 bones (root, body, head, legs_F, legs_B, crest) and ~1.5k tris (1499 after prep). Front feet at x -0.45/+0.35, hind feet at x -0.34/+0.13 (the mesh is asymmetric); each leg PAIR is one bone (one swing for both feet). Horns are forced rigid to head (rigid_regions, no bone). Personality: Skittery - quick hop-waddle, scrappy bite, jittery idle.",
+ "_placed_by": "v21: placed by the writer from z/x mesh sections (zsec.py), a midline z-profile probe and the calibrated views; checked with tools/lmcheck.py (blob mode). body column x=0,y=0 from the floor to z 1.15 (ball 0..~1.24; the spikes reach 1.42); head follower from inside the ball (y -0.2, z 0.55) to the face front (y -0.6, z 0.5, face section z 0.30..0.90); leg-pair bones on the line between each pair of feet (tails unsnapped: they sit between the feet, outside the mesh by design). lmcheck: 4 points report OUTSIDE, all by design and unsnapped: the leg-pair tails (between each pair of feet, on the floor), the crest tail (among the spikes above the ball) and body_top (only sets the body bone's length; the sparse low-poly crown has open leaf cards, so the ray-parity test is unreliable there). Every other point is inside."
+}
