@@ -2170,13 +2170,240 @@ LAST_PARAMS = {
 }
 
 
+# ---------------------------------------------------------------------------
+# v21 (enemies batch 1, Hollow region): Stalker (quadruped template, planted-foot IK like the Frost
+# Wyrm), Brute and Swarmling (rig_templates/blob.py: squash/stretch body + follower bones, see
+# anim/blob_pose.py). Same data-driven builder; blob-only spec keys: "_sq" in a pose = body squash
+# factor s (body sy = s, sx = sz = 1/sqrt(s), volume kept), "ground_lift" (lift the root only when
+# the deformed mesh would dip below the floor -- rocking a round body about its centre).
+# ---------------------------------------------------------------------------
+def _SQ(sq, **extra):
+    """Blob body squash channels (volume kept): height x sq, width/depth x 1/sqrt(sq)."""
+    w = (1.0 / sq) ** 0.5
+    return dict({"sx": w, "sy": sq, "sz": w}, **extra)
+
+
+_BR_IDLE = [("b", "body", "sy", 0.025, 2, 0.0), ("b", "body", "sx", -0.0125, 2, 0.0),
+            ("b", "body", "sz", -0.0125, 2, 0.0), ("b", "tuft", "turn", 5.0, 1, -0.6),
+            ("b", "tuft", "pitch", 3.0, 2, -1.0)]
+_SW_JIT = [("b", "body", "sy", 0.03, 4, 0.0), ("b", "body", "sx", -0.015, 4, 0.0),
+           ("b", "body", "sz", -0.015, 4, 0.0), ("b", "legs_F", "pitch", 6.0, 4, 0.0),
+           ("b", "legs_B", "pitch", -6.0, 4, 0.9), ("b", "crest", "pitch", 5.0, 4, -1.0),
+           ("b", "crest", "turn", 4.0, 2, 0.3)]
+_ST_TAIL = [("b", "tail_01", "turn", 5.0, 1, 0.0), ("b", "tail_02", "turn", 8.0, 1, -0.6),
+            ("b", "tail_03", "turn", 11.0, 1, -1.2)]
+ENEMY_PARAMS = {
+    # Sneaky: low, coiled and watchful. Feet planted (IK) except where lifted; KO lies flat.
+    "stalker": dict(
+        hover=False, planted=True,
+        clips={
+            # Crouched and watching: slow breathing, head low and scanning side to side, the tail
+            # swishing, a little weight shift.
+            "Idle": dict(seconds=3.0, keys=[(0.0, {}), (1.0, {})], bob=(-0.03, 0.006, 2), layers=_ST_TAIL + [
+                ("b", "spine_02", "pitch", 1.0, 2, 0.0), ("b", "neck_02", "turn", 9.0, 1, 0.4),
+                ("b", "head", "turn", 5.0, 1, 0.9), ("b", "neck_02", "pitch", 2.0, 2, 0.3),
+                ("r", "bank", 1.0, 1, 0.0)]),
+            # Pounce: sink low and draw back (head down, tail lashing), then spring forward and up
+            # with the forepaws thrown out ahead and the head stretched at the prey, land, recover.
+            "Attack": dict(seconds=1.15, sharp=2, keys=[
+                (0.0, {}),
+                (0.32, _P(spine_02=(-3, 0, 0), neck_01=(-6, 0, 0), neck_02=(-12, 0, 0), head=(-6, 0, 0),
+                          tail_01=(-6, 10, 0), tail_02=(0, 12, 0), tail_03=(0, 14, 0),
+                          _root={"z": -0.13, "f": -0.09, "pitch": -5})),
+                (0.50, _P(spine_02=(4, 0, 0), neck_01=(-4, 0, 0), neck_02=(-10, 0, 0), head=(-4, 0, 0),
+                          tail_01=(8, -6, 0), tail_02=(6, -8, 0), tail_03=(4, -8, 0),
+                          _lift={"FL": (0.24, 0.46), "FR": (0.24, 0.46)},
+                          _root={"z": 0.12, "f": 0.34, "pitch": 10})),
+                (0.66, _P(neck_02=(-14, 0, 0), head=(-8, 0, 0), tail_01=(2, -4, 0),
+                          _lift={"FL": (0.0, 0.30), "FR": (0.0, 0.30)},
+                          _root={"z": -0.07, "f": 0.22, "pitch": -5})),
+                (1.0, {})]),
+            # Sly charm: rises a little on the hind legs, head and antlers lifted high, forepaws
+            # off the ground, held (cast_release), then settles.
+            "Cast": dict(seconds=1.35, sharp=2, marker=(2, "cast_release"), layers=_ST_TAIL, keys=[
+                (0.0, {}),
+                (0.30, _P(neck_02=(-6, 0, 0), head=(-6, 0, 0), _root={"z": -0.05, "f": -0.02})),
+                (0.52, _P(spine_02=(6, 0, 0), neck_01=(10, 0, 0), neck_02=(10, 0, 0), head=(6, 0, 0),
+                          tail_01=(-8, 0, 0), _lift={"FL": (0.10, 0.02), "FR": (0.10, 0.02)},
+                          _root={"pitch": 9, "z": -0.03, "f": -0.04})),
+                (0.72, _P(spine_02=(6, 0, 0), neck_01=(10, 0, 0), neck_02=(10, 0, 0), head=(8, 0, 0),
+                          tail_01=(-8, 0, 0), _lift={"FL": (0.10, 0.02), "FR": (0.10, 0.02)},
+                          _root={"pitch": 9, "z": -0.03, "f": -0.04})),
+                (1.0, {})]),
+            # Struck: flinches back and low, head snapped aside, then settles.
+            "Hit": dict(seconds=0.55, sharp=1, marker=(1, "hit_react"), keys=[
+                (0.0, {}),
+                (0.24, _P(spine_02=(3, 0, 0), neck_02=(8, 12, 0), head=(10, 14, 8),
+                          tail_01=(0, -12, 0), tail_02=(0, -12, 0),
+                          _root={"f": -0.08, "z": -0.05, "bank": -5})),
+                (0.50, _P(neck_02=(3, 4, 0), head=(4, 5, 3), tail_01=(0, -4, 0),
+                          _root={"f": -0.03, "z": -0.02})),
+                (1.0, {})]),
+            # Sly and pleased: a slow head tilt with a smug nod, the tail swishing in big slow arcs
+            # and the body rocking in a low crouch; returns exactly to rest (loops).
+            "Victory": dict(seconds=2.0, bob=(-0.025, 0.012, 2),
+                            layers=[("b", "tail_01", "turn", 10.0, 2, 0.0), ("b", "tail_02", "turn", 14.0, 2, -0.6),
+                                    ("b", "tail_03", "turn", 18.0, 2, -1.2), ("b", "tail_03", "pitch", -6.0, 2, -1.0)],
+                            keys=[(0.0, {}),
+                                  (0.25, _P(neck_02=(6, 8, 0), head=(6, 10, -16), _root={"bank": -3})),
+                                  (0.55, _P(neck_02=(8, -6, 0), head=(2, -8, 14), _root={"bank": 3})),
+                                  (0.80, _P(neck_02=(3, 0, 0), head=(4, 2, -4))),
+                                  (1.0, {})]),
+            # Collapses onto its belly, legs splayed out on the ground, head down on the floor.
+            "KO": dict(seconds=1.6, ko=True, impact=0.55, keys=[
+                (0.0, {}),
+                (0.20, _P(neck_02=(-6, 0, 0), head=(-8, 6, 8), _root={"bank": 6, "z": -0.04})),
+                (0.55, _P(_legs(60, -60, 5), spine_02=(-3, 0, 0), neck_01=(-10, 0, 0), neck_02=(-14, 0, 0),
+                          head=(-12, 6, 10), tail_01=(-10, 8, 0), tail_02=(4, 10, 0),
+                          _root={"z": -0.25})),
+                (0.84, _P(_legs(78, -78, 6), spine_02=(-4, 0, 0), neck_01=(-14, 0, 0), neck_02=(-18, 0, 0),
+                          head=(-12, 6, 10), tail_01=(-14, 10, 0), tail_02=(6, 12, 0), tail_03=(3, 8, 0),
+                          _root={"z": -0.30})),
+                (1.0, "same")]),
+        }),
+    # Stubborn, grumpy, HEAVY: everything starts with a slow wind-up squash and lands hard. No legs:
+    # body squash/stretch (_SQ), root lean/hop/charge, the rigid face+horns riding on the ball, the
+    # tuft whipping as follow-through. Not planted; every non-KO frame is ground-lifted (a lean
+    # about the root would swing the round base into the floor).
+    "brute": dict(
+        hover=False, planted=False, ground_lift=True,
+        clips={
+            # Grumpy breathing (slow heave of the ball), a sullen look side to side, a huff.
+            "Idle": dict(seconds=3.0, keys=[(0.0, {}), (1.0, {})], layers=_BR_IDLE + [
+                ("b", "head", "turn", 6.0, 1, 0.4), ("b", "head", "pitch", -2.5, 2, 0.8),
+                ("r", "bank", 1.2, 1, 1.0)]),
+            # Horn charge / headbutt: rocks back and squashes (gathering), then bulls forward with
+            # the whole ball stretched and pitched down horns-first, a hard impact squash at the end
+            # of the charge, rebound, back to its spot.
+            "Attack": dict(seconds=1.35, sharp=2, keys=[
+                (0.0, {}),
+                (0.30, _P(body=_SQ(0.84), head=(8, 0, 0), tuft=(10, 0, 0),
+                          _root={"pitch": 10, "f": -0.08})),
+                (0.48, _P(body=_SQ(1.10), head=(-12, 0, 0), tuft=(-10, 0, 0),
+                          _root={"pitch": -12, "f": 0.18, "z": 0.05})),
+                (0.56, _P(body=_SQ(0.80), head=(-16, 0, 0), tuft=(-16, 0, 0),
+                          _root={"pitch": -14, "f": 0.22})),
+                (0.74, _P(body=_SQ(1.04), head=(-6, 0, 0), tuft=(8, 0, 0),
+                          _root={"pitch": -4, "f": 0.12})),
+                (1.0, {})]),
+            # Stubborn bellow: squats right down (gathering), then heaves up tall, face to the sky,
+            # tuft flared, a little off the ground (cast_release), drops back with a squash.
+            "Cast": dict(seconds=1.45, sharp=2, marker=(2, "cast_release"), keys=[
+                (0.0, {}),
+                (0.30, _P(body=_SQ(0.80), head=(-8, 0, 0), tuft=(8, 0, 0))),
+                (0.50, _P(body=_SQ(1.22), head=(14, 0, 0), tuft={"pitch": -6, "sy": 1.2},
+                          _root={"z": 0.08, "pitch": 4})),
+                (0.70, _P(body=_SQ(1.16), head=(12, 0, 0), tuft={"pitch": -4, "sy": 1.15},
+                          _root={"z": 0.05, "pitch": 3})),
+                (0.84, _P(body=_SQ(0.84), head=(-4, 0, 0), tuft=(-10, 0, 0))),
+                (1.0, {})]),
+            # Struck: shoved back on its heels, squashed, face screwed up and turned away.
+            "Hit": dict(seconds=0.6, sharp=1, marker=(1, "hit_react"), keys=[
+                (0.0, {}),
+                (0.24, _P(body=_SQ(0.80), head=(12, 12, 6), tuft=(18, 8, 0),
+                          _root={"f": -0.12, "pitch": 12})),
+                (0.55, _P(body=_SQ(1.05), head=(4, 4, 2), tuft=(-6, 0, 0), _root={"f": -0.05, "pitch": 3})),
+                (1.0, {})]),
+            # Grumpy-proud: two heavy stomping bounces in place, chin up and a smug head tilt;
+            # returns exactly to rest (loops).
+            "Victory": dict(seconds=2.2, layers=[("b", "tuft", "turn", 8.0, 2, 0.0)], keys=[
+                (0.0, {}),
+                (0.14, _P(body=_SQ(0.84), head=(4, 0, 0))),
+                (0.24, _P(body=_SQ(1.10), head=(10, 0, -8), _root={"z": 0.07})),
+                (0.34, _P(body=_SQ(1.0), head=(10, 0, -10), _root={"z": 0.10})),
+                (0.44, _P(body=_SQ(0.82), head=(6, 0, -10))),
+                (0.58, _P(body=_SQ(0.84), head=(6, 0, 10))),
+                (0.68, _P(body=_SQ(1.10), head=(12, 0, 10), _root={"z": 0.07})),
+                (0.78, _P(body=_SQ(1.0), head=(12, 0, 8), _root={"z": 0.10})),
+                (0.88, _P(body=_SQ(0.84), head=(4, 0, 0))),
+                (1.0, {})]),
+            # Dazed wobble, then topples over onto its side and lies there, a little flattened, one
+            # horn on the floor and the grumpy face in profile (on its back, both the battle and the
+            # head-on camera saw only the flat underside). Root bank pivots about the base centre,
+            # so "x" slides the root sideways by about the ball's radius: it rolls over in place
+            # instead of landing beside its tile (the ko ground settle rests the lowest point on
+            # the floor).
+            "KO": dict(seconds=1.6, ko=True, impact=0.6, keys=[
+                (0.0, {}),
+                (0.22, _P(body=_SQ(0.9), head=(-6, 10, 8), tuft=(10, 0, 0), _root={"bank": -10})),
+                (0.60, _P(body=_SQ(0.88), head=(4, 0, -6), tuft=(0, 0, 14), _root={"bank": 84, "x": 0.66})),
+                (0.84, _P(body=_SQ(0.9), head=(6, 0, -8), tuft=(0, 0, 18), _root={"bank": 80, "x": 0.66})),
+                (1.0, "same")]),
+        }),
+    # Skittery and scrappy: quick, jittery, never still; tiny squash pulses, scrabbling leg pairs.
+    "swarmling": dict(
+        hover=False, planted=False, ground_lift=True,
+        clips={
+            # Jittery: quick squash pulses, legs fidgeting, head darting about, crest twitching.
+            "Idle": dict(seconds=2.0, keys=[(0.0, {}), (1.0, {})], layers=_SW_JIT + [
+                ("b", "head", "turn", 9.0, 3, 0.0), ("b", "head", "pitch", 3.0, 4, 0.5),
+                ("r", "bank", 2.0, 2, 0.3)]),
+            # Scrappy bite-lunge: crouch back, spring forward horns-first with the front legs
+            # reaching and the hind legs kicking, chomp (head snaps down), land squashed, scurry back.
+            "Attack": dict(seconds=0.9, sharp=2, keys=[
+                (0.0, {}),
+                (0.28, _P(body=_SQ(0.82), head=(8, 0, 0), legs_F=(-12, 0, 0), legs_B=(12, 0, 0),
+                          _root={"pitch": 6, "f": -0.05})),
+                (0.46, _P(body=_SQ(1.15), head=(-14, 0, 0), legs_F=(30, 0, 0), legs_B=(-28, 0, 0),
+                          _root={"pitch": -15, "f": 0.28, "z": 0.08})),
+                (0.60, _P(body=_SQ(0.84), head=(-8, 0, 0), legs_F=(10, 0, 0), legs_B=(-10, 0, 0),
+                          _root={"pitch": -4, "f": 0.30})),
+                (0.80, _P(body=_SQ(1.04), legs_F=(-8, 0, 0), legs_B=(8, 0, 0), _root={"f": 0.10})),
+                (1.0, {})]),
+            # Puffs up: crouch, then a fluffed-up stretch with the crest flared and head thrown back,
+            # hopping off the ground (cast_release), drop.
+            "Cast": dict(seconds=1.0, sharp=2, marker=(2, "cast_release"), layers=_SW_JIT, keys=[
+                (0.0, {}),
+                (0.28, _P(body=_SQ(0.80), head=(-6, 0, 0), crest=(6, 0, 0))),
+                (0.50, _P(body=_SQ(1.18), head=(12, 0, 0), crest={"pitch": -10, "sy": 1.3},
+                          legs_F=(-14, 0, 0), legs_B=(14, 0, 0), _root={"z": 0.10})),
+                (0.70, _P(body=_SQ(1.10), head=(10, 0, 0), crest={"pitch": -6, "sy": 1.2},
+                          _root={"z": 0.05})),
+                (0.84, _P(body=_SQ(0.86))),
+                (1.0, {})]),
+            # Struck: bowled back and squashed flat, legs flailing.
+            "Hit": dict(seconds=0.45, sharp=1, marker=(1, "hit_react"), keys=[
+                (0.0, {}),
+                (0.25, _P(body=_SQ(0.80), head=(12, 10, 0), legs_F=(26, 0, 0), legs_B=(-20, 0, 0),
+                          crest=(14, 0, 0), _root={"f": -0.12, "pitch": 14})),
+                (0.6, _P(body=_SQ(1.05), head=(4, 3, 0), legs_F=(6, 0, 0), _root={"f": -0.04, "pitch": 3})),
+                (1.0, {})]),
+            # Delighted: four bouncy hops in place, spinning a full turn over the middle two (loops).
+            "Victory": dict(seconds=1.6, layers=[("b", "legs_F", "pitch", 16.0, 4, 0.0),
+                                                 ("b", "legs_B", "pitch", -16.0, 4, 0.0),
+                                                 ("b", "crest", "pitch", 8.0, 4, -1.0)], keys=[
+                (0.0, {}),
+                (0.06, _P(body=_SQ(0.84))), (0.13, _P(body=_SQ(1.12), _root={"z": 0.10})),
+                (0.20, _P(body=_SQ(0.86))), (0.31, _P(body=_SQ(1.12), _root={"z": 0.12})),
+                (0.45, _P(body=_SQ(0.86))), (0.56, _P(body=_SQ(1.12), _root={"z": 0.12})),
+                (0.70, _P(body=_SQ(0.86))), (0.81, _P(body=_SQ(1.12), _root={"z": 0.10})),
+                (0.94, _P(body=_SQ(0.90))), (1.0, {})],
+                tracks=[[(0.0, {}), (0.22, {}), (0.66, {"_root": {"turn": 360.0}}),
+                         (1.0, {"_root": {"turn": 360.0}})]]),
+            # Flips over onto its back, legs in the air, a last twitch, still.
+            "KO": dict(seconds=1.2, ko=True, impact=0.55, keys=[
+                (0.0, {}),
+                (0.20, _P(body=_SQ(0.85), head=(8, 0, 0), _root={"pitch": -6})),
+                (0.55, _P(body=_SQ(0.92), head=(10, 0, 0), legs_F=(-20, 0, 0), legs_B=(20, 0, 0),
+                          _root={"pitch": 105, "bank": 6, "f": 0.8})),
+                (0.84, _P(body=_SQ(0.94), head=(10, 0, 0), legs_F=(-14, 0, 0), legs_B=(14, 0, 0),
+                          _root={"pitch": 100, "bank": 6, "f": 0.8})),
+                (1.0, "same")]),
+        }),
+}
+
+
 def build_bird_clips(creature):
     import mathutils
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import bird_pose as BP
 
-    BPAR = BIRD_PARAMS[creature] if creature in BIRD_PARAMS else LAST_PARAMS[creature]  # v20
+    BPAR = (BIRD_PARAMS[creature] if creature in BIRD_PARAMS else LAST_PARAMS[creature]  # v20
+            if creature in LAST_PARAMS else ENEMY_PARAMS[creature])  # v21
     FWD = BP.forward_of(arm_obj)
+    BLOB = arm_obj.data.get("template") == "blob"  # v21
+    if BLOB:
+        import blob_pose as BLP
     HOVER = float(arm_obj.data.get("hover_offset", 0.0))
     mesh_obj = next(o for o in bpy.data.objects if o.type == "MESH")
     LEG_IK = {s: BP.leg_ik_data(arm_obj, s, FWD) for s in leg_sides}
@@ -2283,6 +2510,13 @@ def build_bird_clips(creature):
             return c
 
         def post(c, t, spec=spec):
+            if BLOB:  # v21: face/horn followers ride on the squashing ball
+                BLP.follow_squash(arm_obj)
+            if BLOB and BPAR.get("ground_lift") and not spec.get("ko"):
+                BLP.ground_lift(arm_obj, mesh_obj, lambda z: BP.set_root(
+                    arm_obj, FWD, (c.get(("r", "x"), 0.0), c.get(("r", "y"), 0.0), z),
+                    c.get(("r", "pitch"), 0.0), c.get(("r", "turn"), 0.0), c.get(("r", "bank"), 0.0)),
+                    c.get(("r", "z"), 0.0))
             if BPAR["planted"] and not spec.get("ko"):
                 lifts = BP.lifts_of(c)
                 for side in leg_sides:
@@ -2348,7 +2582,7 @@ def build_bird_clips(creature):
 
 if CREATURE == "griffin":
     build_griffin_clips()
-elif CREATURE in BIRD_PARAMS or CREATURE in LAST_PARAMS:  # v20: same data-driven builder
+elif CREATURE in BIRD_PARAMS or CREATURE in LAST_PARAMS or CREATURE in ENEMY_PARAMS:  # v20/v21: same builder
     build_bird_clips(CREATURE)
 else:
     build_creature_clips(CREATURE)

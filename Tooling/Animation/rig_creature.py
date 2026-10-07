@@ -69,7 +69,10 @@ CREATURE = args.get("creature", "griffin")
 # v19: birds (upright/hovering bipeds with wings) use rig_templates/winged_biped.py.
 BIRD_CREATURES = ("phoenix", "thunderbird")
 # v20: the Treant (upright biped with arms) and the Leviathan (legless serpent) have their own templates.
-V20_TEMPLATES = {"treant": "biped_arms", "leviathan": "serpent"}
+V20_TEMPLATES = {"treant": "biped_arms", "leviathan": "serpent",
+                 # v21 enemies: the legless Brute and the 6-bone Swarmling use the new blob template
+                 # (the Stalker is a plain quadruped).
+                 "brute": "blob", "swarmling": "blob"}
 TEMPLATE_NAME = args.get("template") or ("winged_quadruped" if CREATURE == "griffin" else
                                          "winged_biped" if CREATURE in BIRD_CREATURES else
                                          V20_TEMPLATES.get(CREATURE, "quadruped"))
@@ -85,6 +88,8 @@ elif TEMPLATE_NAME == "biped_arms":
     import biped_arms as template
 elif TEMPLATE_NAME == "serpent":
     import serpent as template
+elif TEMPLATE_NAME == "blob":
+    import blob as template
 else:
     raise SystemExit(f"rig_creature.py: unknown --template {TEMPLATE_NAME!r} (expected "
                       f"'winged_quadruped', 'quadruped', 'winged_biped', 'biped_arms' or 'serpent')")
@@ -324,6 +329,10 @@ if hasattr(template, "fix_serpent_weights"):
     # v20 (serpent): see serpent.fix_serpent_weights.
     report["weighting"]["serpent_fixes"] = template.fix_serpent_weights(obj, bone_roles, lm)
     print(f"SERPENT WEIGHTS: {report['weighting']['serpent_fixes']}")
+if hasattr(template, "fix_blob_weights"):
+    # v21 (blob): rigid horns + leg-pair regions -- see blob.fix_blob_weights.
+    report["weighting"]["blob_fixes"] = template.fix_blob_weights(obj, bone_roles, lm)
+    print(f"BLOB WEIGHTS: {report['weighting']['blob_fixes']}")
 if hasattr(template, "fix_humanoid_weights") and lm.get("humanoid"):
     # v20 round 2 (biped_arms humanoid opt-in): see biped_arms.fix_humanoid_weights.
     report["weighting"]["humanoid_shell_vertices"] = template.fix_humanoid_weights(obj, bone_roles, lm)
@@ -380,6 +389,23 @@ if CREATURE == "kirin" and lm.get("horn") is not None:
     report["weighting"]["kirin_horns_ears_forced_rigid_to_head"] = horn_forced
     print(f"KIRIN HORNS/EARS: {horn_forced} vertices forced 100% rigid to 'head' "
           f"(region radius {horn_radius:.3f}, min_z {horn_min_z:.3f}, min_y {horn_min_y:.3f})")
+
+# v21 (opt-in per landmark file, Stalker antlers; blob horns): detail with no bone of its own, or a
+# rigid part, forced 100% onto one bone -- the generic form of the Kirin block above.
+for _rr in lm.get("rigid_regions") or []:
+    _n = template.force_rigid_to_bone(obj, bone_roles, _rr["center"], _rr["radius"], _rr["bone"],
+                                      min_z=_rr.get("min_z"), min_y=_rr.get("min_y"),
+                                      protect_roles=_rr.get("protect_roles", ()),
+                                      protect_threshold=_rr.get("protect_threshold", 0.1))
+    report["weighting"].setdefault("rigid_regions", []).append({"bone": _rr["bone"], "forced": _n})
+    print(f"RIGID REGION: {_n} vertices forced 100% to {_rr['bone']!r}")
+
+# v21 (opt-in per landmark file, Stalker): relax hard weight boundaries inside a sphere -- see
+# quadruped.smooth_weights_region.
+for _sr in lm.get("weight_smooth_regions") or []:
+    _n = template.smooth_weights_region(obj, _sr["center"], _sr["radius"], _sr.get("iterations", 6))
+    report["weighting"].setdefault("weight_smooth_regions", []).append(_n)
+    print(f"WEIGHT SMOOTH REGION: {_n} vertices relaxed")
 
 # v20 (opt-in per landmark file, Frost Wyrm): re-split the skull's head-group weight so the jaw bone
 # actually opens the (fused) mouth -- see quadruped.split_jaw_weights.

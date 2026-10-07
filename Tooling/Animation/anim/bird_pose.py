@@ -270,6 +270,9 @@ def bake_frames(arm_obj, scene, fwd, name, n_frames, chan_fn, post_fn=None, inte
     act = bpy.data.actions.new(name)
     act.use_fake_user = True
     arm_obj.animation_data.action = act
+    # v21 (blob rigs): squash-follower bones also get location keys (anim/blob_pose.follow_squash);
+    # every other rig has no `loc_keyed` property, so only root's location is keyed, as before.
+    loc_keyed = {"root"} | set(arm_obj.data.get("loc_keyed", []))
     for i, snap in enumerate(snaps):
         f = i + 1
         scene.frame_set(f)
@@ -279,7 +282,7 @@ def bake_frames(arm_obj, scene, fwd, name, n_frames, chan_fn, post_fn=None, inte
             pb.scale = sc
             pb.keyframe_insert(data_path="rotation_euler", frame=f)
             pb.keyframe_insert(data_path="scale", frame=f)
-            if pb.name == "root":
+            if pb.name in loc_keyed:
                 pb.location = loc
                 pb.keyframe_insert(data_path="location", frame=f)
     for layer in act.layers:

@@ -1843,6 +1843,157 @@ Read from the strips:
   - fresh pre-change baselines for the Frost Wyrm and Leviathan.
 - Re-exported Kirin, Phoenix and Leviathan GLBs are byte-identical to the shipped ones.
 
+## v21: enemies batch 1 (Hollow region) -- Stalker, Brute, Swarmling; a new `blob` template with squash/stretch; hop gates
+
+The first three of the nine Hollow enemies, from Meshy image-to-3D outputs (records
+`Tooling/ArtLab/provenance/meshy-01a113e1/e3/e5-*.md`). The ten shipped beasts are untouched (see
+Regression). Every new behaviour is keyed off landmark-file opt-ins, armature properties or `--creature`
+data.
+
+**Fixed on the way:** `prep_mesh.py --rotate-z-deg` was a silent no-op. The glTF importer leaves the
+object in QUATERNION rotation mode, so writing `rotation_euler` did nothing (the Stalker, the first
+creature to need the flag, came out with bounds identical to the raw mesh). It now sets XYZ first.
+
+### Prep
+
+| Enemy | Tris | Flags | Why |
+| --- | --- | --- | --- |
+| Stalker | 7998 | `--rotate-z-deg -28.8 --no-ground-sheet` | body axis 28.8 deg off Y (PCA of the torso band); after rotation antlers x 0.05, nose x 0.03 |
+| Brute | 8000 | `--no-ground-sheet` | its flat base is anatomy |
+| Swarmling | 1499 | `--no-ground-sheet --target-tris 1500` | crowd unit |
+
+None of the three raw meshes had a ground sheet: zero boundary edges within 5 cm of the floor. The
+ground-sheet pass would have opened 45 / 118 / 52 floor boundary edges (Stalker / Brute / Swarmling);
+with `--no-ground-sheet` the counts match the raw mesh (43 / 8 / 28 edges, all on leaf/spike cards).
+All three face -Y (orientation probe). Both eyes are present on all three in close-ups from both sides;
+no eye repair was needed.
+
+### Landmarks (placed by the writer this time)
+
+Read off horizontal and sagittal mesh sections (scratch `zsec.py`) and the calibrated views, then checked
+with `tools/lmcheck.py` (it gained a blob mode: body column + part bones). Saved to
+`rig_templates/landmarks/<enemy>.json` with notes.
+- Stalker: spine at 0.52-0.58 of each transverse section's height (body z 0.22..1.07). The front legs are
+  staggered in the mesh (FR forward at y -0.59, FL at -0.32); the chains follow the mesh. Knees moved
+  2-3 cm inboard after the first check put them on the body-bottom bulge. All points inside.
+- Brute: body column on the floor at x = y = 0, up to z 1.22 (the y = 0 section spans z 0..1.33). Horn
+  bones from where each coil leaves the skull to its outer loop. The horns are asymmetric in the mesh.
+  All points inside.
+- Swarmling: the leg-pair bone tails sit between their feet on the floor, outside the mesh by design.
+
+### Rigs (every roll explicit; axis dumps in `<enemy>_anim/axes_check.json`)
+
+| Enemy | Template | Bones |
+| --- | --- | --- |
+| Stalker | `quadruped` (Frost Wyrm opt-ins: `forward_mode` body, `roll_policy` lateral) | 30 |
+| Brute | **new `blob`** | 6: root, body, head, horn_L, horn_R, tuft |
+| Swarmling | `blob` | **6** (= Live3D's merged-swarm budget): root, body, head, legs_F, legs_B, crest |
+
+The axis dumps confirm local X = the lateral axis on every bone (|x . LAT| >= 0.98, except the horns,
+which only take semantic channels). +pitch tips a horizontal bone up and a vertical one back, as
+`bird_pose` assumes.
+
+**`rig_templates/blob.py`:**
+- `body` runs from the floor straight up and is the squash/stretch bone. Clips key its SCALE (local Y =
+  height); its head is on the floor, so the base never leaves the ground. Leans and rolls go on root.
+- Parts come from the landmark file's `parts` list. A part parented to root with `"follow": true` is a
+  squash follower: unscaled (the rigid face and horns), with its location keyed every frame so its head
+  rides on the squashing ball (`anim/blob_pose.follow_squash`; the armature's `loc_keyed` list, which
+  `bird_pose.bake_frames` now keys -- absent on every other rig). Parts parented to body (tuft, crest)
+  inherit the squash.
+- Weights (`fix_blob_weights`): a `"rigid"` part's dominant vertices go 100% to it (horns). A leg pair
+  takes the vertices near its feet, with a soft XY rim and a Z ramp. A part's `region` (one or more
+  axis limits) fades its weight to zero outside, handing it to body. Without this, heat weighting
+  spread the face over 689/749 Swarmling vertices and the tuft over 1748 Brute vertices, and the ball
+  could not squash as one piece.
+
+**Generic opt-ins (quadruped and blob):**
+- `rigid_regions` -- the generic form of the Kirin horn block (Stalker antlers, 186 vertices; Brute
+  flower; Swarmling horns);
+- `weight_smooth_regions` -- a Laplacian weight relax inside a sphere. Used for the Stalker's chin
+  underside, where a vertex 100% `scapula_FL` sat beside one on `leg_FR_thigh`/`neck_01`/`jaw`. Move
+  edge stretch went from 5.6x to 3.2x and Cast from 5.7x to 2.7x.
+
+### Clips (all data: gait.py `GAIT_PARAMS`, keyed.py `ENEMY_PARAMS`)
+
+- **Stalker (sneaky):**
+  - Move is a prowl: crouch 0.12 of leg length, 1.4 s, duty 0.68, head carried low (`neck_02` held
+    -14) with a scanning turn;
+  - Attack is a pounce: coil low, spring forward and up with the forepaws thrown out, land;
+  - planted-foot IK elsewhere; KO slumps flat on its belly.
+- **Brute (stubborn, heavy):**
+  - Move is one lumbering hop per 1.2 s: anticipation squash (sy 0.80), launch stretch (1.13), about 10%
+    of its height in the air, a landing squash (0.76) the tuft whips through, a rebound;
+  - Attack is a horn charge: rock back, bull forward horns-first, impact squash;
+  - KO rolls onto its side. On its back, every camera saw only the flat underside.
+- **Swarmling (skittery):**
+  - Move is two quick hops per 0.8 s with a waddle (root bank), the leg pairs scrabbling +-24 deg in
+    antiphase;
+  - jittery Idle, a bite-lunge, a spinning bouncy Victory;
+  - KO flips onto its back, legs up.
+- Blob clips are ground-lifted: the root is raised only when a lean would swing the round base into the
+  floor. A blob KO slides the root by about the ball's radius, so it rolls over in place.
+
+### Gates
+
+`verify.py` treats `blob` as EXT (whole-mesh ground every frame, every-clip edge stretch). A hop rig
+skips foot-slide/knee/walk_direction/foot_orientation, reported as `skipped`. Two new hard gates:
+- **`hop`**, measured on the deformed mesh:
+  - its lowest vertex rises >= 3% H;
+  - >= 25% of the cycle in floor contact (lowest vertex <= 1 cm: the footprint sits on the ground
+    between hops) and >= 15% airborne;
+  - body height scale reaches <= 0.90 and >= 1.05, with the deepest squash on a contact frame and more
+    stretch in the air than on the ground;
+  - scale volume within 15% of 1;
+  - the loop seam includes scale and location;
+  - leg pairs swing >= 10 deg.
+- **`followers`**: every frame of every clip, each follower's head is within 1 mm of where body's posed
+  transform carries it; full matrix seams on Idle/Move/Victory.
+
+`glb_gate.py`:
+- `move_mode="hop"` compares the body's full deformation matrix (scale included -- rotation/position
+  checks alone would miss a squash that never reached the GLB) on every clip;
+- in Move it requires a height-scale span >= 0.15, a root rise >= 0.05 and leg-pair swing >= 10 deg;
+- `max_joints` (armature prop, Swarmling 6) asserts the skin's joint count.
+
+| Gate | Stalker | Brute | Swarmling |
+| --- | --- | --- | --- |
+| loop seams Move/Idle/Victory | 0.000 | 0.000 (+ full matrix 0) | 0.000 (+ full matrix 0) |
+| walk_direction / foot_orientation | PASS (toe 0-11.3, sole 5.7 deg) | skipped (hop) | skipped (hop) |
+| foot slide / knee range | PASS (knees 109-162) | skipped | skipped |
+| hop | -- | PASS (clearance 0.17, contact 62%, air 24%, sy 0.77..1.11) | PASS (0.084, 79%/21%, sy 0.85..1.09, legs 24 deg) |
+| followers | -- | PASS 0.0 mm | PASS 0.0 mm |
+| mesh ground, every frame, 7 clips | PASS (min -0.0000; KO 0.004) | PASS | PASS |
+| KO held | 0.000 | 0.000 | 0.000 |
+| edge stretch Move/Attack/KO (others) | 3.2/4.0/7.2 (2.2-3.3) FAIL | 3.0/3.6/3.4 (2.5-4.6) FAIL | 2.6/2.5/2.5 (2.1-2.7) FAIL |
+| toe_deformation | FAIL 1.6-2.4x; 15 flips Attack, 130 KO (exits 1, the Frost Wyrm class) | n/a | n/a |
+| glb_gate, 7 clips | PASS 0.00 deg / 0.0000 | PASS, scale err 0.0 | PASS, scale err 0.0, 6 joints |
+
+The blobs' worst edges are rigid horn vertices against fur that squashes. The Stalker's are the
+chest/leg boundary and its KO leg splay. None show as tearing in the in-engine strips.
+
+### In-engine (Live3D `--pilot-model`, copies in the bin's Content/model only)
+
+Full-set MP4s per enemy:
+- battle camera, head-on and side;
+- all 7 labelled clips; Idle/Move/Victory looped twice, one-shots +0.4 s, KO +1 s;
+- libx264 crf 20 slow, yuv420p 720x1280 60 fps, +faststart.
+
+Strips are cut from the MP4s.
+
+**Swarm:** Live3D gained `--swarm-model NAME` (load `NAME_anim.glb` into the merged-batch swarm path,
+rescaled to the old swarmling's on-board height), `--swarm-clip` and `--swarm-sequence DIR` (frame-
+indexed capture, implies `--battle`). The 6-joint Swarmling GLB plays through the merged batches
+unchanged: 12 instances, one batch, desynchronised clocks. The swarm path has no unit movement, so it
+plays the in-place Move.
+
+### Regression
+
+`regress/run_regress.sh` was run on all ten shipped beasts before any code change and again after.
+Every rig bone hash, weight hash and Move/keyed F-curve hash is byte-identical. Re-exported Kirin,
+Leviathan and Treant GLBs (and their events sidecars) are byte-identical to the shipped ones. So is the
+Phoenix after `tools/fillholes_glb.py` (the shipped talon fix).
+
 ## v9: max-edge-stretch gate + weight/render fixes -- partial progress, honestly not fully resolved
 ## (lead-review round 9)
 

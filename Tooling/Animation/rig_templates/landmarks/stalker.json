@@ -1,0 +1,231 @@
+{
+ "body_plan": "standing quadruped (wingless), round leafy body on short legs, bushy tail, tall antlers",
+ "legs": [
+  {
+   "side": "FL",
+   "is_front": true,
+   "chain": [
+    [
+     -0.15,
+     -0.26,
+     0.46
+    ],
+    [
+     -0.19,
+     -0.21,
+     0.25
+    ],
+    [
+     -0.18,
+     -0.28,
+     0.07
+    ],
+    [
+     -0.17,
+     -0.31,
+     0.015
+    ]
+   ],
+   "toe_tip": [
+    -0.17,
+    -0.36,
+    0.02
+   ]
+  },
+  {
+   "side": "FR",
+   "is_front": true,
+   "chain": [
+    [
+     0.13,
+     -0.4,
+     0.46
+    ],
+    [
+     0.11,
+     -0.44,
+     0.25
+    ],
+    [
+     0.07,
+     -0.55,
+     0.07
+    ],
+    [
+     0.05,
+     -0.58,
+     0.015
+    ]
+   ],
+   "toe_tip": [
+    0.04,
+    -0.63,
+    0.02
+   ]
+  },
+  {
+   "side": "BL",
+   "is_front": false,
+   "chain": [
+    [
+     -0.17,
+     0.3,
+     0.48
+    ],
+    [
+     -0.16,
+     0.3,
+     0.25
+    ],
+    [
+     -0.19,
+     0.23,
+     0.07
+    ],
+    [
+     -0.19,
+     0.2,
+     0.015
+    ]
+   ],
+   "toe_tip": [
+    -0.19,
+    0.15,
+    0.02
+   ]
+  },
+  {
+   "side": "BR",
+   "is_front": false,
+   "chain": [
+    [
+     0.2,
+     0.28,
+     0.48
+    ],
+    [
+     0.21,
+     0.27,
+     0.25
+    ],
+    [
+     0.25,
+     0.19,
+     0.07
+    ],
+    [
+     0.25,
+     0.16,
+     0.015
+    ]
+   ],
+   "toe_tip": [
+    0.25,
+    0.11,
+    0.02
+   ]
+  }
+ ],
+ "spine": {
+  "pelvis": [
+   0.0,
+   0.32,
+   0.6
+  ],
+  "spine_01": [
+   0.0,
+   -0.05,
+   0.62
+  ],
+  "chest": [
+   0.0,
+   -0.42,
+   0.65
+  ],
+  "neck_base": [
+   -0.02,
+   -0.58,
+   0.74
+  ],
+  "neck_mid": [
+   -0.04,
+   -0.66,
+   0.84
+  ],
+  "head": [
+   -0.05,
+   -0.75,
+   0.92
+  ],
+  "head_top": [
+   -0.05,
+   -0.7,
+   1.08
+  ],
+  "snout_tip": [
+   -0.07,
+   -0.86,
+   0.79
+  ],
+  "jaw_tip": [
+   -0.07,
+   -0.83,
+   0.74
+  ]
+ },
+ "tail": [
+  [
+   0.0,
+   0.5,
+   0.62
+  ],
+  [
+   -0.02,
+   0.75,
+   0.72
+  ],
+  [
+   -0.06,
+   0.95,
+   0.85
+  ],
+  [
+   -0.1,
+   1.1,
+   0.96
+  ]
+ ],
+ "forward_mode": "body",
+ "roll_policy": "lateral",
+ "rigid_regions": [
+  {
+   "bone": "head",
+   "center": [
+    -0.05,
+    -0.75,
+    0.92
+   ],
+   "radius": 1.05,
+   "min_z": 1.02,
+   "protect_roles": [
+    "spine",
+    "neck"
+   ],
+   "note": "both antlers (z 1.02..1.88 above the skull): 100% head"
+  }
+ ],
+ "notes": "v21 enemy (Hollow region): Stalker, a sneaky fast melee hunter. Round leafy-furred body on four short legs, bushy fox tail, two tall branching antlers, big lilac ears, sly narrowed eyes. Mesh prepped with --rotate-z-deg -28.8 (the raw body axis was 28.8 deg off Y; after rotation antler centroid x 0.05, nose x 0.03) and --no-ground-sheet. Head faces -Y. Front legs are staggered in the rest pose (FR forward at y -0.59, FL at -0.32): the leg chains follow the mesh, not a symmetric template. Antlers forced rigid to head (rigid_regions). Personality: Sneaky - low prowling walk with the head held low, a coiled pounce Attack, a sly Victory.",
+ "_placed_by": "v21: placed by the writer from horizontal (z) and sagittal (x) mesh sections (zsec.py) and the calibrated views; checked with tools/lmcheck.py. Spine: pelvis/spine_01/chest sit at 0.58/0.52/0.55 of their transverse section heights (body spans z ~0.22..1.07, centre ~0.63). Knees moved 2-3 cm inboard after the first lmcheck put them on the body-bottom bulge edge. Final lmcheck: every point inside the mesh.",
+ "weight_smooth_regions": [
+  {
+   "center": [
+    -0.03,
+    -0.52,
+    0.25
+   ],
+   "radius": 0.16,
+   "iterations": 6,
+   "note": "chest/chin underside between the front legs: heat weighting left a vertex 100% scapula_FL beside leg_FR_thigh/neck_01/jaw ones (Move 5.6x, KO 8.1x edge stretch)"
+  }
+ ]
+}

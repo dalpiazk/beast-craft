@@ -1,0 +1,117 @@
+{
+ "body_plan": "blob: legless furry ball, ram horns, painted-on paws",
+ "locomotion": "hop",
+ "body": {
+  "base": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "top": [
+   0.0,
+   0.0,
+   1.22
+  ]
+ },
+ "parts": [
+  {
+   "name": "head",
+   "parent": "root",
+   "role": "head",
+   "follow": true,
+   "head": [
+    0.0,
+    -0.2,
+    0.32
+   ],
+   "tail": [
+    0.0,
+    -0.58,
+    0.28
+   ],
+   "region": {
+    "axis": "y",
+    "hi": -0.25,
+    "ramp": 0.15
+   }
+  },
+  {
+   "name": "horn_L",
+   "parent": "head",
+   "role": "horn",
+   "rigid": true,
+   "head": [
+    -0.45,
+    -0.3,
+    0.88
+   ],
+   "tail": [
+    -0.92,
+    -0.4,
+    0.62
+   ]
+  },
+  {
+   "name": "horn_R",
+   "parent": "head",
+   "role": "horn",
+   "rigid": true,
+   "head": [
+    0.3,
+    -0.3,
+    0.9
+   ],
+   "tail": [
+    0.8,
+    -0.45,
+    0.62
+   ]
+  },
+  {
+   "name": "tuft",
+   "parent": "body",
+   "role": "tuft",
+   "head": [
+    -0.05,
+    0.2,
+    1.15
+   ],
+   "tail": [
+    -0.12,
+    0.42,
+    1.6
+   ],
+   "region": {
+    "axis": "z",
+    "lo": 0.98,
+    "ramp": 0.15
+   }
+  }
+ ],
+ "rigid_regions": [
+  {
+   "bone": "horn_R",
+   "center": [
+    0.7,
+    -0.5,
+    1.2
+   ],
+   "radius": 0.2,
+   "note": "the lilac flower sitting on the right horn"
+  }
+ ],
+ "spine": {
+  "head": [
+   0.0,
+   -0.2,
+   0.32
+  ],
+  "snout_tip": [
+   0.0,
+   -0.58,
+   0.28
+  ]
+ },
+ "notes": "v21 enemy (Hollow region): Brute, a stubborn melee tank. A legless moss-furred ball (four paws are only PAINTED on the front), big curled ram horns at the front sides, a grumpy scowling face low on the front, a lilac wisp tuft on top and a lilac flower on the right horn. Mesh prepped with --no-ground-sheet (the flat base is real anatomy; the ground-sheet pass opened 118 floor boundary edges). Moves by a heavy hop with squash and stretch; Attack is a horn charge / headbutt. The horns are asymmetric in the mesh (left coil x -0.96..-0.37, right 0.13..0.86).",
+ "_placed_by": "v21: placed by the writer from z/x mesh sections (zsec.py) and the calibrated views; checked with tools/lmcheck.py (blob mode). Body column at x=0,y=0 from the floor to z 1.22 (the y=0 section spans z 0..1.33; the wisp reaches 1.69). Face follower from inside the ball (y -0.2, z 0.32) to the face front (y -0.58, z 0.28; face section z 0.11..0.46). Horn bones run from where each coil leaves the skull top to its outermost loop (sections at y -0.3/-0.4 put each end at 0.47-0.56 of the coil's height). lmcheck: every point inside the mesh."
+}

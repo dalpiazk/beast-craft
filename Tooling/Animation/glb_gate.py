@@ -28,6 +28,14 @@ constant), so it passed. This gate measures MOTION and MATCH instead:
     bone's world-yaw signal (first harmonic over the loop) must lag the previous bone's, same sign
     on >= 75% of pairs -- a frozen or in-step (rigid) coil fails.
 
+  * v21, blob rigs (`move_mode="hop"`, the Brute and the Swarmling): the leg check is replaced by a
+    HOP check on the GLB itself -- on EVERY clip the squash bone's (body) world scale must match
+    Blender's to <= `max_scale_err` (bone rotations alone would miss a squash that never reached the
+    GLB); in Move the body's height scale must span >= `move_min_squash_span` (squash to stretch),
+    the root must rise >= `move_min_hop` and any leg-pair bone (legs_*) must swing >= 10 deg.
+  * `max_joints` (the Swarmling: 6, Live3D's merged-swarm uniform budget): the GLB's skin may not
+    have more joints.
+
 Coordinates: glTF is Y-up; Blender is Z-up. The Blender glTF exporter maps (x, y, z)_blender ->
 (x, z, -y)_gltf, so C (gltf -> blender) = [[1,0,0],[0,0,-1],[0,1,0]].
 """
@@ -190,7 +198,8 @@ ARM_MIN_RANGE_DEG = {"Move": 12.0, "Idle": 3.0, "Attack": 40.0, "Cast": 40.0, "H
 
 def run_gate(glb_path, truth, fps, max_ang_err_deg=2.0, max_pos_err=0.01,
              move_min_leg_range_deg=15.0, move_mode="walk", move_min_wing_range_deg=25.0,
-             move_min_wave_sum_deg=30.0):
+             move_min_wave_sum_deg=30.0, max_joints=None, squash_bone="body", max_scale_err=0.01,
+             move_min_squash_span=0.15, move_min_hop=0.05):
     """truth: {"rest": {bone: 4x4}, "clips": {clip: {"frame_start": f0, "frames": {f: {bone: 4x4}}}}}
     (Blender world matrices, lists). Returns (passed, report)."""
     g = GlbPose(glb_path)
@@ -198,6 +207,11 @@ def run_gate(glb_path, truth, fps, max_ang_err_deg=2.0, max_pos_err=0.01,
     rest = {b: np.array(m) for b, m in truth["rest"].items()}
     bones = [b for b in rest if b in g_rest]
     report = {"clips": {}, "failures": []}
+    if max_joints is not None:  # v21: Live3D's merged-swarm budget (Swarmling: 6)
+        nj = max(len(sk["joints"]) for sk in g.js.get("skins", [{"joints": []}]))
+        report["joints"] = {"count": nj, "max": max_joints}
+        if nj > max_joints:
+            report["failures"].append(f"skin has {nj} joints > max_joints {max_joints}")
     for clip, cdat in truth["clips"].items():
         if clip not in g.anims:
             report["failures"].append(f"{clip}: animation missing from GLB")
@@ -223,13 +237,42 @@ def run_gate(glb_path, truth, fps, max_ang_err_deg=2.0, max_pos_err=0.01,
                 if ang > worst_ang:
                     worst_ang, worst_where = ang, (b, f)
                 worst_pos = max(worst_pos, pos)
+        if move_mode == "hop" and squash_bone in bones:
+            # v21: the squash must reach the GLB (scale is invisible to the rotation/position checks)
+            serr, sy_g, rz_g = 0.0, [], []
+            for f, pose in sorted(cdat["frames"].items(), key=lambda kv: float(kv[0])):
+                t = t0 + (float(f) - f0) / fps
+                gw = g.world(clip, t)
+                # deformation D = world(t) @ rest^-1 (independent of each format's bone axes);
+                # compare the full 3x3 (rotation AND scale), and read the height scale as the
+                # stretch D gives the body's rest up axis (its bone axis, world Z).
+                dg = gw[squash_bone][:3, :3] @ np.linalg.inv(g_rest[squash_bone][:3, :3])
+                dt = np.asarray(pose[squash_bone])[:3, :3] @ np.linalg.inv(rest[squash_bone][:3, :3])
+                serr = max(serr, float(np.abs(dg - dt).max()))
+                up = rest[squash_bone][:3, 1] / np.linalg.norm(rest[squash_bone][:3, 1])
+                sy_g.append(float(np.linalg.norm(dg @ up)))
+                if "root" in gw:
+                    rz_g.append(float(gw["root"][2, 3]))
+            hop = {"max_scale_err": round(serr, 5), "body_sy_range": [round(min(sy_g), 4), round(max(sy_g), 4)],
+                   "root_z_range": [round(min(rz_g), 4), round(max(rz_g), 4)] if rz_g else None}
+            report.setdefault("hop", {})[clip] = hop
+            if serr > max_scale_err:
+                report["failures"].append(f"{clip}: body scale GLB vs Blender error {serr:.4f} > {max_scale_err}")
+            if clip == "Move":
+                if max(sy_g) - min(sy_g) < move_min_squash_span:
+                    report["failures"].append(f"Move: body height-scale span {max(sy_g) - min(sy_g):.3f} < "
+                                              f"{move_min_squash_span} in the GLB (no squash/stretch)")
+                if rz_g and max(rz_g) - min(rz_g) < move_min_hop:
+                    report["failures"].append(f"Move: root rise {max(rz_g) - min(rz_g):.3f} < {move_min_hop} "
+                                              f"in the GLB (not hopping)")
         leg_ranges = {}
         for b in bones:
             is_leg = b.startswith("leg_") and (b.endswith("_thigh") or b.endswith("_shin"))
             is_wing = move_mode == "hover" and b.startswith("wing_") and b[-3:] in ("_01", "_02")
             is_wave = move_mode == "slither" and b.startswith(("tail_", "body_"))
             is_arm = b.startswith("arm_") and b.endswith(("_upper", "_fore"))  # v20 round 2
-            if not (is_leg or is_wing or is_wave or is_arm):
+            is_pair = move_mode == "hop" and b.startswith("legs_")  # v21 blob leg pairs
+            if not (is_leg or is_wing or is_wave or is_arm or is_pair):
                 continue
             rg = max(_rot_angle(m @ d_g[b][0].T) for m in d_g[b])
             rt = max(_rot_angle(m @ d_t[b][0].T) for m in d_t[b])
@@ -274,6 +317,10 @@ def run_gate(glb_path, truth, fps, max_ang_err_deg=2.0, max_pos_err=0.01,
                 report["failures"].append(f"Move: neck sway sum {bsum:.1f} deg < 6 in the GLB")
             if max(pos, neg) < 0.75 * len(lags):
                 report["failures"].append(f"Move: tail wave does not travel in the GLB (lags {lags})")
+        elif clip == "Move" and move_mode == "hop":
+            for b in sorted(x for x in leg_ranges if x.startswith("legs_")):
+                if leg_ranges[b][0] < 10.0:
+                    report["failures"].append(f"Move: {b} swing {leg_ranges[b][0]:.1f} deg < 10 in the GLB")
         elif clip == "Move":
             sides = sorted({b.split("_")[1] for b in leg_ranges if b.startswith("leg_")})
             for s in sides:
@@ -317,9 +364,13 @@ if __name__ == "__main__":
                            "frames": {float(f): p for f, p in d["frames"].items()}}
                        for c, d in _truth["clips"].items()}
     ok, rep = run_gate(sys.argv[1], _truth, _truth.get("fps", 24),
-                       move_mode=_truth.get("move_mode", "walk"))
+                       move_mode=_truth.get("move_mode", "walk"), max_joints=_truth.get("max_joints"))
     for c, r in rep["clips"].items():
         print(f"{c:8s} max_rot_err={r['max_rot_err_deg']:7.2f} deg  max_pos_err={r['max_pos_err']:.4f}")
+    if "joints" in rep:
+        print(f"JOINTS {rep['joints']['count']} (max {rep['joints']['max']})")
+    for c, h in rep.get("hop", {}).items():
+        print(f"{c:8s} hop: body scale err {h['max_scale_err']} sy {h['body_sy_range']} root z {h['root_z_range']}")
     for c, a in rep.get("arms", {}).items():
         print(f"{c:8s} arm shoulder+elbow LOCAL range deg {a}")
     print("PASS" if ok else "FAIL:")

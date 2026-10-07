@@ -159,6 +159,10 @@ if ROTATE_Z_DEG:
     bpy.ops.object.select_all(action="DESELECT")
     obj.select_set(True)
     bpy.context.view_layer.objects.active = obj
+    # v21 fix: the glTF importer leaves the object in QUATERNION rotation mode, so writing
+    # rotation_euler alone was silently ignored (the flag was a no-op until the Stalker, the first
+    # creature to need it: the prepped bounds came out identical to the raw ones).
+    obj.rotation_mode = "XYZ"
     obj.rotation_euler.z = math.radians(ROTATE_Z_DEG)
     bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
     report["rotate_z_deg_applied"] = ROTATE_Z_DEG
