@@ -1,0 +1,8 @@
+{
+ "_comment": "v22 Shaman eye repair: the approved sprite has two glowing amber eyes either side of the beard face; the Meshy mesh kept the two eye bumps but they read as pale knobs (no eyes). Each op paints a procedural glowing-eye decal onto the bump, projected along the bump's own surface normal. aim = native (x, z) of the bump centre; the surface point comes from a +Y ray from the front.",
+ "ops": [
+  {"name": "eye_L", "aim": [-0.144, 0.979], "r": [0.034, 0.038], "normal_radius": 0.03, "depth": 0.03},
+  {"name": "eye_R", "aim": [0.144, 0.993], "r": [0.034, 0.038], "normal_radius": 0.03, "depth": 0.03}
+ ],
+ "pad": 1.5
+}

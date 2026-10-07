@@ -1,0 +1,159 @@
+{
+ "_comment": "v22 round 5 (producer: the left arm joined the torso at the wrong place -- the mesh had NO shoulders or upper arms, only fists on short forearm stubs poking out of the chest under the leaf mantle): real arms built by meshfix/archer_arms.py. Native coords of archer_prepped.glb (prep_mesh --no-ground-sheet -> prop_surgery.py + archer_cfg.json). Arm parameters are for the right (+X, draw) arm; the left (-X, bow) arm is their mirror image across the trunk mid-plane x = mid_x.",
+ "mid_x": 0.02,
+ "arms": {
+  "R": {
+   "shell_seed": [
+    -0.048,
+    -0.233,
+    0.648
+   ],
+   "old_axis": [
+    [
+     0.14,
+     -0.08,
+     0.8
+    ],
+    [
+     -0.09,
+     -0.29,
+     0.61
+    ]
+   ],
+   "wrist_t": 0.29,
+   "fist_roll": 0.0
+  },
+  "L": {
+   "shell_seed": [
+    -0.292,
+    -0.243,
+    0.642
+   ],
+   "old_axis": [
+    [
+     -0.1,
+     -0.08,
+     0.8
+    ],
+    [
+     -0.355,
+     -0.29,
+     0.615
+    ]
+   ],
+   "wrist_t": 0.29,
+   "fist_roll": 0.0
+  }
+ },
+ "arm": {
+  "socket": {
+   "y": -0.05,
+   "z": 0.83,
+   "dir": [
+    1.0,
+    0.0,
+    -0.1
+   ],
+   "radius": 0.065,
+   "normal_mix": 0.5,
+   "_note": "the torso wall just under the leaf mantle (mantle underside ~z 0.90 here, flaring out to |x| 0.42): the mantle overlaps the shoulder cap"
+  },
+  "cap_out": 0.035,
+  "upper_dir": [
+   0.5,
+   -0.3,
+   -0.81
+  ],
+  "upper_len": 0.17,
+  "fore_dir": [
+   0.35,
+   -0.65,
+   -0.68
+  ],
+  "fore_len": 0.15,
+  "wrist_gap": 0.012,
+  "sides": 12,
+  "ring_ref": [
+   0.0,
+   -1.0,
+   0.0
+  ],
+  "rings": [
+   [
+    0,
+    0.3,
+    0.062
+   ],
+   [
+    0,
+    0.7,
+    0.068
+   ],
+   [
+    0,
+    1.0,
+    0.07
+   ],
+   [
+    1,
+    0.22,
+    0.067
+   ],
+   [
+    1,
+    0.45,
+    0.063
+   ],
+   [
+    1,
+    0.65,
+    0.059
+   ],
+   [
+    1,
+    0.84,
+    0.055
+   ],
+   [
+    1,
+    1.0,
+    0.053
+   ],
+   [
+    2,
+    0.16,
+    0.053
+   ],
+   [
+    2,
+    0.38,
+    0.055
+   ],
+   [
+    2,
+    0.6,
+    0.052
+   ],
+   [
+    2,
+    0.8,
+    0.048
+   ],
+   [
+    2,
+    0.95,
+    0.046
+   ]
+  ],
+  "_rings": "[segment (0 socket->cap, 1 cap->elbow, 2 elbow->wrist), position 0..1 along it, radius]: 3 loops at the shoulder cap, 3 round the elbow (1/0.84, 1/1.0, 2/0.16)"
+ },
+ "uv_patch": {
+  "target_hsv": [
+   0.09,
+   0.18,
+   0.83
+  ],
+  "tol": 0.09,
+  "_note": "the torso's cream skin beside the shoulder (h 0.09, s 0.18, v 0.83, sampled); the largest cream square of the atlas nearest it"
+ }
+}

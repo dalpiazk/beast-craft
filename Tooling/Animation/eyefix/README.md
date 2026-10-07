@@ -93,3 +93,19 @@ ellipse, feather, occlusion tolerance, `two_sided` for inconsistent mesh winding
 keep saturated red/orange target texels such as a beak or crest out of the paint). `--glb`/`--out`
 on the `eyefix_bl.py` command line override the config file's own `"glb"`/`"out"` fields, which are
 otherwise local-machine paths you would have to edit by hand.
+
+## eyepaint.py (v22, the Shaman)
+
+`eyefix_bl.py` can only mirror an eye that exists. The Shaman's Meshy mesh kept the sprite's two eye
+BUMPS beside the beard but lost their glow (both pale knobs: no eyes). `eyepaint.py` (plain Python,
+numpy + Pillow) paints a procedural glowing-eye decal (pale-yellow core, orange glow, thin plum rim,
+soft halo, the sprite's look) onto each bump, projected along the bump's own averaged surface normal
+and limited to points within `depth` of the decal plane, then splices the texture back with
+`glbtex.splice` (only the image bufferView changes; `glbtex.py compare` proves it).
+
+```sh
+python Tooling/Animation/eyefix/eyepaint.py Tooling/Animation/eyefix/shaman_cfg.json \
+  /path/to/shaman_prepped.glb /path/to/out/shaman_prepped.glb /path/to/out
+```
+
+`shaman_cfg.json` holds the two ops (bump centre `aim` = native x, z; decal half-axes `r`).

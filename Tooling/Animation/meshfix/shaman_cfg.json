@@ -1,0 +1,134 @@
+{
+ "name": "shaman",
+ "_comment": "v22 Shaman: the staff (shaft + mushroom cap) is one surface with the body: the shaft's back is fused into the left edge of the beard/cloak from z ~0.74 to 1.17 and the cap rim touches the hood at x -0.11, z 1.26-1.30 (z/x sections). The staff is RIPPED out: flood-filled from the shaft (inside a capsule round its axis + a sphere round the cap, gated by its own colours: brown shaft/gills, green cap top), the thin band of faces mixing staff and body vertices deleted, and both sides' open strips ear-clip-filled from their rings. Nothing is regenerated: the original staff and cap geometry/texture are kept. Native coords of shaman_prepped.glb (prep_mesh --no-ground-sheet, eye-painted by eyefix/eyepaint.py).",
+ "stages": [
+  {
+   "op": "rip",
+   "tag": "staff",
+   "seed": [
+    -0.221,
+    -0.26,
+    0.25
+   ],
+   "include": [
+    {
+     "poly": [
+      [
+       -0.222,
+       -0.262,
+       -0.05
+      ],
+      [
+       -0.22,
+       -0.265,
+       0.6
+      ],
+      [
+       -0.205,
+       -0.27,
+       1.0
+      ],
+      [
+       -0.192,
+       -0.28,
+       1.22
+      ]
+     ],
+     "r": 0.075
+    },
+    {
+     "poly": [
+      [
+       -0.205,
+       -0.305,
+       1.29
+      ]
+     ],
+     "r": 0.15
+    }
+   ],
+   "exclude": [
+    {
+     "box": [
+      -0.105,
+      1.0,
+      -1.0,
+      1.0,
+      1.15,
+      3.0
+     ]
+    },
+    {
+     "box": [
+      -1.0,
+      1.0,
+      -0.185,
+      1.0,
+      1.18,
+      3.0
+     ]
+    },
+    {
+     "poly": [
+      [
+       -0.144,
+       -0.287,
+       0.979
+      ]
+     ],
+     "r": 0.05
+    }
+   ],
+   "colors": [
+    {
+     "h": [
+      0.03,
+      0.155
+     ],
+     "s": [
+      0.08,
+      0.5
+     ],
+     "v": [
+      0.35,
+      0.84
+     ]
+    },
+    {
+     "h": [
+      0.12,
+      0.3
+     ],
+     "s": [
+      0.15,
+      0.6
+     ],
+     "v": [
+      0.35,
+      0.9
+     ],
+     "z": [
+      1.18,
+      2.0
+     ]
+    }
+   ]
+  },
+  {
+   "op": "drop_small",
+   "tag": "slivers",
+   "min_verts": 12
+  },
+  {
+   "op": "fill",
+   "tag": "strips",
+   "poke": false,
+   "smooth": {
+    "cuts": 1,
+    "iters": 30,
+    "inflate": 0.3,
+    "mosaic": true
+   }
+  }
+ ]
+}

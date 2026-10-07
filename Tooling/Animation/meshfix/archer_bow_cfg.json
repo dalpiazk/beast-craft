@@ -1,0 +1,335 @@
+{
+ "_comment": "v22 round 4 (producer: 'a bow staff, not a bow for arrows'; the approved art content/art/source/enemies/archer/hollow/character.png): a SHORT pale-wood D-shaped self bow, ~0.5 of the Archer's 1.90 height (0.95 chord), sagitta 0.14 = 29% of the 0.475 limb, thick limbs, leather grip wrap, no flames; the violet flame belongs to the ARROW (flaring at the head + a smoke-trail wisp). Native coords of the ORIGINAL archer_prepped.glb for the colour sources. Round 3 values are in git history.",
+ "sources": {
+  "wood": {
+   "include": [
+    {
+     "box": [
+      -0.35,
+      0.45,
+      -0.35,
+      0.35,
+      0.12,
+      0.45
+     ]
+    }
+   ],
+   "color": {
+    "h": [
+     0.05,
+     0.15
+    ],
+    "s": [
+     0.12,
+     0.35
+    ],
+    "v": [
+     0.72,
+     0.95
+    ]
+   },
+   "_note": "pale cream-tan of the trousers: the approved art's bow is pale wood (Meshy's stave was mid-brown)"
+  },
+  "flame": {
+   "include": [
+    {
+     "box": [
+      -1.0,
+      -0.44,
+      -0.5,
+      -0.1,
+      0.38,
+      1.12
+     ]
+    }
+   ],
+   "color": {
+    "h": [
+     0.62,
+     0.99
+    ],
+    "s": [
+     0.3,
+     1.0
+    ],
+    "v": [
+     0.45,
+     1.0
+    ]
+   }
+  },
+  "string": {
+   "include": [
+    {
+     "poly": [
+      [
+       -0.31,
+       -0.21,
+       1.12
+      ],
+      [
+       -0.09,
+       -0.29,
+       0.61
+      ],
+      [
+       -0.28,
+       -0.39,
+       0.14
+      ]
+     ],
+     "r": 0.02
+    }
+   ],
+   "color": {
+    "s": [
+     0.0,
+     0.22
+    ],
+    "v": [
+     0.72,
+     1.0
+    ]
+   }
+  },
+  "leather": {
+   "include": [
+    {
+     "box": [
+      0.0,
+      0.5,
+      0.1,
+      0.4,
+      0.35,
+      0.85
+     ]
+    }
+   ],
+   "color": {
+    "v": [
+     0.0,
+     0.62
+    ]
+   }
+  },
+  "leaf": {
+   "include": [
+    {
+     "box": [
+      -0.4,
+      0.4,
+      -0.3,
+      0.4,
+      1.55,
+      1.95
+     ]
+    }
+   ],
+   "color": {
+    "h": [
+     0.14,
+     0.36
+    ]
+   }
+  },
+  "fletch": {
+   "include": [
+    {
+     "box": [
+      0.45,
+      0.95,
+      -0.3,
+      0.4,
+      1.1,
+      1.7
+     ]
+    }
+   ],
+   "color": {
+    "s": [
+     0.0,
+     0.25
+    ],
+    "v": [
+     0.72,
+     1.0
+    ]
+   }
+  },
+  "smoke": {
+   "include": [
+    {
+     "box": [
+      -1.0,
+      -0.44,
+      -0.5,
+      -0.1,
+      0.38,
+      1.12
+     ]
+    }
+   ],
+   "color": {
+    "s": [
+     0.0,
+     0.3
+    ],
+    "v": [
+     0.7,
+     1.0
+    ]
+   }
+  }
+ },
+ "wood_source_line": [
+  [
+   -0.15,
+   -0.25,
+   0.15
+  ],
+  [
+   -0.15,
+   -0.25,
+   0.42
+  ]
+ ],
+ "string_source_line": [
+  [
+   -0.31,
+   -0.21,
+   1.12
+  ],
+  [
+   -0.09,
+   -0.29,
+   0.61
+  ],
+  [
+   -0.28,
+   -0.39,
+   0.14
+  ]
+ ],
+ "flame_source_line": [
+  [
+   -0.45,
+   -0.27,
+   0.6
+  ],
+  [
+   -0.6,
+   -0.26,
+   0.56
+  ],
+  [
+   -0.78,
+   -0.24,
+   0.7
+  ],
+  [
+   -0.85,
+   -0.22,
+   0.95
+  ]
+ ],
+ "leather_point": [
+  0.3,
+  0.3,
+  0.6
+ ],
+ "leaf_point": [
+  0.0,
+  0.0,
+  1.75
+ ],
+ "fletch_point": [
+  0.65,
+  0.0,
+  1.4
+ ],
+ "bow": {
+  "length": 0.95,
+  "bend": 0.14,
+  "profile_exp": 1.35,
+  "recurve": 0.0,
+  "segments_per_limb": 7,
+  "grip_half": 0.055,
+  "grip_r": 0.03,
+  "w_root": 0.034,
+  "w_tip": 0.016,
+  "d_root": 0.026,
+  "d_tip": 0.013,
+  "string_r": 0.004,
+  "flames": false
+ },
+ "flame_tongues": [
+  [
+   0.22,
+   0,
+   45
+  ],
+  [
+   0.17,
+   30,
+   80
+  ],
+  [
+   0.15,
+   -30,
+   25
+  ]
+ ],
+ "arrow": {
+  "length": 0.55,
+  "head_len": 0.1,
+  "head_w": 0.042,
+  "shaft_r": 0.0095,
+  "fletch_len": 0.12,
+  "fletch_h": 0.034,
+  "flame_r": 0.07,
+  "flame_tongues": [
+   [
+    0.2,
+    0,
+    85,
+    0
+   ],
+   [
+    0.15,
+    0,
+    95,
+    45
+   ],
+   [
+    0.15,
+    0,
+    95,
+    -45
+   ]
+  ],
+  "smoke": {
+   "length": 0.34,
+   "r": 0.022,
+   "rings": 8,
+   "waves": 1.5,
+   "sway": 0.04,
+   "rise": 0.14
+  }
+ },
+ "rest": {
+  "bow_grip": [
+   -0.72,
+   -0.1,
+   0.8
+  ],
+  "arrow_nock": [
+   -0.62,
+   0.28,
+   0.3
+  ],
+  "_note": "clear of the body (closer, x -0.55, the hood/hip broke heat weighting: every vertex unweighted)",
+  "bow_yaw": -57.0
+ },
+ "uv_spread_max": 0.06,
+ "srgb_texels": true
+}
