@@ -80,6 +80,12 @@ OUTLINE_MASK_ZERO = list(arm_obj.data.get("outline_mask_zero", []))
 TRUTH["move_mode"] = MOVE_MODE
 if MAX_JOINTS is not None:
     TRUTH["max_joints"] = MAX_JOINTS
+# v23 (Caster): free-floating hover parts and collapsible glow parts get their own GLB motion
+# checks (glb_gate.HOVER_MIN / GLOW_*); absent on every other rig -> truth file and gate unchanged.
+if arm_obj.data.get("hover_parts"):
+    TRUTH["hover_parts"] = list(arm_obj.data["hover_parts"])
+if arm_obj.data.get("glow_parts"):
+    TRUTH["glow_parts"] = list(arm_obj.data["glow_parts"])
 
 
 def quaternion_fcurves_to_euler(action):
@@ -247,7 +253,12 @@ else:
 # v18 round 5: hard gate on the GLB itself -- see glb_gate.py. Fails the export loudly.
 with open(os.path.join(OUT, "glb_gate_truth.json"), "w") as f:
     json.dump({"fps": FPS, **TRUTH}, f)  # lets `python glb_gate.py GLB TRUTH` re-run the gate standalone
-gate_pass, gate_report = glb_gate.run_gate(out_path, TRUTH, FPS, move_mode=MOVE_MODE, max_joints=MAX_JOINTS)
+gate_pass, gate_report = glb_gate.run_gate(out_path, TRUTH, FPS, move_mode=MOVE_MODE, max_joints=MAX_JOINTS,
+                                           hover_parts=TRUTH.get("hover_parts"), glow_parts=TRUTH.get("glow_parts"))
+for _clip, _h in gate_report.get("hover", {}).items():  # v23 (the Caster's crescent)
+    print(f"GLB GATE HOVER {_clip}: {_h}")
+for _clip, _h in gate_report.get("glow", {}).items():
+    print(f"GLB GATE GLOW {_clip}: {_h}")
 if "joints" in gate_report:
     print(f"GLB GATE JOINTS: {gate_report['joints']['count']} (max {gate_report['joints']['max']})")
 for _clip, _h in gate_report.get("hop", {}).items():

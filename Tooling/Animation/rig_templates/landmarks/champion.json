@@ -1,0 +1,273 @@
+{
+ "body_plan": "blob: a round, leafy, white ram-beast on four short stubby legs, ram horns curled at the cheeks, a calm closed-eye face, two violet gloam wisps (its forked tail) rising behind",
+ "locomotion": "hop",
+ "body": {
+  "base": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "top": [
+   0.0,
+   0.0,
+   1.1
+  ]
+ },
+ "parts": [
+  {
+   "name": "head",
+   "parent": "root",
+   "role": "head",
+   "follow": true,
+   "head": [
+    0.0,
+    -0.25,
+    0.8
+   ],
+   "tail": [
+    -0.04,
+    -0.71,
+    0.78
+   ],
+   "region": [
+    {
+     "axis": "y",
+     "hi": -0.38,
+     "ramp": 0.15
+    },
+    {
+     "axis": "z",
+     "lo": 0.4,
+     "ramp": 0.1
+    }
+   ]
+  },
+  {
+   "name": "legs_F",
+   "parent": "root",
+   "role": "legs_F",
+   "head": [
+    -0.02,
+    -0.4,
+    0.25
+   ],
+   "tail": [
+    -0.02,
+    -0.4,
+    0.02
+   ],
+   "feet": [
+    [
+     -0.205,
+     -0.39
+    ],
+    [
+     0.165,
+     -0.41
+    ]
+   ],
+   "foot_radius": 0.12,
+   "z_full": 0.06,
+   "z_top": 0.18,
+   "snap_tail": false
+  },
+  {
+   "name": "legs_B",
+   "parent": "root",
+   "role": "legs_B",
+   "head": [
+    0.0,
+    0.1,
+    0.25
+   ],
+   "tail": [
+    0.0,
+    0.1,
+    0.02
+   ],
+   "feet": [
+    [
+     -0.23,
+     0.115
+    ],
+    [
+     0.235,
+     0.09
+    ]
+   ],
+   "foot_radius": 0.12,
+   "z_full": 0.06,
+   "z_top": 0.18,
+   "snap_tail": false
+  },
+  {
+   "name": "wisp_L_01",
+   "parent": "body",
+   "role": "wisp",
+   "head": [
+    0.08,
+    0.55,
+    1.0
+   ],
+   "tail": [
+    0.12,
+    0.62,
+    1.45
+   ],
+   "region": {
+    "axis": "z",
+    "lo": 0.98,
+    "ramp": 0.12
+   }
+  },
+  {
+   "name": "wisp_L_02",
+   "parent": "wisp_L_01",
+   "role": "wisp",
+   "head": [
+    0.12,
+    0.62,
+    1.45
+   ],
+   "tail": [
+    -0.12,
+    0.5,
+    1.8
+   ]
+  },
+  {
+   "name": "wisp_R_01",
+   "parent": "body",
+   "role": "wisp",
+   "head": [
+    0.5,
+    0.55,
+    0.95
+   ],
+   "tail": [
+    0.4,
+    0.45,
+    1.42
+   ],
+   "region": {
+    "axis": "z",
+    "lo": 0.95,
+    "ramp": 0.12
+   }
+  },
+  {
+   "name": "wisp_R_02",
+   "parent": "wisp_R_01",
+   "role": "wisp",
+   "head": [
+    0.4,
+    0.45,
+    1.42
+   ],
+   "tail": [
+    0.7,
+    0.68,
+    1.32
+   ]
+  }
+ ],
+ "rigid_parts": [
+  {
+   "bone": "head",
+   "note": "left ram horn coil, rigid with the face",
+   "include": [
+    {
+     "poly": [
+      [
+       -0.4,
+       -0.3,
+       0.95
+      ],
+      [
+       -0.5,
+       -0.55,
+       0.95
+      ],
+      [
+       -0.5,
+       -0.76,
+       0.76
+      ],
+      [
+       -0.47,
+       -0.62,
+       0.55
+      ]
+     ],
+     "r": 0.085
+    }
+   ]
+  },
+  {
+   "bone": "head",
+   "note": "right ram horn coil, rigid with the face",
+   "include": [
+    {
+     "poly": [
+      [
+       0.3,
+       -0.3,
+       1.0
+      ],
+      [
+       0.42,
+       -0.55,
+       0.95
+      ],
+      [
+       0.35,
+       -0.78,
+       0.86
+      ],
+      [
+       0.36,
+       -0.65,
+       0.62
+      ]
+     ],
+     "r": 0.085
+    }
+   ]
+  }
+ ],
+ "weight_smooth_regions": [
+  {
+   "center": [
+    -0.4,
+    -0.33,
+    1.06
+   ],
+   "radius": 0.15,
+   "iterations": 6,
+   "note": "left horn root: rigid head 1.0 beside mantle body 1.0"
+  },
+  {
+   "center": [
+    0.4,
+    -0.34,
+    1.07
+   ],
+   "radius": 0.15,
+   "iterations": 6,
+   "note": "right horn root"
+  }
+ ],
+ "spine": {
+  "head": [
+   0.0,
+   -0.25,
+   0.8
+  ],
+  "snout_tip": [
+   -0.04,
+   -0.71,
+   0.78
+  ]
+ },
+ "notes": "v23 enemy (Hollow region): the Champion, mini-boss (Triangle, ~1.75 hexes wide), personality swaggering. A round white-bellied ram beast under a leaf mantle, four short stubby legs (front feet x -0.21/+0.17 at y -0.4, hind x -0.23/+0.24 at y ~0.1; each pair is one bone), big brown ram horns curled at the cheeks (rigid with the face), little twig horns on the crown (body), a calm closed-eye face (thin red slits), and two violet gloam wisps rising from the back (its forked tail; the producer confirmed the two tails) -- two-bone soft chains parented to the squashing body."
+}

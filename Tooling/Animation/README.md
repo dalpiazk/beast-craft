@@ -2357,6 +2357,178 @@ sidecar ship in `Tooling/Spike55/Live3D/Content/model`.
 - In Victory, the raised bow is hidden behind the head from the battle camera.
 - A cream fold left on the chest by round 1's arm cut-away is still visible under the mantle.
 
+## v23: enemies batch 3 (Hollow region) -- Giant, Champion, Caster; a furred back, a hover part, a glow shell
+
+The last three Hollow enemies, from Meshy image-to-3D outputs (records
+`Tooling/ArtLab/provenance/meshy-01a1178d/8f/91-*.md`). All three are `blob` rigs. The sixteen shipped creatures are
+untouched (see Regression). Every new behaviour is keyed off landmark-file opt-ins, armature properties or
+`--creature` data.
+
+### Prep, eyes, surgery
+
+| Enemy | Prep | Eyes | Surgery | Final tris |
+| --- | --- | --- | --- | --- |
+| Giant (boss) | `--no-ground-sheet --target-tris 16000` | both violet eyes present | `meshfix/giant_fur.py` (fur back) | 15900 |
+| Champion (mini-boss) | `--no-ground-sheet` | both closed-eye slits present | none | 8000 |
+| Caster | `--no-ground-sheet` | both eyes present | `meshfix/caster_glow.py` (glow shell) | 8142 |
+
+- All three face -Y (orientation probe); no rotation. The Caster's body is a diagonal oval (the input art is a
+  3/4 view), but its face, its two paws and the crescent all face -Y.
+- The ground-sheet pass would have opened 357 / 86 / 144 boundary edges within 5 % of H of the floor. With
+  `--no-ground-sheet` the counts match the raw mesh (1 / 16 / 26 in total, 0 / 0 / 1 near the floor).
+- Eyes checked in front, both 3/4 and both profile close-ups: present on all three, no repair.
+- No fused or missing parts. The Caster's crescent is already its own closed shell; the Champion's horns and
+  wisps and the Caster's antlers are part of the body shell, so they are weighted rigid/soft, not cut.
+
+**Giant fur back (`meshfix/giant_fur.py`).** Meshy saw only the front: the back, the back of the head and the
+back half of each flank were a smooth blob. The script copies the front coat onto the back as relief plus
+re-pointed UVs, so the body stays one watertight shell:
+- clean: the 3 non-manifold edges (a triple-face sliver at the left cheek) are removed and filled. That frees a
+  66-vertex cheek lock, which stays as its own closed shell (44 vertices after the decimate).
+- relief: `(P - Taubin-smoothed P) . N`, low-passed to clump scale.
+- region: by azimuth round the body axis. It opens up round the upper flanks and over the crown to the brow,
+  and leaves out the violet cape (texture-gated), the floor fringe and real protrusions (the ears).
+- map: each back vertex reads the coat below the face at the same height (the back of the head folds into the
+  pale upper coat). Both flanks read the coat's lit +X side; copying the shadowed left half made a hard
+  dark/pale seam. A noise warp and a 2-3x gain noise vary it.
+- The relief is displaced along the back's normals, the faces take the coat's texels (one texel when a face
+  straddles UV charts), and the mesh is decimated to 15900 tris.
+- Result: 0 open / 0 non-manifold edges, 2 closed shells, 15900 tris. Deterministic (a re-run is
+  byte-identical).
+
+**Caster glow shell (`meshfix/caster_glow.py`).** Live3D's toon shader has no emissive term. A copy of the
+crescent shell is pushed out 2 cm along its normals and mapped to one pale-lime texel painted into an unused
+atlas cell. Its corner normals all point up, so the toon pass lights every pixel in the highlight band: a flat,
+bright read. With real normals it read as a grey-and-lime fat crescent. It has its own bone (see below).
+Deterministic.
+
+### Rigs (`blob`, every roll explicit; axis dumps in `<enemy>_anim/axes_check.json`)
+
+| Enemy | Bones | Parts |
+| --- | --- | --- |
+| Giant | 5: root, body, head, legs_L, legs_R | face = squash follower; each front paw is its own "leg pair" bone, its pivot just behind the bib front |
+| Champion | 9: root, body, head, legs_F, legs_B, wisp_L_01/02, wisp_R_01/02 | ram horns rigid to the face follower (`rigid_parts` capsules); the two gloam wisps are 2-bone soft chains on the squashing body |
+| Caster | 9: root, body, head, legs_F, antler_L, antler_R, tuft, crescent, crescent_glow | antlers = rigid squash followers; crescent = new hover part; crescent_glow = its child |
+
+The axis dumps confirm local X = the lateral axis on every bone (|x . LAT| >= 0.99). 0 unweighted vertices;
+at most 3 / 4 / 4 influences.
+
+New opt-ins (absent everywhere else, so older rigs are byte-identical):
+- **hover parts** (`"hover": true` on a part; armature `hover_parts`): a root child that is NOT a squash
+  follower. `anim/blob_pose.hover_place` keys its location every frame from world offsets `lx/ly/lz` (in its
+  own channels), whatever the root's pose. The Caster's crescent bobs, rises, spins, flies out and drops.
+- **glow parts** (a part with role `glow`; armature `glow_parts`): held at 0.2 % scale by
+  `bird_pose.HOVER_HOLDS["caster"]` in every clip. At 2 % it still showed as a bright dot in the crescent's
+  middle. Cast swells it to 1.1x about the crescent's centre. The joint is in `outline_mask_zero`, so no ink
+  hull forms round the collapsed shell.
+- `blob.py` now also passes through `rigid_parts`, `outline_mask_zero` and `weight_smooth_regions` from the
+  landmark file. They are used for the Giant's paw pivots and rims and the Champion's horn roots, where heat
+  weight 1.0 sat beside 0.28.
+- `gait.py` hop Move reads an optional `hold` (the glow).
+
+### Clips (`gait.py` `GAIT_PARAMS`, `keyed.py` `ENEMY_PARAMS`)
+
+- **Giant (cross, sleepy-grumpy, big and slow):**
+  - Move is a stomp-shuffle: two lumbering hops per 2.6 s, each heaving off one paw (that paw swings forward),
+    a long lean-in squash, a low 4 % hang, then a deep landing squash.
+  - Idle dozes (a slow heave and a sagging nod).
+  - Attack is a paw swipe. It leans back, hauls the left paw up and out past the bib, then swipes it down and
+    across with a lunge. The stubby paw is stretched 1.6x, a cartoon reach, so the blow clears the fur.
+  - Cast is a roar: hunker, then rear up tall, paws up, head thrown back and shaking (no modelled mouth, so no
+    jaw), then a ground-shaking drop.
+  - Victory is two chest thumps, chin up.
+  - KO sags, nods off, then keels over onto its side.
+- **Champion (swaggering):**
+  - Move is a cocky strut: two bouncy hops per 1.1 s, chest up, a side-to-side swagger and the wisps streaming.
+  - Attack is a horn ram. Cast is a serene rise off the ground, wisps flared. Victory is two strutting bounces
+    and a head toss.
+  - KO topples onto its side, wisps limp.
+- **Caster (spiteful):**
+  - Move is a prim two-hop skitter, the crescent trailing and bobbing out of phase.
+  - Attack hurls the crescent ahead, spinning, and it swings back.
+  - Cast is the signature: a squash, then the crescent rises high over the antlers, spins twice and glows
+    (`cast_release`), holds, then dims and floats down.
+  - Victory is three hops with the crescent orbiting front to back, between the antlers. A side-to-side orbit
+    hit the antlers (prop gate).
+  - KO topples over and the crescent drops to the floor in front of its face. The crescent is a root child,
+    so it swings over with the body; the offsets were measured on the settled pose.
+
+### Gates
+
+`glb_gate.py` gains hover and glow checks, on the GLB itself:
+- hover: per clip, the hover part's travel and its spin relative to root. The minimums are Idle and Move 0.03, Hit 0.05;
+  Attack 0.3 and 180 deg; Cast 0.3 and 360 deg; Victory 0.2 and 180 deg.
+- glow: the part stays <= 0.05 scale outside Cast and reaches >= 0.9 in Cast.
+
+| Gate | Giant | Champion | Caster |
+| --- | --- | --- | --- |
+| loop seams Move/Idle/Victory | 0.000 | 0.000 | 0.000 |
+| hop (clearance, contact/air, sy) | PASS 0.093, 46/62 / 12/62, 0.81..1.08 | PASS 0.078, 17/26 / 6/26, 0.86..1.09 | PASS 0.068, 15/22 / 5/22, 0.86..1.09 |
+| followers | PASS 0.0 mm | PASS 0.0 mm | PASS 0.0 mm (head, antlers) |
+| prop_clearance (crescent + glow vs body) | -- | -- | PASS, 0 frames on all 7 clips |
+| mesh ground, every frame | PASS (min -0.0000; KO 0.004) | PASS | PASS |
+| KO held | 0.000 | 0.000 | 0.000 |
+| edge stretch, worst clip | 14.1x Attack (the 1.6x-stretched paw's rim) FAIL | 5.8x Hit (horn root) FAIL | 3.5x KO FAIL |
+| glb_gate, 7 clips | PASS 0.00 deg; paws Attack 134 deg | PASS 0.00 | PASS 0.00; crescent Cast travel 0.46, spin 780 deg; glow 0.002 / 1.14 |
+
+The stretch failures are the usual soft gate. The Giant's worst edge is a 1 cm edge on the rim of the
+deliberately stretched swipe paw.
+
+### In-engine (Live3D `--pilot-model`)
+
+- Full-set MP4s per enemy from the battle, head-on and side cameras: 7 labelled clips, Idle/Move/Victory looped
+  twice, one-shots +0.4 s, KO +1 s, libx264 crf 20 slow, yuv420p 720x1280 60 fps, +faststart.
+- A back-start Idle turntable for the Giant (`giant_idle_turntable_back.mp4`, 48 yaws, played twice).
+- Strips are cut from the MP4s. The three GLBs and their sidecars ship in `Tooling/Spike55/Live3D/Content/model`.
+
+### Regression
+
+`regress/run_regress.sh` was run on all sixteen shipped creatures before any change and again after the last.
+Every rig bone hash, weight hash and Move/keyed F-curve hash is byte-identical (48/48). Re-exported Brute,
+Stingling, Archer, Kirin, Treant and Shaman GLBs and sidecars are byte-identical to the shipped ones.
+
+### v23 round 2 (Giant, lead review): a real fur back, no crown edge, a paw that reads
+
+The lead rejected three things: the back was still a smooth, bald dome with faint lock lines; the
+pale crown patch had a hard straight edge (side view); the Attack paw read as a flat dark slab.
+
+- **Fur back in geometry** (`meshfix/giant_fur.py`, docstring "Round 2"). About 265 closed fur-lock
+  shells (11 verts and 18 tris each) cover the back, the flanks (more than 68 deg from straight ahead)
+  and the crown. Roots are Poisson-disk sampled (0.105). Each lock falls down and back, is re-projected
+  onto the surface along its length (it hugs the mound instead of sticking out like a scale), is 30-42
+  cm long and gets a random bend and twist. The colours come from a 12 x 4 palette of the coat's own
+  painted texels, painted into a free atlas block: dark undertone at the root and underside, lighter
+  along the ridge (lighter higher up). The gaps show the dark undertone.
+- **Crown edge**: the back and crown surface no longer copy coat texels. Each vertex reads the palette,
+  blended at the region's edge toward the palette entry nearest the original texel next door. The
+  locks run right up to the pale face; no straight edge is left in the side view or the turntable.
+- **Paws**: the Meshy paws (dark-painted lobes) are smoothed into the bib. Two modelled arms replace
+  them: closed lofted shells from a shoulder inside the body to a rounded, flat-soled paw in fur
+  colours, with four ivory claws, forearm fur and a wrist ruff. `legs_L`/`legs_R` now pivot at those
+  shoulders (landmarks), and the arms are rigid to them (`rigid_parts` component seeds). The paw can
+  now swing up beside the head with no stretch.
+- New rig opt-in **`shell_bind`** (`blob.bind_small_shells`, called from `rig_creature.py`): every
+  shell of at most 20 verts (lock, claw) takes the weights of one anchor. The anchor is the larger
+  shell's vertex nearest the closest surface point to the lock's root. The body pays a 5 cm bias, so
+  arm fur binds to the arm. Result: 265 to body, 15 / 18 to the arms. The Giant's
+  `weight_smooth_regions` are gone.
+- **Attack** (1.9 s): it rears back, squashed, and hauls the left paw up and out until it towers
+  beside the head (pitch 170, bank -55, 1.15x), then the mound lurches forward and the paw arcs over
+  and slams down in front with a deep, wide squash (sy 0.78) and a slow settle. The Idle paw sway is
+  now 1 deg and Move's lead paw no longer pushes back (both would put the longer arm's toe through the
+  floor).
+- Tris: body 11000 + arms/claws/forearm fur + locks = **16548** (2 arm shells of 72 verts, 302
+  shells). 0 open / 0 non-manifold edges. Deterministic (a re-run is byte-identical).
+
+Gates: `verify.py` loop seams 0.000, followers 0.0 mm, hop PASS (clearance 0.095, contact 46/62,
+air 12/62, sy 0.81..1.08), mesh ground PASS on all 7 clips (KO 0.004), KO held 0.000. Edge stretch
+worst is 4.49x in Cast (soft gate, was 14.1x). `glb_gate` PASS at 0.00 deg on all 7 clips (left paw
+Attack range 179 deg). No prop gate on the arms (they leave the body by design). Regression:
+`run_regress.sh` on all sixteen shipped creatures is byte-identical to the pre-v23 hashes (48/48), and
+the Champion and Caster rig+anim+export runs are byte-identical to the shipped GLBs and sidecars.
+In-engine: full sets (battle, head-on, side) and the back-start Idle turntable were recaptured, and
+the Attack strips were cut from each MP4.
+
 ## v9: max-edge-stretch gate + weight/render fixes -- partial progress, honestly not fully resolved
 ## (lead-review round 9)
 

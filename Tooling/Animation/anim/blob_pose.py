@@ -41,6 +41,30 @@ def follow_squash(arm_obj):
         pb.location = pb.bone.matrix_local.to_3x3().normalized().transposed() @ d
 
 
+def hover_place(arm_obj, chans):
+    """v23 (Caster's crescent): every hover part (armature prop hover_parts; a child of root, not a
+    squash follower) is offset from its rest head by the WORLD vector (lx, ly, lz) taken from its
+    own channels ("b", name, "lx"/"ly"/"lz"; 0 when absent), whatever the root's pose: location is
+    in the bone's rest axes, applied in the parent's posed frame, so
+    loc = Rb^T Rp_rest Rp_pose^T d. Every frame sets it (a frame without the channels resets it).
+    No-op on rigs without hover_parts."""
+    names = list(arm_obj.data.get("hover_parts", []))
+    if not names:
+        return
+    import bird_pose as BP
+    for n in names:
+        pb = arm_obj.pose.bones.get(n)
+        if pb is None:
+            continue
+        d = Vector((chans.get(("b", n, "lx"), 0.0), chans.get(("b", n, "ly"), 0.0),
+                    chans.get(("b", n, "lz"), 0.0)))
+        par = pb.parent
+        Rp_pose = BP.fk_world(par).to_3x3().normalized()
+        Rp_rest = par.bone.matrix_local.to_3x3().normalized()
+        Rb = pb.bone.matrix_local.to_3x3().normalized()
+        pb.location = Rb.transposed() @ Rp_rest @ Rp_pose.transposed() @ d
+
+
 def mesh_min_z(mesh_obj):
     bpy.context.view_layer.update()
     dg = bpy.context.evaluated_depsgraph_get()

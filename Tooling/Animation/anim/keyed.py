@@ -2730,6 +2730,256 @@ ENEMY_PARAMS = {
                           tail_02={"turn": 18}, _root={"bank": 80, "x": 0.55})),
                 (1.0, "same")]),
         }),
+    # v23 (enemies batch 3). Giant (cross, sleepy-grumpy BOSS): everything slow and heavy -- long
+    # wind-ups, big squashes, a lagging grumpy face. No modelled mouth (a painted frown), so the
+    # roar is the whole head thrown back. Paws: legs_L / legs_R (+pitch swings a paw FORWARD and up).
+    "giant": dict(
+        hover=False, planted=False, ground_lift=True,
+        clips={
+            # Dozing: a slow deep heave of the whole mound, the head sagging into a nod and coming
+            # back up, a sullen slow look aside, the paws shifting.
+            "Idle": dict(seconds=4.0, keys=[(0.0, {}), (1.0, {})], layers=[
+                ("b", "body", "sy", 0.03, 2, 0.0), ("b", "body", "sx", -0.015, 2, 0.0),
+                ("b", "body", "sz", -0.015, 2, 0.0), ("b", "head", "pitch", -4.0, 1, 0.0),
+                ("b", "head", "pitch", 1.5, 3, 0.6), ("b", "head", "turn", 5.0, 1, 1.2),
+                ("b", "legs_L", "pitch", 1.0, 1, 0.0), ("b", "legs_R", "pitch", -1.0, 1, 0.0),
+                ("r", "bank", 1.2, 1, 0.8)]),
+            # Paw swipe (round 2: a modelled furry arm on a shoulder pivot inside the body). A big
+            # boss wind-up: it rears back onto its haunches, squashed, and hauls the LEFT paw up
+            # and out until it towers beside its head (claws up, the face glaring after it), holds,
+            # then the whole mound lurches forward and the paw arcs over and SLAMS down in front --
+            # a deep, wide impact squash, the face jolted down -- and a slow grumpy settle.
+            "Attack": dict(seconds=1.9, sharp=2, keys=[
+                (0.0, {}),
+                (0.26, _P(body=_SQ(0.88), head=(10, -10, 6), legs_L={"pitch": 140, "bank": -45},
+                          legs_R=(-2, 0, 0), _root={"pitch": 8, "bank": -4, "f": -0.05})),
+                (0.40, _P(body=_SQ(1.08), head=(14, -14, 8),
+                          legs_L={"pitch": 170, "bank": -55, "sx": 1.15, "sy": 1.15, "sz": 1.15},
+                          legs_R=(-2, 0, 0), _root={"pitch": 12, "bank": -5, "f": -0.08})),
+                (0.50, _P(body=_SQ(1.1), head=(4, -6, 4),
+                          legs_L={"pitch": 120, "bank": -35, "sx": 1.15, "sy": 1.15, "sz": 1.15},
+                          _root={"pitch": 2, "bank": -2, "f": 0.0})),
+                (0.58, _P(body=_SQ(0.78), head=(-14, 6, -4),
+                          legs_L={"pitch": 55, "bank": -8, "sx": 1.1, "sy": 1.1, "sz": 1.1},
+                          legs_R=(4, 0, 0), _root={"pitch": -10, "bank": 3, "f": 0.16})),
+                (0.68, _P(body=_SQ(0.82), head=(-12, 6, -4), legs_L={"pitch": 50, "bank": -6},
+                          _root={"pitch": -9, "bank": 2, "f": 0.15})),
+                (0.84, _P(body=_SQ(1.03), head=(-3, 3, 0), legs_L={"pitch": 12, "bank": -2},
+                          _root={"pitch": -2, "f": 0.05})),
+                (1.0, {})]),
+            # Roar: hunkers down with the head sunk, then rears up tall onto its haunches, both
+            # paws lifted, the head thrown right back (roaring at the sky) and shaking, held
+            # (cast_release), then drops back down with a ground-shaking squash.
+            "Cast": dict(seconds=2.0, sharp=2, marker=(2, "cast_release"),
+                         layers=[("b", "head", "turn", 3.0, 7, 0.0), ("b", "body", "sy", 0.015, 7, 0.0)], keys=[
+                (0.0, {}),
+                (0.26, _P(body=_SQ(0.84), head=(-12, 0, 0), legs_L=(-4, 0, 0), legs_R=(-4, 0, 0))),
+                (0.44, _P(body=_SQ(1.2), head=(30, 0, 0), legs_L=(38, 0, 0), legs_R=(38, 0, 0),
+                          _root={"pitch": 12, "z": 0.05})),
+                (0.70, _P(body=_SQ(1.17), head=(28, 0, 0), legs_L=(34, 0, 0), legs_R=(34, 0, 0),
+                          _root={"pitch": 11, "z": 0.04})),
+                (0.82, _P(body=_SQ(0.8), head=(-6, 0, 0), legs_L=(0, 0, 0), legs_R=(0, 0, 0))),
+                (1.0, {})]),
+            # Struck: rocked back on its haunches, squashed, the face screwed up and turned away,
+            # the paws flung up, then a slow grumpy settle.
+            "Hit": dict(seconds=0.8, sharp=1, marker=(1, "hit_react"), keys=[
+                (0.0, {}),
+                (0.22, _P(body=_SQ(0.84), head=(10, 14, 8), legs_L=(22, 0, 0), legs_R=(16, 0, 0),
+                          _root={"f": -0.1, "pitch": 9})),
+                (0.55, _P(body=_SQ(1.04), head=(3, 5, 2), legs_L=(5, 0, 0), _root={"f": -0.04, "pitch": 3})),
+                (1.0, {})]),
+            # Smug grump: thumps its own chest -- left paw, right paw, each with a heavy squash --
+            # chin up and turning its nose up at everyone; returns exactly to rest (loops).
+            "Victory": dict(seconds=3.0, keys=[
+                (0.0, {}),
+                (0.12, _P(body=_SQ(1.05), head=(10, 6, 0), legs_L=(60, 0, 0))),
+                (0.22, _P(body=_SQ(0.86), head=(8, 6, 0), legs_L=(30, 0, 0))),
+                (0.34, _P(body=_SQ(1.0), head=(12, 0, 0), legs_L=(0, 0, 0))),
+                (0.46, _P(body=_SQ(1.05), head=(10, -6, 0), legs_R=(60, 0, 0))),
+                (0.56, _P(body=_SQ(0.86), head=(8, -6, 0), legs_R=(30, 0, 0))),
+                (0.68, _P(body=_SQ(1.0), head=(14, 0, 6))),
+                (0.84, _P(body=_SQ(1.0), head=(14, -10, -6))),
+                (1.0, {})]),
+            # Slumps: sags and nods off (squashed, head drooping), sways, then keels over onto its
+            # side and lies there, flattened, paws limp (root bank pivots on the floor; "x" slides
+            # it by about the mound's radius so it falls in place; the KO ground settle rests it).
+            "KO": dict(seconds=2.2, ko=True, impact=0.62, keys=[
+                (0.0, {}),
+                (0.24, _P(body=_SQ(0.86), head=(-14, 6, 6), legs_L=(-4, 0, 0), _root={"bank": -6})),
+                (0.40, _P(body=_SQ(0.88), head=(-16, 8, 8), _root={"bank": 8})),
+                (0.62, _P(body=_SQ(0.86), head=(-6, 0, -8), legs_L=(10, 0, 0), legs_R=(18, 0, 0),
+                          _root={"bank": 84, "x": 0.82})),
+                (0.84, _P(body=_SQ(0.88), head=(-4, 0, -10), legs_L=(12, 0, 0), legs_R=(20, 0, 0),
+                          _root={"bank": 80, "x": 0.82})),
+                (1.0, "same")]),
+        }),
+    # Champion (swaggering mini-boss): cocky, bouncy, chest out; the two gloam wisps (wisp_L/R_01-02,
+    # soft chains on the squashing body) stream and whip as follow-through everywhere.
+    "champion": dict(
+        hover=False, planted=False, ground_lift=True,
+        clips={
+            # Cocky breathing, chin up, a slow self-satisfied head roll, the wisps curling lazily.
+            "Idle": dict(seconds=3.0, keys=[(0.0, {}), (1.0, {})], layers=[
+                ("b", "body", "sy", 0.025, 2, 0.0), ("b", "body", "sx", -0.0125, 2, 0.0),
+                ("b", "body", "sz", -0.0125, 2, 0.0), ("b", "head", "pitch", 5.0, 0, 1.5708),
+                ("b", "head", "bank", 5.0, 1, 0.0), ("b", "head", "turn", 4.0, 1, 1.0),
+                ("b", "wisp_L_01", "turn", 7.0, 1, 0.0), ("b", "wisp_L_02", "turn", 12.0, 1, -0.9),
+                ("b", "wisp_R_01", "turn", -7.0, 1, 0.5), ("b", "wisp_R_02", "turn", -12.0, 1, -0.4),
+                ("b", "wisp_L_02", "pitch", 6.0, 2, 0.0), ("b", "wisp_R_02", "pitch", 6.0, 2, 1.0)]),
+            # Horn ram: rears back on its hind legs, front feet up, then charges in head-down,
+            # horns first, the whole body stretched, a hard impact squash, a cocky bounce back.
+            "Attack": dict(seconds=1.25, sharp=2, keys=[
+                (0.0, {}),
+                (0.30, _P(body=_SQ(0.86), head=(10, 0, 0), legs_F=(-18, 0, 0), legs_B=(8, 0, 0),
+                          wisp_L_01=(10, 0, 0), wisp_R_01=(10, 0, 0), _root={"pitch": 10, "f": -0.08})),
+                (0.48, _P(body=_SQ(1.12), head=(-16, 0, 0), legs_F=(26, 0, 0), legs_B=(-24, 0, 0),
+                          wisp_L_01=(-14, 0, 0), wisp_L_02=(-16, 0, 0), wisp_R_01=(-14, 0, 0),
+                          wisp_R_02=(-16, 0, 0), _root={"pitch": -12, "f": 0.24, "z": 0.06})),
+                (0.56, _P(body=_SQ(0.82), head=(-18, 0, 0), legs_F=(8, 0, 0), legs_B=(-8, 0, 0),
+                          wisp_L_02=(-24, 0, 0), wisp_R_02=(-24, 0, 0), _root={"pitch": -12, "f": 0.27})),
+                (0.74, _P(body=_SQ(1.06), head=(4, 0, 0), wisp_L_02=(12, 0, 0), wisp_R_02=(12, 0, 0),
+                          _root={"pitch": 2, "f": 0.12, "z": 0.04})),
+                (1.0, {})]),
+            # Gloam surge: sinks low, then rises tall and serene (eyes closed, chin raised), floats
+            # a little off the ground with the wisps flared up and apart (cast_release), drifts down.
+            "Cast": dict(seconds=1.5, sharp=2, marker=(2, "cast_release"),
+                         layers=[("b", "wisp_L_02", "turn", 8.0, 4, 0.0), ("b", "wisp_R_02", "turn", -8.0, 4, 0.4)],
+                         keys=[
+                (0.0, {}),
+                (0.28, _P(body=_SQ(0.84), head=(-8, 0, 0), wisp_L_01=(8, 0, 0), wisp_R_01=(8, 0, 0))),
+                (0.50, _P(body=_SQ(1.16), head=(16, 0, 0), legs_F=(-12, 0, 0), legs_B=(12, 0, 0),
+                          wisp_L_01={"pitch": 10, "turn": 16}, wisp_L_02={"pitch": 14, "turn": 14},
+                          wisp_R_01={"pitch": 10, "turn": -16}, wisp_R_02={"pitch": 14, "turn": -14},
+                          _root={"z": 0.1})),
+                (0.72, _P(body=_SQ(1.12), head=(14, 0, 0), legs_F=(-8, 0, 0), legs_B=(8, 0, 0),
+                          wisp_L_01={"pitch": 8, "turn": 14}, wisp_L_02={"pitch": 12, "turn": 12},
+                          wisp_R_01={"pitch": 8, "turn": -14}, wisp_R_02={"pitch": 12, "turn": -12},
+                          _root={"z": 0.08})),
+                (0.88, _P(body=_SQ(0.86), head=(-2, 0, 0))),
+                (1.0, {})]),
+            # Struck: bowled back, squashed, the face snapped aside, the wisps whipping forward.
+            "Hit": dict(seconds=0.55, sharp=1, marker=(1, "hit_react"), keys=[
+                (0.0, {}),
+                (0.25, _P(body=_SQ(0.82), head=(12, 12, 6), legs_F=(22, 0, 0), legs_B=(-14, 0, 0),
+                          wisp_L_01=(-14, 0, 0), wisp_L_02=(-20, 0, 0), wisp_R_01=(-14, 0, 0),
+                          wisp_R_02=(-20, 0, 0), _root={"f": -0.12, "pitch": 12})),
+                (0.6, _P(body=_SQ(1.04), head=(4, 4, 2), wisp_L_02=(8, 0, 0), wisp_R_02=(8, 0, 0),
+                         _root={"f": -0.04, "pitch": 3})),
+                (1.0, {})]),
+            # Showing off: two strutting bounces with a swaggering sway, then a proud head toss,
+            # the wisps waving like flags; returns exactly to rest (loops).
+            "Victory": dict(seconds=2.4, layers=[("b", "wisp_L_02", "turn", 16.0, 2, 0.0),
+                                                 ("b", "wisp_R_02", "turn", -16.0, 2, 0.6),
+                                                 ("b", "wisp_L_01", "turn", 8.0, 2, -0.6),
+                                                 ("b", "wisp_R_01", "turn", -8.0, 2, 0.0)], keys=[
+                (0.0, {}),
+                (0.08, _P(body=_SQ(0.86), head=(4, 0, 0), _root={"bank": -6})),
+                (0.18, _P(body=_SQ(1.1), head=(8, 0, 6), legs_F=(-14, 0, 0), legs_B=(14, 0, 0),
+                          _root={"z": 0.1, "bank": -8, "turn": -10})),
+                (0.30, _P(body=_SQ(0.86), head=(6, 0, 6), _root={"bank": 2, "turn": -6})),
+                (0.42, _P(body=_SQ(1.1), head=(8, 0, -6), legs_F=(-14, 0, 0), legs_B=(14, 0, 0),
+                          _root={"z": 0.1, "bank": 8, "turn": 10})),
+                (0.54, _P(body=_SQ(0.86), head=(6, 0, -6), _root={"bank": -2, "turn": 6})),
+                (0.70, _P(body=_SQ(1.04), head=(20, 0, 0), _root={"pitch": 6})),
+                (0.84, _P(body=_SQ(1.0), head=(10, 0, 0), _root={"pitch": 2})),
+                (1.0, {})]),
+            # Topples onto its side, legs out, the wisps flopping limp along the floor.
+            "KO": dict(seconds=1.5, ko=True, impact=0.6, keys=[
+                (0.0, {}),
+                (0.22, _P(body=_SQ(0.9), head=(-8, 10, 8), _root={"bank": -10})),
+                (0.60, _P(body=_SQ(0.88), head=(4, 0, -6), legs_F=(-16, 0, 0), legs_B=(16, 0, 0),
+                          wisp_L_01=(-20, 0, 0), wisp_L_02=(-30, 0, 0), wisp_R_01=(-20, 0, 0),
+                          wisp_R_02=(-30, 0, 0), _root={"bank": 84, "x": 0.66})),
+                (0.84, _P(body=_SQ(0.9), head=(6, 0, -8), legs_F=(-12, 0, 0), legs_B=(12, 0, 0),
+                          wisp_L_01=(-24, 0, 0), wisp_L_02=(-34, 0, 0), wisp_R_01=(-24, 0, 0),
+                          wisp_R_02=(-34, 0, 0), _root={"bank": 80, "x": 0.66})),
+                (1.0, "same")]),
+        }),
+    # Caster (spiteful ranged): smug, prim, a little sly; the floating crescent (a HOVER part: world
+    # offsets lx/ly/lz + its own spin) is the star, with its glow shell (crescent_glow, held
+    # collapsed by bird_pose.HOVER_HOLDS["caster"]: a scale key here sits 0.998 above the hold).
+    "caster": dict(
+        hover=False, planted=False, ground_lift=True, hold="caster",
+        clips={
+            # Smug and still: slow breathing, a sly head tilt, the crescent bobbing and turning
+            # slowly over its head, the tuft flicking.
+            "Idle": dict(seconds=3.0, keys=[(0.0, {}), (1.0, {})], layers=[
+                ("b", "body", "sy", 0.025, 2, 0.0), ("b", "body", "sx", -0.0125, 2, 0.0),
+                ("b", "body", "sz", -0.0125, 2, 0.0), ("b", "head", "bank", 6.0, 1, 0.0),
+                ("b", "head", "turn", 4.0, 1, 1.4), ("b", "tuft", "turn", 10.0, 2, 0.0),
+                ("b", "crescent", "lz", 0.04, 2, 0.0), ("b", "crescent", "turn", 25.0, 1, 0.0),
+                ("b", "crescent", "bank", 6.0, 1, 1.0)]),
+            # Crescent hurl: rears back with a sly squash as the crescent winds up behind its
+            # antlers, then flicks its head forward and the crescent whips out ahead of it,
+            # spinning, and swings back over its head.
+            "Attack": dict(seconds=1.2, sharp=2, keys=[
+                (0.0, {}),
+                (0.30, _P(body=_SQ(0.86), head=(10, 0, 0), crescent={"lz": 0.06, "ly": 0.18, "turn": -40},
+                          _root={"pitch": 8, "f": -0.05})),
+                (0.46, _P(body=_SQ(1.1), head=(-14, 0, 0), crescent={"lz": -0.25, "ly": -0.75, "turn": 200,
+                                                                      "pitch": -30},
+                          _root={"pitch": -12, "f": 0.12})),
+                (0.58, _P(body=_SQ(0.88), head=(-10, 0, 0), crescent={"lz": -0.28, "ly": -0.8, "turn": 300,
+                                                                      "pitch": -30},
+                          _root={"pitch": -8, "f": 0.12})),
+                (0.80, _P(body=_SQ(1.03), head=(2, 0, 0), crescent={"lz": 0.05, "ly": -0.15, "turn": 360},
+                          _root={"f": 0.04})),
+                (1.0, {"crescent": {"turn": 360}})]),
+            # Signature spell: squashes down as the crescent dips, then stretches tall and smug as
+            # the crescent RISES high over the antlers, spinning twice, and GLOWS (the glow shell
+            # swells out of it; cast_release at full glow), holds, dims and floats back down.
+            "Cast": dict(seconds=2.0, sharp=2, marker=(2, "cast_release"),
+                         layers=[("b", "crescent_glow", "sx", 0.04, 6, 0.0), ("b", "crescent_glow", "sy", 0.04, 6, 0.0),
+                                 ("b", "crescent_glow", "sz", 0.04, 6, 0.0)], keys=[
+                (0.0, {}),
+                (0.22, _P(body=_SQ(0.86), head=(-6, 0, 0), crescent={"lz": -0.06, "turn": -30})),
+                (0.46, _P(body=_SQ(1.14), head=(14, 0, 0), legs_F=(-10, 0, 0),
+                          crescent={"lz": 0.4, "turn": 380},
+                          crescent_glow={"sx": 2.098, "sy": 2.098, "sz": 2.098}, _root={"z": 0.06})),
+                (0.70, _P(body=_SQ(1.1), head=(12, 0, 0), crescent={"lz": 0.42, "turn": 700},
+                          crescent_glow={"sx": 2.098, "sy": 2.098, "sz": 2.098}, _root={"z": 0.04})),
+                (0.84, _P(body=_SQ(0.9), head=(2, 0, 0), crescent={"lz": 0.12, "turn": 720},
+                          crescent_glow={"sx": 1.018, "sy": 1.018, "sz": 1.018})),
+                (1.0, {"crescent": {"turn": 720}})]),
+            # Struck: knocked back and squashed, the face screwed up, the crescent knocked askew and
+            # dipping, then wobbling back into place.
+            "Hit": dict(seconds=0.55, sharp=1, marker=(1, "hit_react"), keys=[
+                (0.0, {}),
+                (0.25, _P(body=_SQ(0.82), head=(12, 12, 6), legs_F=(22, 0, 0), tuft=(10, 20, 0),
+                          crescent={"lz": -0.08, "ly": 0.12, "bank": 30, "pitch": 15},
+                          _root={"f": -0.12, "pitch": 12})),
+                (0.6, _P(body=_SQ(1.04), head=(4, 4, 2), crescent={"lz": 0.02, "bank": -10},
+                         _root={"f": -0.04, "pitch": 3})),
+                (1.0, {})]),
+            # Gloating: three prim little hops, the crescent orbiting once round its head, then a
+            # smug head tilt; returns exactly to rest (loops). The orbit runs front-back, between the
+            # antlers (a side-to-side one hit them).
+            "Victory": dict(seconds=2.0, layers=[("b", "legs_F", "pitch", 14.0, 3, 0.0),
+                                                 ("b", "tuft", "turn", 16.0, 3, -0.8)], keys=[
+                (0.0, {}),
+                (0.08, _P(body=_SQ(0.86))), (0.17, _P(body=_SQ(1.1), _root={"z": 0.08})),
+                (0.26, _P(body=_SQ(0.88))), (0.36, _P(body=_SQ(1.1), _root={"z": 0.09})),
+                (0.46, _P(body=_SQ(0.88))), (0.56, _P(body=_SQ(1.1), _root={"z": 0.08})),
+                (0.66, _P(body=_SQ(0.9))),
+                (0.78, _P(head=(6, 0, 12))), (0.9, _P(head=(4, 0, 8))), (1.0, {})],
+                tracks=[[(0.0, {}), (0.1, {}),
+                         (0.4, {"crescent": {"ly": -0.3, "lz": 0.1, "turn": 180}}),
+                         (0.7, {"crescent": {"ly": 0.3, "lz": 0.1, "turn": 360}}),
+                         (0.9, {"crescent": {"turn": 360}}), (1.0, {"crescent": {"turn": 360}})]]),
+            # Topples over onto its side, paws out; the crescent (a root child, so it swings over with
+            # the body) drops to the floor in front of its face (offsets measured on the settled pose).
+            "KO": dict(seconds=1.4, ko=True, impact=0.6, keys=[
+                (0.0, {}),
+                (0.22, _P(body=_SQ(0.9), head=(-8, 10, 8), crescent={"lz": 0.05, "bank": 20},
+                          _root={"bank": -10})),
+                (0.60, _P(body=_SQ(0.9), head=(4, 0, -6), legs_F=(-18, 0, 0), tuft=(0, -20, 0),
+                          crescent={"lz": -0.765, "ly": -0.65},
+                          _root={"bank": 84, "x": 0.6})),
+                (0.84, _P(body=_SQ(0.92), head=(6, 0, -8), legs_F=(-14, 0, 0), tuft=(0, -24, 0),
+                          crescent={"lz": -0.765, "ly": -0.65},
+                          _root={"bank": 80, "x": 0.6})),
+                (1.0, "same")]),
+        }),
 }
 
 
@@ -2865,6 +3115,7 @@ def build_bird_clips(creature):
         def post(c, t, spec=spec):
             if BLOB:  # v21: face/horn followers ride on the squashing ball
                 BLP.follow_squash(arm_obj)
+                BLP.hover_place(arm_obj, c)  # v23: free-floating hover parts (no-op without any)
             if BLOB and BPAR.get("ground_lift") and not spec.get("ko"):
                 BLP.ground_lift(arm_obj, mesh_obj, lambda z: BP.set_root(
                     arm_obj, FWD, (c.get(("r", "x"), 0.0), c.get(("r", "y"), 0.0), z),
