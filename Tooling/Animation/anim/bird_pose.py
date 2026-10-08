@@ -45,6 +45,11 @@ HOVER_HOLDS = {
                 ("b", "leg_BL_toe", "pitch", -80.0), ("b", "leg_BR_toe", "pitch", -80.0),
                 ("b", "wing_L_02", "flap", -35.0), ("b", "wing_R_02", "flap", -35.0),
                 ("b", "wing_L_03", "flap", -5.0), ("b", "wing_R_03", "flap", -5.0)],
+    # v23 (Caster, a blob, not a hover rig -- the same constant-channel mechanism): the crescent's
+    # glow shell is held collapsed to 0.2 % (scale channels default to 1.0; 2 % still showed as a
+    # bright dot in the crescent's empty middle in-engine); Cast keys sx/sy/sz above 1 to swell it.
+    "caster": [("b", "crescent_glow", "sx", -0.998), ("b", "crescent_glow", "sy", -0.998),
+               ("b", "crescent_glow", "sz", -0.998)],
 }
 
 

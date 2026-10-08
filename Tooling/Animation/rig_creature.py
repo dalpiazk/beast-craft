@@ -74,7 +74,9 @@ V20_TEMPLATES = {"treant": "biped_arms", "leviathan": "serpent",
                  # (the Stalker is a plain quadruped).
                  "brute": "blob", "swarmling": "blob",
                  # v22 enemies batch 2: humanoid Archer/Shaman, 6-bone swarm Stingling
-                 "archer": "biped_arms", "shaman": "biped_arms", "stingling": "blob"}
+                 "archer": "biped_arms", "shaman": "biped_arms", "stingling": "blob",
+                 # v23 enemies batch 3: the Giant, Champion and Caster are all squash-and-stretch blobs
+                 "giant": "blob", "champion": "blob", "caster": "blob"}
 TEMPLATE_NAME = args.get("template") or ("winged_quadruped" if CREATURE == "griffin" else
                                          "winged_biped" if CREATURE in BIRD_CREATURES else
                                          V20_TEMPLATES.get(CREATURE, "quadruped"))
@@ -472,6 +474,12 @@ if CREATURE != "griffin":
     if hasattr(template, "fill_unweighted"):
         report["weighting"]["unweighted_filled_from_neighbours"] = template.fill_unweighted(obj)
     print(f"ROOT WEIGHT STRIP: {root_stripped} vertex-group memberships removed from 'root'")
+
+# v23 round 2 (opt-in per landmark file, the Giant): fur clumps and claws (small closed shells) take
+# the weights of the shell they grow from -- see blob.bind_small_shells.
+if lm.get("shell_bind") and hasattr(template, "bind_small_shells"):
+    report["weighting"]["shell_bind"] = template.bind_small_shells(obj, lm["shell_bind"], to_normalized)
+    print(f"SHELL BIND: {report['weighting']['shell_bind']}")
 
 worst, avg = common.max_influences_per_vertex(obj)
 report["weighting"]["max_influences_after_cleanup"] = worst

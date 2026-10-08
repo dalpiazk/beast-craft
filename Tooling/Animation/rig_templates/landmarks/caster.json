@@ -1,0 +1,306 @@
+{
+ "body_plan": "blob: a fluffy green moss ball on two clawed front paws, a rear fur tuft, tall pink antler-feathers, a floating green crescent above the head",
+ "locomotion": "hop",
+ "body": {
+  "base": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "top": [
+   0.0,
+   0.03,
+   0.95
+  ]
+ },
+ "parts": [
+  {
+   "name": "head",
+   "parent": "root",
+   "role": "head",
+   "follow": true,
+   "head": [
+    0.1,
+    -0.2,
+    0.45
+   ],
+   "tail": [
+    0.17,
+    -0.57,
+    0.45
+   ],
+   "region": [
+    {
+     "axis": "y",
+     "hi": -0.3,
+     "ramp": 0.15
+    },
+    {
+     "axis": "z",
+     "lo": 0.18,
+     "ramp": 0.1
+    },
+    {
+     "axis": "z",
+     "hi": 0.8,
+     "ramp": 0.1
+    }
+   ]
+  },
+  {
+   "name": "legs_F",
+   "parent": "root",
+   "role": "legs_F",
+   "head": [
+    -0.02,
+    -0.05,
+    0.3
+   ],
+   "tail": [
+    -0.02,
+    -0.05,
+    0.02
+   ],
+   "feet": [
+    [
+     -0.31,
+     -0.1
+    ],
+    [
+     0.27,
+     0.0
+    ]
+   ],
+   "foot_radius": 0.16,
+   "z_full": 0.08,
+   "z_top": 0.22,
+   "snap_tail": false
+  },
+  {
+   "name": "antler_L",
+   "parent": "root",
+   "role": "antler",
+   "follow": true,
+   "rigid": true,
+   "head": [
+    -0.22,
+    -0.27,
+    0.86
+   ],
+   "tail": [
+    -0.47,
+    -0.08,
+    1.82
+   ]
+  },
+  {
+   "name": "antler_R",
+   "parent": "root",
+   "role": "antler",
+   "follow": true,
+   "rigid": true,
+   "head": [
+    0.48,
+    -0.12,
+    0.86
+   ],
+   "tail": [
+    0.62,
+    0.27,
+    1.78
+   ]
+  },
+  {
+   "name": "tuft",
+   "parent": "body",
+   "role": "tuft",
+   "head": [
+    -0.35,
+    0.28,
+    0.25
+   ],
+   "tail": [
+    -0.6,
+    0.47,
+    0.12
+   ],
+   "region": [
+    {
+     "axis": "z",
+     "hi": 0.42,
+     "ramp": 0.12
+    },
+    {
+     "axis": "x",
+     "hi": -0.3,
+     "ramp": 0.12
+    }
+   ]
+  },
+  {
+   "name": "crescent",
+   "parent": "root",
+   "role": "crescent",
+   "hover": true,
+   "snap": false,
+   "head": [
+    0.021,
+    -0.123,
+    1.345
+   ],
+   "tail": [
+    0.021,
+    -0.123,
+    1.47
+   ]
+  },
+  {
+   "name": "crescent_glow",
+   "parent": "crescent",
+   "role": "glow",
+   "snap": false,
+   "head": [
+    0.021,
+    -0.123,
+    1.345
+   ],
+   "tail": [
+    0.021,
+    -0.123,
+    1.41
+   ]
+  }
+ ],
+ "rigid_parts": [
+  {
+   "bone": "crescent",
+   "note": "the floating crescent (its own closed shell), rigid",
+   "component_seed": [
+    0.0175,
+    -0.11546,
+    1.48601
+   ],
+   "gate": {
+    "name": "crescent",
+    "grip_bones": [],
+    "grip_radius": 0.0
+   }
+  },
+  {
+   "bone": "crescent_glow",
+   "note": "the glow shell (meshfix/caster_glow.py), rigid to its own bone; gated with the crescent it wraps",
+   "component_seed": [
+    0.04377,
+    -0.11647,
+    1.5053
+   ],
+   "gate": {
+    "name": "crescent",
+    "grip_bones": [],
+    "grip_radius": 0.0
+   }
+  },
+  {
+   "bone": "antler_L",
+   "note": "left antler-feather, rigid",
+   "include": [
+    {
+     "poly": [
+      [
+       -0.25,
+       -0.28,
+       0.9
+      ],
+      [
+       -0.43,
+       -0.23,
+       1.2
+      ],
+      [
+       -0.46,
+       -0.18,
+       1.45
+      ],
+      [
+       -0.47,
+       -0.07,
+       1.86
+      ]
+     ],
+     "r": 0.12
+    }
+   ],
+   "exclude": [
+    {
+     "box": [
+      -2,
+      2,
+      -2,
+      2,
+      -1,
+      0.86
+     ]
+    }
+   ]
+  },
+  {
+   "bone": "antler_R",
+   "note": "right antler-feather, rigid",
+   "include": [
+    {
+     "poly": [
+      [
+       0.51,
+       -0.11,
+       0.9
+      ],
+      [
+       0.64,
+       0.06,
+       1.2
+      ],
+      [
+       0.66,
+       0.12,
+       1.45
+      ],
+      [
+       0.62,
+       0.28,
+       1.82
+      ]
+     ],
+     "r": 0.12
+    }
+   ],
+   "exclude": [
+    {
+     "box": [
+      -2,
+      2,
+      -2,
+      2,
+      -1,
+      0.86
+     ]
+    }
+   ]
+  }
+ ],
+ "outline_mask_zero": [
+  "crescent_glow"
+ ],
+ "spine": {
+  "head": [
+   0.1,
+   -0.2,
+   0.45
+  ],
+  "snout_tip": [
+   0.17,
+   -0.57,
+   0.45
+  ]
+ },
+ "notes": "v23 enemy (Hollow region): the Caster, ranged special, personality spiteful. A fluffy green moss ball on two brown clawed front paws (x -0.31/+0.27; one leg-pair bone) with a fur tuft behind at the left, a smug face low on the front (x ~+0.15), two tall pink antler-feathers (rigid squash followers) and a floating green crescent (its own closed shell) between them. The crescent is a HOVER part (v23): a child of root keyed from its own world-offset channels, so it bobs, rises and spins on its own; its glow shell (meshfix/caster_glow.py) has its own child bone, held collapsed except in Cast, and no ink outline (outline_mask_zero). The body is a slightly diagonal oval (the input art was a 3/4 view); the face, the paws and the crescent all face -Y, so no prep rotation."
+}

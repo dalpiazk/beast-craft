@@ -11,7 +11,8 @@ Data-driven like serpent.py: hand-placed landmarks in rig_templates/landmarks/<b
                squash never pushes the base through the ground. Never rotated by the clips (leans
                go on root), so its children only ever inherit an axis-aligned scale.
   parts        the landmark file's "parts" list, in order: {name, parent, head, tail, role,
-               follow (bool), rigid (bool), feet ([x, y] native, leg-pair regions)}. A part whose
+               follow (bool), rigid (bool), hover (bool, v23), feet ([x, y] native, leg-pair
+               regions)}. A part whose
                parent is root and has "follow": true is a SQUASH FOLLOWER: unscaled itself (rigid
                face, horns), but its location is keyed every frame so its head rides on the
                squashing ball (anim/blob_pose.follow_squash) -- the face and horns stay rigid
@@ -39,6 +40,7 @@ import mathutils
 from winged_quadruped import _native_to_normalized_fn, _snap_if_outside  # noqa: F401
 from winged_biped import fill_unweighted, dump_axes  # noqa: F401 -- re-exported
 from quadruped import force_rigid_to_bone, rigid_regions_normalized  # noqa: F401 -- re-exported
+from quadruped import smooth_weights_region  # noqa: F401 -- re-exported (v23 weight_smooth_regions)
 
 LANDMARKS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "landmarks")
 
@@ -105,6 +107,18 @@ def detect_landmarks_handplaced(obj, H, to_normalized, beast_name):
         "head_tip": head["tail"], "tail_tip": top, "notes": data.get("notes", ""),
         "locomotion": data.get("locomotion", "hop"), "max_joints": data.get("max_joints"),
         "rigid_regions": rigid_regions_normalized(data, to_normalized),
+        # v23 opt-ins (absent on the Brute/Swarmling/Stingling, so their rigs are unchanged):
+        # rig_creature.py's generic rigid_parts pass (Champion horns; Caster antlers, crescent and
+        # its glow shell), the extra outline-mask joints (the Caster's collapsed glow shell) and
+        # weight_smooth_regions.
+        "rigid_parts": data.get("rigid_parts") or [],
+        "outline_mask_zero": list(data.get("outline_mask_zero", [])),
+        # v23: Laplacian weight relax spheres (Giant paw pivots, Champion horn roots), as quadruped
+        "weight_smooth_regions": rigid_regions_normalized(
+            {"rigid_regions": [dict(r, bone="") for r in data.get("weight_smooth_regions") or []]},
+            to_normalized, keep=("iterations",)),
+        # v23 round 2 (Giant): small closed shells (fur clumps, claws) bound to the shell under them
+        "shell_bind": data.get("shell_bind"),
     }
 
 
@@ -115,10 +129,20 @@ def _forward(lm):
 def armature_props(lm):
     follow = [p["name"] for p in lm["parts"] if p.get("follow")]
     props = {"forward": list(_forward(lm)), "locomotion": lm["locomotion"], "hover_offset": 0.0,
-             "outline_mask_zero": [], "template": "blob", "squash_bone": "body",
-             "follow_squash": follow, "loc_keyed": follow}
+             "outline_mask_zero": list(lm.get("outline_mask_zero", [])), "template": "blob",
+             "squash_bone": "body", "follow_squash": follow, "loc_keyed": follow}
     if lm.get("max_joints"):
         props["max_joints"] = int(lm["max_joints"])
+    # v23 (Caster): a "hover" part floats free of the ball (the crescent over the Caster's head):
+    # a child of root, NOT a squash follower; its location is keyed every frame from its own
+    # world-offset channels lx/ly/lz (anim/blob_pose.hover_place) so it can bob and rise.
+    hover = [p["name"] for p in lm["parts"] if p.get("hover")]
+    if hover:
+        props["hover_parts"] = hover
+        props["loc_keyed"] = follow + hover
+    glow = [p["name"] for p in lm["parts"] if p.get("role") == "glow"]
+    if glow:  # v23: a collapsible glow shell (the crescent's); glb_gate checks it hides / shows
+        props["glow_parts"] = glow
     return props
 
 
@@ -254,4 +278,66 @@ def fix_blob_weights(obj, bone_roles, lm):
                 obj.vertex_groups[body].add([vi], cur + moved, "REPLACE")
             n += 1
         out["region_stripped"][p["name"]] = n
+    return out
+
+
+def bind_small_shells(obj, cfg, to_normalized=None):
+    """v23 round 2 (opt-in landmark "shell_bind", the Giant): every closed shell of at most
+    cfg["max_verts"] vertices (a fur clump, a claw) takes, on ALL its vertices, the weights of ONE
+    anchor vertex: the vertex of a larger shell nearest the closest SURFACE point (BVH) to the
+    clump's root (its vertex closest to a larger shell's surface). The largest shell (the body) is penalised by cfg["body_bias"] (native units,
+    scaled) so a clump on a modelled arm binds to the arm even where the arm sits just under the
+    body's surface. The clump then moves rigidly with the surface it grows from. Returns
+    {"shells": n, "vertices": n, "anchors": {bone of the anchor's top weight: n}}."""
+    import mathutils.kdtree as _kd
+    from common import connected_components
+    me = obj.data
+    comps = sorted(connected_components(obj), key=len, reverse=True)
+    small = [c for c in comps if len(c) <= cfg.get("max_verts", 20)]
+    large = [c for c in comps if len(c) > cfg.get("max_verts", 20)]
+    if not small or not large:
+        return {"shells": 0, "vertices": 0, "anchors": {}}
+    k = 1.0
+    if to_normalized is not None:
+        k = (to_normalized((0.0, 0.0, 1.0)) - to_normalized((0.0, 0.0, 0.0))).z
+    bias = cfg.get("body_bias", 0.05) * k
+    from mathutils.bvhtree import BVHTree
+    vcomp = {}
+    for ci, c in enumerate(large):
+        for vi in c:
+            vcomp[vi] = ci
+    trees = []
+    for ci, c in enumerate(large):
+        cset = set(c)
+        polys = [list(p.vertices) for p in me.polygons if p.vertices[0] in cset]
+        idx = {vi: i for i, vi in enumerate(c)}
+        bvh = BVHTree.FromPolygons([me.vertices[vi].co for vi in c], [[idx[v] for v in p] for p in polys])
+        kd = _kd.KDTree(len(c))
+        for vi in c:
+            kd.insert(me.vertices[vi].co, vi)
+        kd.balance()
+        trees.append((bvh, kd, bias if ci == 0 else 0.0))
+    names = {g.index: g.name for g in obj.vertex_groups}
+    out = {"shells": len(small), "vertices": 0, "anchors": {}}
+    for c in small:
+        best = None
+        for vi in c:
+            co = me.vertices[vi].co
+            for bvh, kd, b in trees:
+                hit = bvh.find_nearest(co)
+                if hit[0] is None:
+                    continue
+                d = hit[3]
+                if best is None or d + b < best[0]:
+                    best = (d + b, kd.find(hit[0])[1])
+        ai = best[1]
+        ws = [(g.group, g.weight) for g in me.vertices[ai].groups if g.weight > 0]
+        for vi in c:
+            for g in list(me.vertices[vi].groups):
+                obj.vertex_groups[g.group].remove([vi])
+            for gi, w in ws:
+                obj.vertex_groups[gi].add([vi], w, "REPLACE")
+        out["vertices"] += len(c)
+        top = names[max(ws, key=lambda x: x[1])[0]] if ws else "-"
+        out["anchors"][top] = out["anchors"].get(top, 0) + 1
     return out

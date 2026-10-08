@@ -1,0 +1,136 @@
+{
+ "body_plan": "blob: a huge, shaggy, cat-like moss-fur mound sitting on its haunches; two clawed front paws under the fur bib, the hind feet hidden in the fur (one shows at the right side), violet cape flaps at the base",
+ "locomotion": "hop",
+ "body": {
+  "base": [
+   -0.05,
+   0.0,
+   0.0
+  ],
+  "top": [
+   -0.05,
+   0.0,
+   1.55
+  ]
+ },
+ "parts": [
+  {
+   "name": "head",
+   "parent": "root",
+   "role": "head",
+   "follow": true,
+   "head": [
+    -0.15,
+    -0.2,
+    1.35
+   ],
+   "tail": [
+    -0.18,
+    -0.68,
+    1.33
+   ],
+   "region": [
+    {
+     "axis": "y",
+     "hi": -0.28,
+     "ramp": 0.2
+    },
+    {
+     "axis": "z",
+     "lo": 1.05,
+     "ramp": 0.15
+    }
+   ]
+  },
+  {
+   "name": "legs_L",
+   "parent": "root",
+   "role": "legs_L",
+   "head": [
+    -0.45,
+    -0.36,
+    0.86
+   ],
+   "tail": [
+    -0.2,
+    -0.37,
+    0.17
+   ],
+   "feet": [
+    [
+     -0.2,
+     -0.42
+    ]
+   ],
+   "foot_radius": 0.001,
+   "z_full": 0.0005,
+   "z_top": 0.001,
+   "snap": false,
+   "note": "round 2: the modelled arm (meshfix/giant_fur.py) is rigid to this bone via rigid_parts; the shoulder pivot sits inside the body so a raised paw swings up beside the head. foot_radius ~0 = no body vertex is a 'foot'"
+  },
+  {
+   "name": "legs_R",
+   "parent": "root",
+   "role": "legs_R",
+   "head": [
+    0.31,
+    -0.36,
+    0.86
+   ],
+   "tail": [
+    0.06,
+    -0.37,
+    0.17
+   ],
+   "feet": [
+    [
+     0.06,
+     -0.42
+    ]
+   ],
+   "foot_radius": 0.001,
+   "z_full": 0.0005,
+   "z_top": 0.001,
+   "snap": false,
+   "note": "round 2: the modelled arm (meshfix/giant_fur.py) is rigid to this bone via rigid_parts; the shoulder pivot sits inside the body so a raised paw swings up beside the head. foot_radius ~0 = no body vertex is a 'foot'"
+  }
+ ],
+ "spine": {
+  "head": [
+   -0.15,
+   -0.2,
+   1.35
+  ],
+  "snout_tip": [
+   -0.18,
+   -0.68,
+   1.33
+  ]
+ },
+ "notes": "v23 enemy (Hollow region): the Giant, boss (Hex7, ~2.5 hexes wide), personality cross, sleepy-grumpy. A huge mossy-fur mound sitting on its haunches with a small grumpy cat face high on the front (violet eyes, a painted cross frown -- no modelled mouth, so no jaw bone), two short clawed front paws under the fur bib (x -0.19 and +0.06; the head sits left of centre at x ~-0.17), one hind foot showing at the right side (stays on the body), violet cape flaps at the base (body). Its back was a smooth blob (Meshy only saw the front): meshfix/giant_fur.py gave it the front coat's fur (relief + painted locks). Blob rig: the ball squashes, the face rides on it as a rigid follower, each front paw is a modelled furry arm (round 2) rigid to its own leg-pair bone, pivoting at a shoulder inside the body for the stomp-shuffle, the paw swipe and the slam. Big and slow.",
+ "rigid_parts": [
+  {
+   "bone": "legs_L",
+   "note": "round 2: the modelled left arm + paw (its own closed shell), rigid",
+   "component_seed": [
+    -0.2,
+    -0.5846,
+    0.05057
+   ]
+  },
+  {
+   "bone": "legs_R",
+   "note": "round 2: the modelled right arm + paw, rigid",
+   "component_seed": [
+    0.06,
+    -0.5846,
+    0.05057
+   ]
+  }
+ ],
+ "shell_bind": {
+  "max_verts": 20,
+  "body_bias": 0.05,
+  "note": "round 2: fur clumps (11 verts) and claws (5) take the weights of the shell they grow from (blob.bind_small_shells)"
+ }
+}

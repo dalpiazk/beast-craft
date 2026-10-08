@@ -356,6 +356,57 @@ GAIT_PARAMS["stingling"] = dict(locomotion="hop", cycle_seconds=0.7, keys=(
     layers=[("r", "bank", 5.0, 1, 0.0), ("b", "legs_L", "pitch", 26.0, 1, 0.0),
             ("b", "legs_R", "pitch", -26.0, 1, 0.0), ("b", "tail_01", "turn", 9.0, 1, -0.8),
             ("b", "tail_02", "turn", 14.0, 1, -1.6), ("b", "tail_02", "bank", 6.0, 2, -1.0)])
+# v23 (enemies batch 3). Giant (cross, sleepy-grumpy, BOSS): a slow, heavy STOMP-SHUFFLE -- two
+# lumbering little hops per 2.6 s, each one heaving the whole mound off one front paw (that paw
+# swings forward in the air, the other pushes back), a long anticipation squash leaning onto the
+# planted side, a short low hang (~4 % of its height: a giant does not bounce) and a hard, deep
+# landing squash with the face lagging and settling. Keys are the FULL cycle (the paws swap).
+def _gi_hop(t0, lead, trail, side):
+    def k(t, sq, z=0.0, pitch=0.0, bank=0.0, ease="inout", **b):
+        return _hk(t0 + 0.5 * t, sq, z=z, pitch=pitch, bank=bank, ease=ease, **b)
+    L, T = lead, trail
+    return [k(0.10, 0.97, bank=1.5 * side, **{L: 0.0, T: 0.0}, head=0.0),
+            k(0.26, 0.85, pitch=-3.0, bank=4.0 * side, **{L: 0.0, T: 4.0}, head=-4.0),
+            k(0.38, 1.08, z=0.07, pitch=-2.0, bank=3.0 * side, ease="in", **{L: 18.0, T: -8.0}, head=-1.0),
+            k(0.50, 1.05, z=0.11, pitch=1.0, bank=1.0 * side, ease="out", **{L: 26.0, T: -10.0}, head=2.0),
+            k(0.60, 1.05, z=0.05, pitch=2.0, ease="in", **{L: 14.0, T: -6.0}, head=3.0),
+            k(0.66, 0.80, z=0.0, pitch=0.0, bank=-1.5 * side, ease="in", **{L: 0.0, T: 0.0}, head=-6.0),
+            k(0.82, 1.03, bank=-0.5 * side, **{L: 0.0, T: 0.0}, head=2.0)]
+
+
+GAIT_PARAMS["giant"] = dict(locomotion="hop", cycle_seconds=2.6, keys=(
+    [_hk(0.0, 1.0)] + _gi_hop(0.0, "legs_L", "legs_R", 1.0) + _gi_hop(0.5, "legs_R", "legs_L", -1.0)
+    + [_hk(1.0, 1.0)]),
+    layers=[("b", "head", "turn", 3.0, 1, 0.3), ("r", "turn", 2.0, 1, 0.0)])
+# Champion (swaggering mini-boss): a cocky STRUT -- two bouncy hops per 1.1 s, chest up (root
+# leaning back a touch), the whole body swaggering side to side (bank + turn toward each landing),
+# both leg pairs kicking in antiphase, the head held high and rolling with the swagger, the two
+# gloam wisps streaming and swaying behind with a lag down each chain.
+_CH_HOP = [_hk(0.00, 1.00, pitch=3.0), _hk(0.14, 0.86, pitch=1.0), _hk(0.28, 1.12, z=0.07, pitch=4.0, ease="in"),
+           _hk(0.42, 1.04, z=0.12, pitch=5.0, ease="out"), _hk(0.56, 1.06, z=0.05, pitch=4.0, ease="in"),
+           _hk(0.64, 0.86, z=0.0, pitch=2.0, ease="in"), _hk(0.80, 1.03, pitch=3.0), _hk(1.00, 1.00, pitch=3.0)]
+GAIT_PARAMS["champion"] = dict(locomotion="hop", cycle_seconds=1.1, keys=(
+    [(0.5 * t, p, e) for t, p, e in _CH_HOP] + [(0.5 + 0.5 * t, p, e) for t, p, e in _CH_HOP[1:]]),
+    layers=[("r", "bank", 6.0, 1, 0.0), ("r", "turn", 6.0, 1, 0.4), ("b", "legs_F", "pitch", 22.0, 2, 0.0),
+            ("b", "legs_B", "pitch", -22.0, 2, 0.0), ("b", "head", "pitch", 6.0, 0, 1.5708),
+            ("b", "head", "bank", -5.0, 1, 0.3),
+            ("b", "wisp_L_01", "turn", 8.0, 1, -0.6), ("b", "wisp_L_02", "turn", 12.0, 1, -1.4),
+            ("b", "wisp_R_01", "turn", 8.0, 1, -0.9), ("b", "wisp_R_02", "turn", 12.0, 1, -1.7),
+            ("b", "wisp_L_02", "pitch", 6.0, 2, -1.0), ("b", "wisp_R_02", "pitch", 6.0, 2, -1.3)])
+# Caster (spiteful ranged): a prim little SKITTER -- two quick, low hops per 0.9 s on its two paws,
+# a small waddle, the rear tuft flicking, while the crescent floats on behind it: it trails the hops
+# (bobbing out of phase, lagging back a little) and turns slowly. The glow shell stays collapsed
+# ("hold": bird_pose.HOVER_HOLDS["caster"]).
+_CA_HOP = [_hk(0.00, 1.00), _hk(0.12, 0.86, pitch=-3.0), _hk(0.26, 1.10, z=0.06, ease="in"),
+           _hk(0.40, 1.03, z=0.10, ease="out"), _hk(0.54, 1.05, z=0.04, pitch=2.0, ease="in"),
+           _hk(0.62, 0.86, z=0.0, pitch=2.0, ease="in"), _hk(0.80, 1.03), _hk(1.00, 1.00)]
+GAIT_PARAMS["caster"] = dict(locomotion="hop", cycle_seconds=0.9, hold="caster", keys=(
+    [(0.5 * t, p, e) for t, p, e in _CA_HOP] + [(0.5 + 0.5 * t, p, e) for t, p, e in _CA_HOP[1:]]),
+    layers=[("r", "bank", 4.0, 1, 0.0), ("b", "legs_F", "pitch", 20.0, 2, 0.0),
+            ("b", "tuft", "turn", 14.0, 2, -1.0), ("b", "tuft", "pitch", 6.0, 2, -0.5),
+            ("b", "head", "turn", 4.0, 1, 0.5),
+            ("b", "crescent", "lz", 0.05, 2, -2.2), ("b", "crescent", "ly", 0.03, 2, -1.6),
+            ("b", "crescent", "turn", 12.0, 1, 0.0), ("b", "crescent", "bank", 6.0, 2, -2.0)])
 GP = GAIT_PARAMS.get(CREATURE, GAIT_PARAMS["griffin"])
 FK_ANCHORED = GP.get("fk_anchored", False)
 if GP.get("bird"):
@@ -394,11 +445,17 @@ if GP.get("locomotion") == "hop":
     _n = int(round(CYCLE_SECONDS * FPS))
     _keys = list(GP["keys"])
 
+    # v23 (Caster): constant per-creature channels on every frame (bird_pose.HOVER_HOLDS -- the
+    # collapsed glow shell); absent on every other hop rig.
+    _hold = {("b", b, ch): v for _, b, ch, v in BP.HOVER_HOLDS.get(GP.get("hold"), [])}
+
     def _hop_chans(t):
-        return BP.add_channels(BP.sample_keys(_keys, t), BP.sines(GP.get("layers", []), t))
+        c = BP.add_channels(BP.sample_keys(_keys, t), BP.sines(GP.get("layers", []), t))
+        return BP.add_channels(c, _hold) if _hold else c
 
     def _hop_post(c, t):
         BLP.follow_squash(arm_obj)
+        BLP.hover_place(arm_obj, c)  # v23: free-floating hover parts (no-op without any)
         BLP.ground_lift(arm_obj, mesh_obj, lambda z: BP.set_root(
             arm_obj, _fwd, (c.get(("r", "x"), 0.0), c.get(("r", "y"), 0.0), z), c.get(("r", "pitch"), 0.0),
             c.get(("r", "turn"), 0.0), c.get(("r", "bank"), 0.0)), c.get(("r", "z"), 0.0))

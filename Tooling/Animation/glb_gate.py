@@ -207,10 +207,20 @@ HOP_TAIL_MIN_RANGE_DEG = {"Move": 10.0, "Idle": 5.0, "Attack": 90.0, "Cast": 20.
                           "Victory": 10.0, "KO": 5.0}
 
 
+# v23 (blob hover parts -- the Caster's floating crescent, a root child keyed by world offsets): per
+# clip, the part's head must travel at least `travel` (normalised units, H = 2) and turn at least
+# `spin` deg relative to root in the GLB. Cast is the signature rise-and-spin.
+HOVER_MIN = {"Idle": (0.03, 0.0), "Move": (0.03, 0.0), "Attack": (0.3, 180.0), "Cast": (0.3, 360.0),
+             "Hit": (0.05, 0.0), "Victory": (0.2, 180.0)}
+# ... and a glow part (a collapsed shell) must be collapsed (max scale <= GLOW_HIDDEN) in every clip
+# but Cast, and swell to >= GLOW_SHOWN in Cast.
+GLOW_HIDDEN, GLOW_SHOWN = 0.05, 0.9
+
+
 def run_gate(glb_path, truth, fps, max_ang_err_deg=2.0, max_pos_err=0.01,
              move_min_leg_range_deg=15.0, move_mode="walk", move_min_wing_range_deg=25.0,
              move_min_wave_sum_deg=30.0, max_joints=None, squash_bone="body", max_scale_err=0.01,
-             move_min_squash_span=0.15, move_min_hop=0.05):
+             move_min_squash_span=0.15, move_min_hop=0.05, hover_parts=None, glow_parts=None):
     """truth: {"rest": {bone: 4x4}, "clips": {clip: {"frame_start": f0, "frames": {f: {bone: 4x4}}}}}
     (Blender world matrices, lists). Returns (passed, report)."""
     g = GlbPose(glb_path)
@@ -232,6 +242,7 @@ def run_gate(glb_path, truth, fps, max_ang_err_deg=2.0, max_pos_err=0.01,
         worst_ang, worst_pos, worst_where = 0.0, 0.0, None
         d_g, d_t = {}, {}
         d_w = {}  # v22 round 3: GLB world matrices of the bow / bow_string bones (rigs that have them)
+        p_g = {}  # v23: GLB world head positions + world matrices of hover / glow parts
         bone_worst = {}
         for f, pose in sorted(cdat["frames"].items(), key=lambda kv: float(kv[0])):
             t = t0 + (float(f) - f0) / fps
@@ -246,6 +257,8 @@ def run_gate(glb_path, truth, fps, max_ang_err_deg=2.0, max_pos_err=0.01,
                 d_t.setdefault(b, []).append(dt)
                 if b in ("bow", "bow_string"):
                     d_w.setdefault(b, []).append(np.asarray(gw[b]))
+                if b in (hover_parts or ()) or b in (glow_parts or ()):
+                    p_g.setdefault(b, []).append(np.asarray(gw[b]))
                 if b not in bone_worst or ang > bone_worst[b][0]:
                     bone_worst[b] = (round(ang, 2), round(pos, 4), f)
                 if ang > worst_ang:
@@ -395,6 +408,35 @@ def run_gate(glb_path, truth, fps, max_ang_err_deg=2.0, max_pos_err=0.01,
             if trav < need:
                 report["failures"].append(f"{clip}: bow string nock travel {trav:.3f} < {need} in the GLB "
                                           f"(string not drawn)")
+        for b in hover_parts or ():
+            if b not in p_g:
+                continue
+            hz = [m[:3, 3] for m in p_g[b]]
+            trav = max(float(np.linalg.norm(h - hz[0])) for h in hz)
+            spin = 0.0
+            if "root" in d_g and b in d_g:
+                rel = [d_g["root"][k].T @ d_g[b][k] for k in range(len(d_g[b]))]
+                spin = max(_rot_angle(m @ rel[0].T) for m in rel)
+            # a full turn returns to the start: also count the summed per-step turning
+            if "root" in d_g and b in d_g and len(d_g[b]) > 1:
+                rel = [d_g["root"][k].T @ d_g[b][k] for k in range(len(d_g[b]))]
+                spin = max(spin, sum(_rot_angle(rel[k + 1] @ rel[k].T) for k in range(len(rel) - 1)))
+            need_t, need_s = HOVER_MIN.get(clip, (0.0, 0.0))
+            report.setdefault("hover", {}).setdefault(clip, {})[b] = {"travel": round(trav, 4),
+                                                                       "spin_deg": round(spin, 1)}
+            if trav < need_t or spin < need_s:
+                report["failures"].append(f"{clip}: hover part {b} travel {trav:.3f} (need {need_t}) / "
+                                          f"spin {spin:.0f} deg (need {need_s}) in the GLB")
+        for b in glow_parts or ():
+            if b not in p_g:
+                continue
+            sc = [float(np.linalg.norm((m[:3, :3] @ np.linalg.inv(g_rest[b][:3, :3]))[:, 0])) for m in p_g[b]]
+            report.setdefault("glow", {})[clip] = {b: [round(min(sc), 4), round(max(sc), 4)]}
+            if clip == "Cast" and max(sc) < GLOW_SHOWN:
+                report["failures"].append(f"Cast: glow part {b} peaks at scale {max(sc):.3f} < {GLOW_SHOWN} in the GLB")
+            if clip != "Cast" and max(sc) > GLOW_HIDDEN:
+                report["failures"].append(f"{clip}: glow part {b} reaches scale {max(sc):.3f} > {GLOW_HIDDEN} "
+                                          f"(should stay collapsed) in the GLB")
         report["clips"][clip] = {"max_rot_err_deg": round(worst_ang, 3),
                                  "max_pos_err": round(worst_pos, 5),
                                  "worst_at": worst_where,
@@ -411,7 +453,8 @@ if __name__ == "__main__":
                            "frames": {float(f): p for f, p in d["frames"].items()}}
                        for c, d in _truth["clips"].items()}
     ok, rep = run_gate(sys.argv[1], _truth, _truth.get("fps", 24),
-                       move_mode=_truth.get("move_mode", "walk"), max_joints=_truth.get("max_joints"))
+                       move_mode=_truth.get("move_mode", "walk"), max_joints=_truth.get("max_joints"),
+                       hover_parts=_truth.get("hover_parts"), glow_parts=_truth.get("glow_parts"))
     for c, r in rep["clips"].items():
         print(f"{c:8s} max_rot_err={r['max_rot_err_deg']:7.2f} deg  max_pos_err={r['max_pos_err']:.4f}")
     if "joints" in rep:
@@ -424,6 +467,10 @@ if __name__ == "__main__":
         print(f"{c:8s} tail range sum deg {tsum}")
     for c, a in rep.get("arms", {}).items():
         print(f"{c:8s} arm shoulder+elbow LOCAL range deg {a}")
+    for c, h in rep.get("hover", {}).items():
+        print(f"{c:8s} hover parts {h}")
+    for c, h in rep.get("glow", {}).items():
+        print(f"{c:8s} glow parts scale range {h}")
     print("PASS" if ok else "FAIL:")
     for x in rep["failures"]:
         print("  " + x)

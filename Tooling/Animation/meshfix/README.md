@@ -79,3 +79,33 @@ separate closed shells; the rig's `rigid_parts` weights them. Deterministic.
   per arm. Writes `arms_report.json` (socket, cap, elbow, wrist and fist-tip points for the landmarks).
   `blender -b --python meshfix/archer_arms.py -- meshfix/archer_arms_cfg.json SURGERY.glb OUT_DIR`,
   then `archer_bow.py` on its output.
+
+## giant_fur.py (v23, enemies batch 3)
+
+```
+blender -b --python meshfix/giant_fur.py -- GIANT_PREPPED.glb OUT_DIR [BODY_TARGET_TRIS]
+```
+
+The Giant's back (Meshy saw only the front) gets the front coat's fur: relief measured against a
+Taubin-smoothed copy and the coat's painted texels, mapped onto the back by azimuth (same side, the
+coat's lit half for both flanks) and height, varied by noise; the back is subdivided once, displaced and
+the whole mesh decimated back to 15900 tris. Also cleans the 3 non-manifold edges. One watertight body
+shell plus a small closed cheek lock; deterministic. Writes `giant_prepped.glb`, the .blend and
+`fur_report.json`. The docstring has the region and mapping numbers.
+
+Round 2 (lead review): the back is now real geometry -- ~265 closed fur-lock shells hugging the back,
+flanks and crown, two modelled furry arms with ivory claws replacing the Meshy paws, and a fur palette
+painted into a free atlas block (the back and paw stubs blend into the coat, no hard crown edge). The
+body is decimated to 11000 tris; 16548 tris in total. See the docstring's round 2 section.
+
+## caster_glow.py (v23)
+
+```
+blender -b --python meshfix/caster_glow.py -- CASTER_PREPPED.glb OUT_DIR [INFLATE]
+```
+
+Adds a glow shell round the Caster's floating crescent (its own closed shell): a copy pushed out INFLATE
+(0.02) along its normals, every corner on one pale-lime texel painted into an unused 8 px atlas cell,
+corner normals all straight up so Live3D's toon pass lights it in the highlight band. The rig collapses
+it (its own bone) except in Cast. 8142 tris; deterministic. Writes `glow_report.json` with the crescent
+and glow component-seed vertices the landmark file uses.
