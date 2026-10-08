@@ -112,6 +112,15 @@
     <None Include="Content\model\shaman_anim_events.json" Link="Content\model\shaman_anim_events.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Content\model\stingling_anim.glb" Link="Content\model\stingling_anim.glb" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Content\model\stingling_anim_events.json" Link="Content\model\stingling_anim_events.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- v23, enemies batch 3 (Tooling/Animation/README.md): the Giant (boss, a furred back from
+         meshfix/giant_fur.py), the Champion (mini-boss) and the Caster (its floating crescent is a
+         hover part with a glow shell, meshfix/caster_glow.py), all blob rigs. -->
+    <None Include="Content\model\giant_anim.glb" Link="Content\model\giant_anim.glb" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\model\giant_anim_events.json" Link="Content\model\giant_anim_events.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\model\champion_anim.glb" Link="Content\model\champion_anim.glb" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\model\champion_anim_events.json" Link="Content\model\champion_anim_events.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\model\caster_anim.glb" Link="Content\model\caster_anim.glb" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\model\caster_anim_events.json" Link="Content\model\caster_anim_events.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
